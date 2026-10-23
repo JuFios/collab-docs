@@ -105,13 +105,13 @@ services:
       timeout: 3s
       retries: 10
 
-  # One-shot placeholder; will run `prisma migrate deploy` (and the dev seed) once the schema exists.
+  # One-shot job: applies migrations, then seeds demo data when APP_ENV=dev (the seed skips other environments).
   migrate:
-    build: *api-build
-    image: collab-docs/api:local
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
     restart: 'no'
     environment: *app-env
-    command: ['node', '-e', "console.log('migrate: no migrations yet')"]
     depends_on:
       postgres:
         condition: service_healthy

@@ -58,6 +58,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm test:integration
+      - name: Migrations apply and match schema.prisma
+        run: |
+          pnpm --filter @collab-docs/db db:deploy
+          pnpm --filter @collab-docs/db db:drift
 
   docker-build:
     runs-on: ubuntu-latest
@@ -74,6 +78,9 @@ jobs:
           - name: collab
             context: .
             file: apps/collab/Dockerfile
+          - name: migrate
+            context: .
+            file: packages/db/Dockerfile
           - name: minio
             context: docker/minio
             file: docker/minio/Dockerfile

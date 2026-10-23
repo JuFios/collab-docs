@@ -1,0 +1,4 @@
+{
+  "jsc": { "target": "es2022", "parser": { "syntax": "typescript" }, "keepClassNames": true },
+  "module": { "type": "commonjs" }
+}
