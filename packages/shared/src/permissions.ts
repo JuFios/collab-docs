@@ -148,10 +148,13 @@ export interface MemberRemoval {
 
 /** Removal: anyone may leave (except the last Owner); removing others needs ADMIN+, and an Admin cannot remove an Owner. */
 export function checkMemberRemoval(removal: MemberRemoval): MemberRuleViolation | null {
+  if (!removal.self) {
+    if (!roleAtLeast(removal.actorRole, 'ADMIN')) return 'ACTOR_NOT_PERMITTED';
+    if (removal.targetRole === 'OWNER' && removal.actorRole !== 'OWNER') {
+      return 'CANNOT_MODIFY_OWNER';
+    }
+  }
   if (removal.targetRole === 'OWNER' && removal.targetIsLastOwner) return 'LAST_OWNER';
-  if (removal.self) return null;
-  if (!roleAtLeast(removal.actorRole, 'ADMIN')) return 'ACTOR_NOT_PERMITTED';
-  if (removal.targetRole === 'OWNER' && removal.actorRole !== 'OWNER') return 'CANNOT_MODIFY_OWNER';
   return null;
 }
 
