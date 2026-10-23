@@ -229,6 +229,40 @@ describe('auth', () => {
     });
   });
 
+  describe('GET /auth/refresh (browser navigation)', () => {
+    const navigate = (token: string | undefined, next?: string) => {
+      const req = http()
+        .get('/api/auth/refresh')
+        .query(next === undefined ? {} : { next });
+      return token ? req.set('Cookie', `${REFRESH_COOKIE}=${token}`) : req;
+    };
+
+    it('rotates the session and redirects to the requested path', async () => {
+      const { refresh } = await register();
+      const response = await navigate(refresh, '/w/abc?x=1').expect(302);
+      expect(response.headers.location).toBe('/w/abc?x=1');
+      expect(cookiesOf(response)[ACCESS_COOKIE]).toBeDefined();
+      expect(cookiesOf(response)[REFRESH_COOKIE]).toBeDefined();
+    });
+
+    it.each(['https://evil.example', '//evil.example', '/\\evil.example', undefined])(
+      'never redirects to an unsafe target (%s)',
+      async (next) => {
+        const { refresh } = await register();
+        const response = await navigate(refresh, next).expect(302);
+        expect(response.headers.location).toBe('/w');
+      },
+    );
+
+    it('sends the browser to the login page and clears cookies when the session is gone', async () => {
+      const response = await navigate('unknown-token', '/w/abc').expect(302);
+      expect(response.headers.location).toBe('/login?next=%2Fw%2Fabc');
+      expect(cookiesOf(response)[REFRESH_COOKIE]).toContain('Expires=Thu, 01 Jan 1970');
+      const missing = await navigate(undefined, '/shared').expect(302);
+      expect(missing.headers.location).toBe('/login?next=%2Fshared');
+    });
+  });
+
   describe('refresh rotation', () => {
     it('serves two parallel refreshes with the same token and keeps the family alive', async () => {
       const { refresh } = await register();
