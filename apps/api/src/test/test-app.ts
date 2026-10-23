@@ -67,9 +67,10 @@ export class TestController {
 
 export async function createTestApp(
   extra: Type[] = [TestController],
+  imports: Type[] = [],
 ): Promise<NestExpressApplication> {
   const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
+    imports: [AppModule, ...imports],
     controllers: extra,
   }).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
