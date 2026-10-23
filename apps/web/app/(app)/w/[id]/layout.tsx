@@ -35,7 +35,7 @@ export default async function WorkspaceLayout({
   const [user, initialTree] = await Promise.all([getCurrentUser(), treeRequest]);
   return (
     <WorkspaceProvider workspaceId={workspace.id} role={workspace.role} initialTree={initialTree}>
-      <div className="grid gap-6 md:grid-cols-[17rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[17rem_minmax(0,1fr)]">
         <WorkspaceSidebar />
         <div className="grid min-w-0 content-start gap-6">
           <header className="grid gap-3">
