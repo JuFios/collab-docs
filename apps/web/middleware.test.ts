@@ -35,6 +35,23 @@ describe('middleware', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
+  it('remembers the workspace being viewed and does not rewrite an unchanged cookie', async () => {
+    const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
+    const id = '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
+    const first = await middleware(request(`/w/${id}/settings`, `cd_at=${token}`));
+    expect(first.cookies.get('cd_ws')).toMatchObject({
+      value: id,
+      httpOnly: true,
+      sameSite: 'lax',
+    });
+
+    const again = await middleware(request(`/w/${id}`, `cd_at=${token}; cd_ws=${id}`));
+    expect(again.cookies.get('cd_ws')).toBeUndefined();
+
+    const elsewhere = await middleware(request('/w', `cd_at=${token}`));
+    expect(elsewhere.cookies.get('cd_ws')).toBeUndefined();
+  });
+
   it('sends expired sessions through the api refresh endpoint', async () => {
     const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d', {
       now: new Date(Date.now() - 3_600_000),

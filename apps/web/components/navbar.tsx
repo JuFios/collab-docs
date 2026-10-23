@@ -1,11 +1,17 @@
-import type { AuthUser } from '@collab-docs/shared';
-import { ChevronDown } from 'lucide-react';
+import type { AuthUser, Workspace } from '@collab-docs/shared';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
+import { WorkspaceSwitcher } from '@/components/workspaces/workspace-switcher';
 
-/** Server Component shell; the user menu is the only client island. */
-export function Navbar({ user }: { user: AuthUser }) {
+/** Server Component shell; the switcher and the user menu are the only client islands. */
+export function Navbar({
+  user,
+  workspaces,
+}: {
+  user: AuthUser;
+  /** `null` when the list could not be loaded; the rest of the page still works. */
+  workspaces: readonly Workspace[] | null;
+}) {
   return (
     <header className="border-b bg-background">
       <nav
@@ -16,10 +22,7 @@ export function Navbar({ user }: { user: AuthUser }) {
           <Link href="/w" className="font-semibold">
             Collab Docs
           </Link>
-          {/* workspace switcher: filled in with the workspace screens */}
-          <Button variant="ghost" size="sm" disabled aria-label="Workspace switcher (coming soon)">
-            Workspaces <ChevronDown className="h-3 w-3" aria-hidden />
-          </Button>
+          {workspaces ? <WorkspaceSwitcher workspaces={workspaces} /> : null}
         </div>
         <UserMenu user={user} />
       </nav>
