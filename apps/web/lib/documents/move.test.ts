@@ -1,6 +1,6 @@
 import type { TreeNode } from '@collab-docs/shared';
 import { describe, expect, it } from 'vitest';
-import { applyMove, locateDrop, planDrop, planKeyboardMove } from './move';
+import { applyMove, locateDrop, planDrop, planKeyboardMove, pointerYOf } from './move';
 import { flattenVisible } from './tree';
 
 function id(n: number): string {
@@ -52,6 +52,14 @@ describe('locateDrop', () => {
   it('finds nothing outside the rows', () => {
     expect(locateDrop(rects, -3)).toBeNull();
     expect(locateDrop(rects, 200)).toBeNull();
+  });
+});
+
+describe('pointerYOf', () => {
+  it('prefers the position the event is about to apply over the stored one', () => {
+    expect(pointerYOf({ currentY: 10, to: { y: 42 } })).toBe(42);
+    expect(pointerYOf({ currentY: 10, by: { y: 5 } })).toBe(15);
+    expect(pointerYOf({ currentY: 10 })).toBe(10);
   });
 });
 

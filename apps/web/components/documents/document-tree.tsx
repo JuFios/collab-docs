@@ -14,6 +14,7 @@ import {
   type MovePlan,
   type RowRect,
   locateDrop,
+  pointerYOf,
   planDrop,
   planKeyboardMove,
 } from '@/lib/documents/move';
@@ -254,7 +255,9 @@ export function DocumentTree() {
       {header}
       {rows.length === 0 ? (
         <div className="grid gap-2 px-2 py-6 text-center text-sm text-muted-foreground">
-          <p>{canCreate ? 'No documents yet.' : 'Nothing has been shared with you here yet.'}</p>
+          <p>
+            {canCreate ? 'The workspace is empty.' : 'Nothing has been shared with you here yet.'}
+          </p>
           {canCreate ? (
             <Button
               variant="outline"
@@ -273,7 +276,14 @@ export function DocumentTree() {
           onDragMove={(event) => {
             const source = event.operation.source;
             if (!source) return;
-            updateDropTarget(String(source.id), event.operation.position.current.y);
+            updateDropTarget(
+              String(source.id),
+              pointerYOf({
+                currentY: event.operation.position.current.y,
+                to: event.to,
+                by: event.by,
+              }),
+            );
           }}
           onDragEnd={(event) => {
             const source = event.operation.source;

@@ -185,7 +185,7 @@ describe('DocumentTree', () => {
 
   it('shows an empty state with a create button for editors only', () => {
     const { unmount } = renderTree([]);
-    expect(screen.getByText('No documents yet.')).toBeInTheDocument();
+    expect(screen.getByText('The workspace is empty.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create the first document' })).toBeInTheDocument();
     unmount();
     renderTree([], 'VIEWER');

@@ -15,6 +15,18 @@ export type KeyboardMove = 'up' | 'down' | 'indent' | 'outdent';
 /** Fraction of a row's height, from the top and from the bottom, that means "before" and "after". */
 export const EDGE_ZONE_RATIO = 0.25;
 
+/**
+ * Pointer y for a `dragmove` event. The event is dispatched before the drag operation stores the new position, so
+ * `operation.position.current` is one move behind; the event's own `to`/`by` carry the position being applied.
+ */
+export function pointerYOf(move: {
+  currentY: number;
+  to?: { y: number };
+  by?: { y: number };
+}): number {
+  return move.to?.y ?? move.currentY + (move.by?.y ?? 0);
+}
+
 export interface RowRect {
   id: string;
   top: number;
