@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const data = vi.hoisted(() => ({
-  getWorkspace: vi.fn(),
+  requireWorkspace: vi.fn(),
   getCurrentUser: vi.fn(),
   getMembers: vi.fn(),
   getInvites: vi.fn(),
@@ -33,7 +33,7 @@ describe('settings page', () => {
   it.each(['EDITOR', 'VIEWER'])(
     'shows the forbidden state to a %s without loading admin data',
     async (role) => {
-      data.getWorkspace.mockResolvedValue(workspace(role));
+      data.requireWorkspace.mockResolvedValue(workspace(role));
       render(await SettingsPage({ params }));
       expect(screen.getByText('Access denied')).toBeInTheDocument();
       expect(data.getMembers).not.toHaveBeenCalled();

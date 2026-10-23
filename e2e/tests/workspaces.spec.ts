@@ -26,8 +26,9 @@ async function createWorkspace(page: Page, name: string): Promise<string> {
 
 async function invite(page: Page, workspaceId: string, email: string, role = 'Editor') {
   await page.goto(`/w/${workspaceId}/settings`);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Role', { exact: true }).selectOption({ label: role });
+  // role queries skip the hidden copy that streaming leaves in the DOM until the boundary is revealed
+  await page.getByRole('textbox', { name: 'Email' }).fill(email);
+  await page.getByRole('combobox', { name: 'Role' }).selectOption({ label: role });
   await page.getByRole('button', { name: 'Send invitation' }).click();
 }
 
@@ -170,13 +171,13 @@ test.describe('workspaces', () => {
     await expect(list).toContainText('nobody@example.test');
     await owner.getByRole('button', { name: 'Revoke invitation for nobody@example.test' }).click();
     await expect(list).toHaveCount(0);
-    await expect(owner.getByText('No pending invitations')).toBeVisible();
+    await expect(owner.getByText('No pending invitations').first()).toBeVisible();
   });
 
   test('renaming the workspace updates the header', async ({ signedInPage: owner }) => {
     const workspaceId = await createWorkspace(owner, 'Old name');
     await owner.goto(`/w/${workspaceId}/settings`);
-    const input = owner.getByLabel('Workspace name');
+    const input = owner.getByRole('textbox', { name: 'Workspace name' });
     await input.fill('New name');
     await owner.getByRole('button', { name: 'Save' }).click();
     await expect(owner.getByRole('heading', { name: 'New name', level: 1 })).toBeVisible();
@@ -201,7 +202,7 @@ test.describe('workspaces', () => {
     await expect(alert).toContainText('The Free plan allows 3 members');
     await expect(alert).toContainText('pending invitations count too');
     // what was typed stays in the form
-    await expect(owner.getByLabel('Email')).toHaveValue('three@example.test');
+    await expect(owner.getByRole('textbox', { name: 'Email' })).toHaveValue('three@example.test');
   });
 
   test('members without admin rights cannot open settings, and strangers get a not-found page', async ({
@@ -225,7 +226,7 @@ test.describe('workspaces', () => {
     await expect(viewerPage).toHaveURL(new RegExp(`/w/${workspaceId}$`));
 
     await viewerPage.goto(`/w/${workspaceId}/settings`);
-    await expect(viewerPage.getByText('Access denied')).toBeVisible();
+    await expect(viewerPage.getByRole('heading', { name: 'Access denied' })).toBeVisible();
 
     const outsider = await signedIn(browser, baseURL, stranger);
     await outsider.goto(`/w/${workspaceId}`);

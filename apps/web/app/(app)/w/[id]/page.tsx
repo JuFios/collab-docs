@@ -8,7 +8,7 @@ import {
   UsageBlock,
 } from '@/components/dashboard/blocks';
 import { DashboardBlock } from '@/components/dashboard/dashboard-block';
-import { getWorkspace } from '@/lib/workspaces/data';
+import { requireWorkspace } from '@/lib/workspaces/data';
 
 export const metadata: Metadata = { title: 'Overview · Collab Docs' };
 
@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: 'Overview · Collab Docs' };
  */
 export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const workspace = await getWorkspace(id);
+  const workspace = await requireWorkspace(id);
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <DashboardBlock title="Recent documents" loadingLabel="Loading recent documents" rows={4}>
