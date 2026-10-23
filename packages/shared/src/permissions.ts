@@ -81,6 +81,11 @@ export function canRestoreDocument(role: WorkspaceRole | null, isAuthor: boolean
   return role === 'EDITOR' && isAuthor;
 }
 
+/** Visibility and sharing: MANAGE, or EDIT for the document's author. */
+export function canManageDocument(access: Access, isAuthor: boolean): boolean {
+  return access === 'MANAGE' || (isAuthor && accessAtLeast(access, 'EDIT'));
+}
+
 /** Creating: role EDITOR+ in the workspace and EDIT on the parent (when there is one). */
 export function canCreateDocument(
   role: WorkspaceRole | null,
@@ -161,4 +166,14 @@ export function checkMemberRemoval(removal: MemberRemoval): MemberRuleViolation 
 /** Invites may be created for any role except OWNER. */
 export function canInviteWithRole(role: WorkspaceRole): boolean {
   return role !== 'OWNER';
+}
+
+/** True when moving `documentId` under `newParentId` would put it inside its own subtree. `ancestors` = ids from the new parent up to the root. */
+export function createsCycle(
+  documentId: string,
+  newParentId: string | null,
+  ancestors: readonly string[],
+): boolean {
+  if (newParentId === null) return false;
+  return newParentId === documentId || ancestors.includes(documentId);
 }
