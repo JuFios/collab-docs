@@ -11,6 +11,7 @@ import {
   getCorrelationId,
 } from '@collab-docs/shared/nest';
 import { AppModule } from '../app.module';
+import { Public } from '../auth';
 import { configureApp } from '../bootstrap';
 
 class CreateThingDto {
@@ -19,6 +20,7 @@ class CreateThingDto {
   name!: string;
 }
 
+@Public()
 @Controller('test')
 export class TestController {
   @Get('ok')

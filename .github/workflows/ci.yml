@@ -57,15 +57,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - name: Migrations apply and match schema.prisma
+        run: |
+          pnpm --filter @collab-docs/db db:deploy
+          pnpm --filter @collab-docs/db db:drift
       - run: pnpm test:integration
       - name: OpenAPI document is up to date
         run: |
           pnpm --filter @collab-docs/api openapi:export
           git diff --exit-code docs/openapi.json
-      - name: Migrations apply and match schema.prisma
-        run: |
-          pnpm --filter @collab-docs/db db:deploy
-          pnpm --filter @collab-docs/db db:drift
 
   docker-build:
     runs-on: ubuntu-latest

@@ -14,15 +14,18 @@ import { getRootLogger } from './logger';
 export class AppException extends HttpException {
   readonly code: ErrorCode;
   readonly details?: unknown;
+  /** Extra response headers (e.g. `Retry-After`). */
+  readonly headers: Record<string, string>;
 
   constructor(
     code: ErrorCode,
     message: string,
-    options: { status?: number; details?: unknown } = {},
+    options: { status?: number; details?: unknown; headers?: Record<string, string> } = {},
   ) {
     super({ code, message, details: options.details }, options.status ?? ERROR_STATUS[code]);
     this.code = code;
     this.details = options.details;
+    this.headers = options.headers ?? {};
   }
 }
 
@@ -163,6 +166,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
     if (response.headersSent) return;
+    if (exception instanceof AppException) response.set(exception.headers);
     response.status(body.statusCode).json(body);
   }
 }

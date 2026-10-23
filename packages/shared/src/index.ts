@@ -1,5 +1,6 @@
 export * from './errors';
 export * from './pagination';
+export * from './auth';
 
 import { SignJWT, jwtVerify } from 'jose';
 
