@@ -1,14 +1,15 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { loadConfigOrExit } from '@collab-docs/shared/nest';
-import { AppModule } from './app.module';
+import { PinoAppLogger, loadConfigOrExit, setCurrentConfig } from '@collab-docs/shared/nest';
+import { WorkerModule } from './worker.module';
 
-// Placeholder worker process: queue processors (search-sync, mail, ...) are registered here later.
+// Queue processors (search-sync, mail, ...) are registered by their stage modules in WorkerModule.
 async function bootstrap(): Promise<void> {
-  loadConfigOrExit();
-  const app = await NestFactory.createApplicationContext(AppModule);
+  setCurrentConfig(loadConfigOrExit());
+  const app = await NestFactory.createApplicationContext(WorkerModule, { bufferLogs: true });
+  app.useLogger(app.get(PinoAppLogger));
   app.enableShutdownHooks();
-  // Nothing holds the event loop open until processors exist; keep the process alive.
+  // Until processors exist nothing holds the event loop open; keep the process alive.
   setInterval(() => undefined, 60_000);
 }
 

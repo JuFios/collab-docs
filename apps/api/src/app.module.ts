@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { HealthController } from './health.controller';
+import { PlatformModule } from '@collab-docs/shared/nest';
+import { PrismaModule } from './prisma/prisma.module';
 
-@Module({ controllers: [HealthController] })
+@Module({ imports: [PlatformModule.forRoot(), PrismaModule] })
 export class AppModule {}
