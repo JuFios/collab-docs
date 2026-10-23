@@ -12,7 +12,7 @@ describe('toErrorResponse', () => {
       new AppException('PLAN_LIMIT_EXCEEDED', 'Limit reached', { details: { limit: 3 } }),
     );
     expect(body).toEqual({
-      statusCode: 402,
+      statusCode: 403,
       code: 'PLAN_LIMIT_EXCEEDED',
       message: 'Limit reached',
       details: { limit: 3 },

@@ -18,3 +18,6 @@ export async function jwtRoundTrip(subject: string): Promise<string | undefined>
   const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
   return payload.sub;
 }
+export * from './plans';
+export * from './permissions';
+export * from './realtime-events';
