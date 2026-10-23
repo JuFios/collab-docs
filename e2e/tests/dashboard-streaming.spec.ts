@@ -18,11 +18,6 @@ test('the dashboard streams: skeletons are flushed before the blocks have their 
   });
   expect(created.status()).toBe(201);
   const { id } = (await created.json()) as { id: string };
-  const doc = await page.request.post(`/api/workspaces/${id}/documents`, {
-    data: { title: 'Streamed document' },
-    headers,
-  });
-  expect(doc.status()).toBe(201);
 
   const cookie = (await page.context().cookies())
     .map((entry) => `${entry.name}=${entry.value}`)
@@ -37,6 +32,9 @@ test('the dashboard streams: skeletons are flushed before the blocks have their 
   let skeletonAt: number | undefined;
   let dataAt: number | undefined;
   let dataInFirstFlush = false;
+  // The usage block's meter text. The document tree in the sidebar is rendered with the layout, so a document title
+  // would be in the first flush too and would say nothing about the blocks.
+  const marker = 'aria-valuetext="1 of 3"';
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -44,13 +42,13 @@ test('the dashboard streams: skeletons are flushed before the blocks have their 
     const elapsed = Date.now() - startedAt;
     if (skeletonAt === undefined && received.includes('Loading recent documents')) {
       skeletonAt = elapsed;
-      dataInFirstFlush = received.includes('Streamed document');
+      dataInFirstFlush = received.includes(marker);
     }
-    if (dataAt === undefined && received.includes('Streamed document')) dataAt = elapsed;
+    if (dataAt === undefined && received.includes(marker)) dataAt = elapsed;
   }
 
   expect(skeletonAt, 'the skeleton of the recent-documents block is in the response').toBeDefined();
-  expect(dataAt, 'the document title arrives in the same response').toBeDefined();
+  expect(dataAt, 'the usage data arrives in the same response').toBeDefined();
   // every block shows its own skeleton...
   for (const label of ['Loading members', 'Loading plan and usage', 'Loading shared documents']) {
     expect(received).toContain(label);
