@@ -2,8 +2,51 @@
   "name": "@collab-docs/db",
   "version": "0.0.0",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "scripts": {
-    "typecheck": "tsc --noEmit"
-  }
+    "generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "db:drift": "prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
+    "test": "echo 'no unit tests'",
+    "test:integration": "jest"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@node-rs/argon2": "2.2.2",
+    "@swc/core": "1.16.20",
+    "@swc/jest": "0.2.39",
+    "@types/jest": "30.0.0",
+    "@types/pg": "8.23.1",
+    "dotenv": "18.0.9",
+    "jest": "30.5.2",
+    "prisma": "7.10.1",
+    "tsx": "4.23.15"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "prisma",
+    "prisma.config.ts"
+  ]
 }

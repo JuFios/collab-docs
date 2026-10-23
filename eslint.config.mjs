@@ -16,7 +16,13 @@ const webConfigs = compat
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/.next/**', '**/coverage/**', '**/next-env.d.ts'],
+    ignores: [
+      '**/dist/**',
+      '**/src/generated/**',
+      '**/.next/**',
+      '**/coverage/**',
+      '**/next-env.d.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
