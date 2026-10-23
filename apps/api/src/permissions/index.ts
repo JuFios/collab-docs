@@ -1,4 +1,14 @@
 export { PermissionsModule } from './permissions.module';
-export { PermissionsService, notFound, type DocumentAccessResult } from './permissions.service';
+export {
+  PermissionsService,
+  notFound,
+  type Db,
+  type DocumentAccessResult,
+} from './permissions.service';
 export { PermEventsService } from './perm-events.service';
-export { DocumentAccess, WorkspaceRole, workspaceRoleOf } from './permissions.decorators';
+export {
+  DocumentAccess,
+  WorkspaceRole,
+  documentAccessOf,
+  workspaceRoleOf,
+} from './permissions.decorators';

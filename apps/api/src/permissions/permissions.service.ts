@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { PrismaClient } from '@collab-docs/db';
+import { Prisma, PrismaClient } from '@collab-docs/db';
 import {
   type Access,
   type Decision,
+  type ShareRole,
   type DocumentVisibility,
   type WorkspaceRole,
   decideDocumentAccess,
@@ -15,6 +16,8 @@ export interface DocumentAccessResult {
   access: Access;
   /** The caller's role in the document's workspace; `null` for guests. */
   workspaceRole: WorkspaceRole | null;
+  /** The caller's explicit share on the document, if any. */
+  shareRole: ShareRole | null;
   document: {
     id: string;
     workspaceId: string;
@@ -23,6 +26,9 @@ export interface DocumentAccessResult {
     deletedAt: Date | null;
   };
 }
+
+/** Either the client or an open transaction, so callers can re-check permissions inside their transaction. */
+export type Db = PrismaClient | Prisma.TransactionClient;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -68,9 +74,10 @@ export class PermissionsService {
   async getDocumentAccess(
     userId: string,
     documentId: string,
+    db: Db = this.prisma,
   ): Promise<DocumentAccessResult | null> {
     if (!UUID.test(documentId)) return null;
-    const document = await this.prisma.document.findUnique({
+    const document = await db.document.findUnique({
       where: { id: documentId },
       select: {
         id: true,
@@ -82,11 +89,11 @@ export class PermissionsService {
     });
     if (!document) return null;
     const [member, share] = await Promise.all([
-      this.prisma.workspaceMember.findUnique({
+      db.workspaceMember.findUnique({
         where: { workspaceId_userId: { workspaceId: document.workspaceId, userId } },
         select: { role: true },
       }),
-      this.prisma.documentShare.findUnique({
+      db.documentShare.findUnique({
         where: { documentId_userId: { documentId, userId } },
         select: { role: true },
       }),
@@ -98,7 +105,7 @@ export class PermissionsService {
       shareRole: share?.role ?? null,
       visibility: document.visibility,
     });
-    return { access, workspaceRole, document };
+    return { access, workspaceRole, shareRole: share?.role ?? null, document };
   }
 
   /** Throws 404 when the caller has no access at all (or the document does not exist) and 403 below `min`. */
@@ -106,8 +113,9 @@ export class PermissionsService {
     userId: string,
     documentId: string,
     min: Access,
+    db: Db = this.prisma,
   ): Promise<DocumentAccessResult> {
-    const result = await this.getDocumentAccess(userId, documentId);
+    const result = await this.getDocumentAccess(userId, documentId, db);
     raise(decideDocumentAccess(result?.access ?? 'NONE', min), 'Document');
     return result as DocumentAccessResult;
   }

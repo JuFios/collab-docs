@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
-import { PERM_EVENT_CHANNELS, type PermChangedEvent } from '@collab-docs/shared';
+import {
+  type DocLifecycleEvent,
+  PERM_EVENT_CHANNELS,
+  type PermChangedEvent,
+} from '@collab-docs/shared';
 import { REDIS_CLIENT, getCorrelationId, getRootLogger } from '@collab-docs/shared/nest';
 
 /**
@@ -20,6 +24,28 @@ export class PermEventsService {
       );
     } catch (error) {
       getRootLogger().warn({ err: error, event }, 'perm.changed publish failed');
+    }
+  }
+
+  async docDeleted(event: DocLifecycleEvent): Promise<void> {
+    await this.publish(PERM_EVENT_CHANNELS.docDeleted, event);
+  }
+
+  async docRestored(event: DocLifecycleEvent): Promise<void> {
+    await this.publish(PERM_EVENT_CHANNELS.docRestored, event);
+  }
+
+  private async publish(channel: string, event: DocLifecycleEvent): Promise<void> {
+    try {
+      await this.redis.publish(
+        channel,
+        JSON.stringify({ ...event, correlationId: getCorrelationId() }),
+      );
+    } catch (error) {
+      getRootLogger().warn(
+        { err: error, channel, workspaceId: event.workspaceId },
+        `${channel} publish failed`,
+      );
     }
   }
 }
