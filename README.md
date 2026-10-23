@@ -501,15 +501,18 @@ will subscribe to), or a generic message. Forms run the same schema in the brows
 function (`use-validated-action.ts`), so field errors appear without a round trip. Authorization is always the
 api's; hiding admin controls in the UI is convenience only.
 
-**Why actions do not call `revalidatePath` or `redirect`.** The api client is never cached (`cache: 'no-store'`),
-so there is no server data cache to purge; what a mutation needs is a fresh render of the current page. Calling
-`revalidatePath`/`redirect` inside the action makes the action response carry that render, and against the
-production build (Next 15.5, React 19.2) a form that did so stayed in its pending state or never showed the
-result in a large share of submits, with or without the nginx proxy in front (it never happened without the
-revalidation). So an action only returns data (`ActionState`, including `redirectTo` after creating a workspace or
-accepting an invite) and the component finishes the job in `useActionFeedback`: toast, `router.push` when asked, and
-`router.refresh()`, which is a separate GET that also re-renders the layouts (the navbar switcher picks up a new
-workspace). Components that call actions from event handlers (role select, remove, revoke) refresh the same way.
+**Why actions do not call `revalidatePath` or `redirect`.** The api client is never cached, so there is no server
+data cache to purge; what a mutation needs is a fresh render of the current page. Calling `revalidatePath` or
+`redirect` inside the action makes the action response carry that render, and on the production build (Next 15.5,
+React 19.2) forms that did so intermittently stayed pending or never showed the result, with or without the nginx
+proxy in front. Two things were measured: a `loading.tsx` above the workspace layouts made it much worse (6 of 16
+submits of the invite form stalled, against 0 of 78 once the skeletons were scoped to their own segments, which
+is why the list skeleton lives in the `app/(app)/w/(list)` route group), but revalidating actions still flaked
+in the parallel e2e run (create and rename, 2 of 4 runs). So an action only returns data (`ActionState`, including
+`redirectTo` after creating a workspace or accepting an invite) and the component finishes the job in
+`useActionFeedback`: toast, `router.push` when asked, and `router.refresh()`, a separate GET that also re-renders the
+layouts (the navbar switcher picks up a new workspace). Components that call actions from event handlers (role
+select, remove, revoke) refresh the same way. The root cause inside Next/React is not identified.
 
 Route groups keep the rendering mode of each area separate:
 
@@ -554,7 +557,7 @@ and honoured only from `TRUSTED_PROXY_CIDRS`. `web` forwards the header it recei
 decides the address: an exposed Next server would let a client pick a new "IP" per request and defeat every
 limit. Hence the compose topology `browser → proxy (nginx) → web → api`: nginx is the only published HTTP
 port, replaces `X-Forwarded-For` with the peer address instead of appending to it, and passes `Host` and
-`X-Forwarded-Proto`. The same holds for the staging override, which also unpublishes the api port.
+`X-Forwarded-Proto`. It resolves `web` through Docker's DNS on every request (`resolver` plus a variable in `proxy_pass`), so recreating only the `web` container needs no nginx restart; the cost is a new upstream connection per request (no keepalive pool). The same holds for the staging override, which also unpublishes the api port.
 If you put another load balancer or TLS terminator in front of nginx, configure nginx `real_ip` for it
 (`set_real_ip_from` + `real_ip_header X-Forwarded-For`), otherwise every user shares the balancer's address.
 
@@ -596,9 +599,6 @@ the streaming spec skips itself without it:
 DASHBOARD_BLOCK_DELAY_MS=600 docker compose up --build --wait proxy worker
 DASHBOARD_BLOCK_DELAY_MS=600 pnpm test:e2e
 ```
-
-If you rebuild only `web`, restart `proxy` as well (`docker compose restart proxy`): nginx resolves the `web`
-address once at startup and answers 502 for a recreated container until it is restarted.
 
 Every test runs from the same address (the proxy overwrites `X-Forwarded-For`), so CI raises the per-IP limits
 through the `RATE_*` variables; `client-ip.spec.ts` proves that a spoofed header gets no fresh bucket. Fixtures
