@@ -23,7 +23,11 @@ describe('queues', () => {
   let close: () => Promise<void>;
 
   beforeAll(async () => {
-    const redis = new Redis(process.env.REDIS_URL as string);
+    // own database: the HTTP suite flushes db 15 and the two suites run in parallel
+    const url = new URL(process.env.REDIS_URL as string);
+    url.pathname = '/14';
+    process.env.REDIS_URL = url.toString();
+    const redis = new Redis(process.env.REDIS_URL);
     await redis.flushdb();
     redis.disconnect();
     const moduleRef = await Test.createTestingModule({
