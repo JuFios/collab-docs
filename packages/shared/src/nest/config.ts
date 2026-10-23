@@ -41,6 +41,12 @@ export const envSchema = z.object({
   COLLAB_INTERNAL_URL: url,
   COLLAB_PUBLIC_URL: z.string().regex(/^wss?:\/\//, 'must start with ws:// or wss://'),
   TRUSTED_PROXY_CIDRS: z.string().default(''),
+  /** Comma-separated extra CORS origins; WEB_ORIGIN is always allowed. */
+  CORS_ALLOWED_ORIGINS: z.string().default(''),
+  HTTP_BODY_LIMIT: z
+    .string()
+    .regex(/^\d+(kb|mb)$/i, 'e.g. 1mb')
+    .default('1mb'),
 
   BILLING_PROVIDER: z.enum(['mock']).default('mock'),
 
@@ -55,6 +61,8 @@ export const envSchema = z.object({
   ISR_REVALIDATE_SECONDS: positiveInt.default(3600),
 
   // Rate limits and collab limits
+  RATE_GLOBAL_PER_MIN_IP: positiveInt.default(600),
+  RATE_TICKET_PER_MIN_USER: positiveInt.default(30),
   RATE_LOGIN_PER_MIN_IP_EMAIL: positiveInt.default(5),
   RATE_LOGIN_PER_MIN_IP: positiveInt.default(20),
   RATE_REGISTER_PER_HOUR_IP: positiveInt.default(10),
