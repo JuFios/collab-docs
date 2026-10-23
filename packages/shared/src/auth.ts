@@ -92,7 +92,8 @@ export async function verifyAccessToken(
 export const PASSWORD_MIN_LENGTH = 10;
 export const PASSWORD_MAX_LENGTH = 128;
 
-const emailInput = z
+/** Trimmed, lower-cased, valid address of at most 254 characters. */
+export const emailInput = z
   .string()
   .trim()
   .toLowerCase()

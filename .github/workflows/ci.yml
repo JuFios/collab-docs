@@ -112,6 +112,10 @@ jobs:
       RATE_REGISTER_PER_HOUR_IP: '10000'
       RATE_LOGIN_PER_MIN_IP: '10000'
       RATE_LOGIN_PER_MIN_IP_EMAIL: '10000'
+      # lets the streaming spec observe skeletons before data (read by the web container and by the spec)
+      DASHBOARD_BLOCK_DELAY_MS: '600'
+      # bake tags images with the names compose expects for this project
+      COMPOSE_PROJECT_NAME: collab-docs
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -128,15 +132,29 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # System libraries are intentionally not installed: the runner image already carries what headless
+      # Chromium needs, and `install-deps` spent ~10 minutes in apt on every run.
       - name: Install browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
         if: steps.browsers.outputs.cache-hit != 'true'
-      - name: Install browser system dependencies
-        run: pnpm exec playwright install-deps chromium
-        if: steps.browsers.outputs.cache-hit == 'true'
       - uses: docker/setup-buildx-action@v3
+      # Reuse the layer caches the docker-build job writes (same scopes), instead of rebuilding from scratch
+      - uses: docker/bake-action@v6
+        with:
+          files: docker-compose.yml
+          targets: web,api,collab,migrate,minio
+          load: true
+          set: |
+            web.tags=collab-docs-web
+            collab.tags=collab-docs-collab
+            migrate.tags=collab-docs-migrate
+            web.cache-from=type=gha,scope=web
+            api.cache-from=type=gha,scope=api
+            collab.cache-from=type=gha,scope=collab
+            migrate.cache-from=type=gha,scope=migrate
+            minio.cache-from=type=gha,scope=minio
       - name: Start the stack
-        run: docker compose up --build --wait proxy
+        run: docker compose up --no-build --wait proxy worker
       - run: pnpm test:e2e
       - name: Compose logs
         if: failure()

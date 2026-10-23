@@ -2,6 +2,11 @@ import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs
 import { type NextRequest, NextResponse } from 'next/server';
 import { jwtAccessSecret } from '@/lib/env';
 import { type SessionState, decideRoute } from '@/lib/auth/route-policy';
+import {
+  LAST_WORKSPACE_COOKIE,
+  LAST_WORKSPACE_MAX_AGE_SECONDS,
+  workspaceIdFromPath,
+} from '@/lib/workspaces/last-workspace';
 
 // Skips the api proxy, internal handlers, Next assets and anything with a file extension.
 export const config = {
@@ -39,8 +44,20 @@ export async function middleware(request: NextRequest) {
       response = NextResponse.redirect(target);
       break;
     }
-    default:
+    default: {
       response = NextResponse.next({ request: { headers: requestHeaders } });
+      // remember the workspace the user is looking at, so `/w` can send them back to it
+      const workspaceId = workspaceIdFromPath(pathname);
+      if (workspaceId && request.cookies.get(LAST_WORKSPACE_COOKIE)?.value !== workspaceId) {
+        response.cookies.set(LAST_WORKSPACE_COOKIE, workspaceId, {
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: request.headers.get('x-forwarded-proto') === 'https',
+          maxAge: LAST_WORKSPACE_MAX_AGE_SECONDS,
+        });
+      }
+    }
   }
   response.headers.set('x-correlation-id', correlationId);
   return response;

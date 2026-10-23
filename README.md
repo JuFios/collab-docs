@@ -409,6 +409,8 @@ in `documents.position` (`COLLATE "C"`), so a reorder rewrites one row and never
 - **Sharing** is by email for registered users only (`404` for unknown addresses). A guest sees only the
   documents shared with them (`GET /me/shared-documents`), not the tree or the workspace. A share overrides the
   workspace role in both directions.
+- **Recent documents** (`GET /workspaces/:id/documents/recent?limit=`, default 8, max 20) feed the dashboard:
+  newest change first, visibility filtered in SQL so the limit applies to documents the caller may open.
 - **Who may do what:** create `EDITOR`+ with `EDIT` on the parent; edit title/icon, move and delete `EDIT`;
   change visibility or manage shares `MANAGE` or `EDIT` as the author; restore Owner/Admin or the author.
 
@@ -450,18 +452,73 @@ bundled through npm so builds need no network).
 Server Component is the default: anything that reads data and needs no browser state. A Client Component
 (`"use client"`) exists only where the browser is required, and each one is listed here with the reason:
 
-| Client component                                           | Why                                                                                 |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `components/providers.tsx`                                 | TanStack Query provider and the toast outlet                                        |
-| `components/auth/login-form.tsx`, `register-form.tsx`      | `useActionState` (pending state, field errors) and a zod pass before the round trip |
-| `components/user-menu.tsx`                                 | Radix menu; the logout Server Action runs from its event handler                    |
-| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner` | Radix/Sonner primitives that need effects and event handlers                        |
-| `app/error.tsx`                                            | Error boundaries must be Client Components                                          |
+| Client component                                                                                            | Why                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `components/providers.tsx`                                                                                  | TanStack Query provider and the toast outlet                                                                                  |
+| `components/auth/login-form.tsx`, `register-form.tsx`                                                       | `useActionState` (pending state, field errors) and a zod pass before the round trip                                           |
+| `components/user-menu.tsx`                                                                                  | Radix menu; the logout Server Action runs from its event handler                                                              |
+| `components/workspaces/create-workspace-form`, `rename-workspace-form`, `invite-form`, `accept-invite-form` | `useActionState` (pending state, field errors, plan-limit explanation) and a zod pass before the round trip                   |
+| `components/workspaces/members-table.tsx`, `pending-invites.tsx`                                            | Role selects, the remove confirmation and revoke call Server Actions from event handlers                                      |
+| `components/workspaces/leave-workspace-button.tsx`                                                          | Confirmation dialog; the action runs from an event handler, then navigation and refresh                                       |
+| `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                    |
+| `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                        |
+| `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action |
+| `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                            |
+| `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                               |
+| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                  |
+| `app/error.tsx`                                                                                             | Error boundaries must be Client Components                                                                                    |
+
+Screens and where they render (everything not listed as a client island is a Server Component):
+
+| Screen                | Renders in                             | Why                                                                                                                                                                              |
+| --------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/w`                  | RSC page + client create form          | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present |
+| `/w/[id]` (dashboard) | RSC, four async RSC blocks             | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                |
+| `/w/[id]/settings`    | RSC page + client forms/tables         | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                           |
+| `/invite/[token]`     | RSC                                    | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                  |
+| Navbar                | RSC shell + switcher/user-menu islands | The workspace list is fetched in the layout and passed down as typed props                                                                                                       |
+
+**Dashboard streaming.** `app/(app)/w/[id]/page.tsx` awaits nothing but the workspace the layout already loaded
+(deduplicated by `React.cache`). The blocks (`components/dashboard/blocks.tsx`: recent documents, members,
+plan and usage, shared with me) are async Server Components under their own `<Suspense>`, so a slow or failing
+block never holds back the others. The e2e suite asserts this on the raw response: with
+`DASHBOARD_BLOCK_DELAY_MS` set (ignored when `APP_ENV=staging`) the first flush contains the skeletons and not
+the data, and the data arrives later in the same response.
+
+### Server Actions vs REST vs WebSocket
+
+| Operation                                                                                       | Channel               | Why                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create/rename workspace, invite, change role, remove member, revoke/accept invite, login/logout | **Server Actions**    | Forms that work as plain `<form action>`, cookies handled on the server, `revalidatePath` refreshes the Server Components that show the data |
+| Document tree (move/create/rename/delete), comments, sharing, publishing                        | REST + TanStack Query | Interactive, optimistic UI and cache invalidation in the browser                                                                             |
+| Notifications, tree changes                                                                     | SSE                   | One-way push                                                                                                                                 |
+| Document content, presence                                                                      | WebSocket (Yjs)       | Conflict-free merging and awareness                                                                                                          |
+
+Server Actions call the api through `lib/api/server.ts` (cookies, `x-forwarded-for`, correlation id), validate
+their input with the zod schemas of `@collab-docs/shared` (arguments of actions that are not form posts are
+validated too, since they are public endpoints), and report failures as data (`ActionState`): field errors,
+a plain-language plan-limit explanation (`PLAN_LIMIT_EXCEEDED` also fires the window event the upgrade dialog
+will subscribe to), or a generic message. Forms run the same schema in the browser first, inside the action
+function (`use-validated-action.ts`), so field errors appear without a round trip. Authorization is always the
+api's; hiding admin controls in the UI is convenience only.
+
+**Why actions do not call `revalidatePath` or `redirect`.** The api client is never cached, so there is no server
+data cache to purge; what a mutation needs is a fresh render of the current page. Calling `revalidatePath` or
+`redirect` inside the action makes the action response carry that render, and on the production build (Next 15.5,
+React 19.2) forms that did so intermittently stayed pending or never showed the result, with or without the nginx
+proxy in front. Two things were measured: a `loading.tsx` above the workspace layouts made it much worse (6 of 16
+submits of the invite form stalled, against 0 of 78 once the skeletons were scoped to their own segments, which
+is why the list skeleton lives in the `app/(app)/w/(list)` route group), but revalidating actions still flaked
+in the parallel e2e run (create and rename, 2 of 4 runs). So an action only returns data (`ActionState`, including
+`redirectTo` after creating a workspace or accepting an invite) and the component finishes the job in
+`useActionFeedback`: toast, `router.push` when asked, and `router.refresh()`, a separate GET that also re-renders the
+layouts (the navbar switcher picks up a new workspace). Components that call actions from event handlers (role
+select, remove, revoke) refresh the same way. The root cause inside Next/React is not identified.
 
 Route groups keep the rendering mode of each area separate:
 
-- `app/(public)` — landing, `/login`, `/register` (later `/p/[slug]`, `/e/[token]`, `/invite/[token]`).
-- `app/(app)` — everything behind a session (`/w`, later documents, settings, billing).
+- `app/(public)` — landing, `/login`, `/register`, `/invite/[token]` (later `/p/[slug]`, `/e/[token]`).
+- `app/(app)` — everything behind a session (`/w`, `/w/[id]`, `/w/[id]/settings`, later documents and billing).
 - The root `app/layout.tsx` is static: it never calls `cookies()` or `headers()`. Only `(app)/layout.tsx`
   reads the session, so public pages stay statically renderable (the build output marks `/` as static).
 
@@ -501,7 +558,7 @@ and honoured only from `TRUSTED_PROXY_CIDRS`. `web` forwards the header it recei
 decides the address: an exposed Next server would let a client pick a new "IP" per request and defeat every
 limit. Hence the compose topology `browser → proxy (nginx) → web → api`: nginx is the only published HTTP
 port, replaces `X-Forwarded-For` with the peer address instead of appending to it, and passes `Host` and
-`X-Forwarded-Proto`. The same holds for the staging override, which also unpublishes the api port.
+`X-Forwarded-Proto`. It resolves `web` through Docker's DNS on every request (`resolver` plus a variable in `proxy_pass`), so recreating only the `web` container needs no nginx restart; the cost is a new upstream connection per request (no keepalive pool). The same holds for the staging override, which also unpublishes the api port.
 If you put another load balancer or TLS terminator in front of nginx, configure nginx `real_ip` for it
 (`set_real_ip_from` + `real_ip_header X-Forwarded-For`), otherwise every user shares the balancer's address.
 
@@ -528,10 +585,20 @@ TanStack `QueryCache`/`MutationCache`):
 The Playwright suite (`e2e/`) runs against the production images, not dev servers:
 
 ```bash
-docker compose up --build --wait proxy   # nginx plus web, api, collab and the infrastructure behind them
+docker compose up --build --wait proxy worker   # nginx plus web, api, collab, the queue worker (it sends the invitation mail) and the infrastructure
 pnpm exec playwright install chromium  # first run only
 RATE_REGISTER_PER_HOUR_IP=1000 RATE_LOGIN_PER_MIN_IP=1000 docker compose up -d api   # headroom: all tests share one address
 pnpm test:e2e
+```
+
+Two more pieces of the stack matter to the workspace specs: Mailpit (the invitation mail is fetched from
+`MAILPIT_URL`, default `http://localhost:8025`) and, for the streaming spec, `DASHBOARD_BLOCK_DELAY_MS` on the
+`web` container. Set it in the shell that starts compose and keep it in the environment of `pnpm test:e2e`;
+the streaming spec skips itself without it:
+
+```bash
+DASHBOARD_BLOCK_DELAY_MS=600 docker compose up --build --wait proxy worker
+DASHBOARD_BLOCK_DELAY_MS=600 pnpm test:e2e
 ```
 
 Every test runs from the same address (the proxy overwrites `X-Forwarded-For`), so CI raises the per-IP limits
