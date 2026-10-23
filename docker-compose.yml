@@ -29,6 +29,10 @@ x-app-env: &app-env
   COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:-ws://localhost:4001}
   TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
   BILLING_PROVIDER: ${BILLING_PROVIDER:-mock}
+  # per-IP limits; the e2e suite raises them because every test user registers from the same address
+  RATE_LOGIN_PER_MIN_IP: ${RATE_LOGIN_PER_MIN_IP:-20}
+  RATE_LOGIN_PER_MIN_IP_EMAIL: ${RATE_LOGIN_PER_MIN_IP_EMAIL:-5}
+  RATE_REGISTER_PER_HOUR_IP: ${RATE_REGISTER_PER_HOUR_IP:-10}
 
 x-api-build: &api-build
   context: .
@@ -184,6 +188,9 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-dev}
       API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      # verifies the access cookie in the edge middleware (read at request time, not baked into the build)
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-jwt-access-secret-change-me}
     ports:
       - '${WEB_PORT:-3000}:3000'
     depends_on:

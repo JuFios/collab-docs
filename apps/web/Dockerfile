@@ -12,6 +12,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
 
 FROM fetch AS build
 ENV NEXT_TELEMETRY_DISABLED=1
+# Next compiles rewrites into the routes manifest, so the api proxy target is fixed at build time
+ARG API_INTERNAL_URL=http://api:4000
+ENV API_INTERNAL_URL=$API_INTERNAL_URL
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile
 RUN pnpm --filter @collab-docs/shared build && pnpm --filter @collab-docs/web build

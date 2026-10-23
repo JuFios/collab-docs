@@ -1,15 +1,22 @@
-import { jwtRoundTrip } from '@collab-docs/shared';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
-export default async function HomePage() {
-  // Smoke check: the shared package and its ESM-only dependency load during `next build`.
-  const smoke = await jwtRoundTrip('home');
-
+// no cookies()/headers(): the landing page stays statically rendered
+export default function HomePage() {
   return (
-    <main className="mx-auto max-w-2xl p-8">
-      <h1 className="text-3xl font-semibold">Collab Docs</h1>
-      <p className="mt-2 text-neutral-600" data-smoke={smoke}>
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 p-8">
+      <h1 className="text-4xl font-semibold tracking-tight">Collab Docs</h1>
+      <p className="text-lg text-muted-foreground">
         Collaborative workspace with real-time document editing.
       </p>
+      <div className="flex gap-3">
+        <Button asChild>
+          <Link href="/register">Get started</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/login">Sign in</Link>
+        </Button>
+      </div>
     </main>
   );
 }
