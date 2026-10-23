@@ -233,4 +233,40 @@ test.describe('workspaces', () => {
     await outsider.goto('/w/not-a-uuid');
     await expect(outsider.getByText('Page not found')).toBeVisible();
   });
+
+  test('a member can leave a workspace, the last owner cannot', async ({
+    browser,
+    baseURL,
+    signedInPage: owner,
+  }) => {
+    const guest = await registerViaApi(
+      (await browser.newContext({ baseURL })).request,
+      newUser('leaver'),
+    );
+    const workspaceId = await createWorkspace(owner, 'Revolving door');
+
+    // the only owner is refused, with the reason
+    await owner.getByRole('button', { name: 'Leave workspace' }).click();
+    await owner.getByRole('dialog').getByRole('button', { name: 'Leave workspace' }).click();
+    await expect(owner.getByRole('dialog').getByRole('alert')).toContainText('at least one owner');
+    await owner.getByRole('button', { name: 'Cancel' }).click();
+
+    await invite(owner, workspaceId, guest.email);
+    const member = await signedIn(browser, baseURL, guest);
+    await member.goto(new URL(await inviteLinkFor(guest.email)).pathname);
+    await member.getByRole('button', { name: 'Accept invitation' }).click();
+    await expect(member).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+
+    await member.getByRole('button', { name: 'Leave workspace' }).click();
+    await member.getByRole('dialog').getByRole('button', { name: 'Leave workspace' }).click();
+    await expect(member).toHaveURL(/\/w\?all=1$/);
+    await expect(member.getByText('No workspaces yet')).toBeVisible();
+    await member.goto(`/w/${workspaceId}`);
+    await expect(member.getByText('Page not found')).toBeVisible();
+
+    await owner.goto(`/w/${workspaceId}/settings`);
+    await expect(owner.getByRole('table', { name: 'Workspace members' })).not.toContainText(
+      guest.email,
+    );
+  });
 });

@@ -25,6 +25,7 @@ vi.mock('next/navigation', () => ({
 
 import { CreateWorkspaceForm } from './create-workspace-form';
 import { InviteForm } from './invite-form';
+import { LeaveWorkspaceButton } from './leave-workspace-button';
 import { MembersTable } from './members-table';
 import { PendingInvites } from './pending-invites';
 import { RenameWorkspaceForm } from './rename-workspace-form';
@@ -252,6 +253,52 @@ describe('PendingInvites', () => {
       }),
     );
     await waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+  });
+});
+
+describe('LeaveWorkspaceButton', () => {
+  const userId = '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a77';
+  const renderButton = () =>
+    render(<LeaveWorkspaceButton workspaceId={WS} workspaceName="Acme" userId={userId} />);
+
+  it('asks for confirmation, leaves, and goes back to the workspace list', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByRole('button', { name: 'Leave workspace' }));
+    expect(actions.removeMemberAction).not.toHaveBeenCalled();
+    expect(await screen.findByText('Leave Acme?')).toBeInTheDocument();
+
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Leave workspace' }));
+    await waitFor(() =>
+      expect(actions.removeMemberAction).toHaveBeenCalledWith({ workspaceId: WS, userId }),
+    );
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/w?all=1'));
+    expect(navigation.refresh).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith('You left Acme.');
+  });
+
+  it('shows why the last owner cannot leave and stays on the page', async () => {
+    actions.removeMemberAction.mockResolvedValueOnce({
+      formError: 'A workspace must keep at least one owner',
+    } as never);
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByRole('button', { name: 'Leave workspace' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Leave workspace' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'A workspace must keep at least one owner',
+    );
+    expect(navigation.push).not.toHaveBeenCalled();
+  });
+
+  it('can be cancelled without calling the api', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByRole('button', { name: 'Leave workspace' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(actions.removeMemberAction).not.toHaveBeenCalled();
   });
 });
 
