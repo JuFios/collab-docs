@@ -61,3 +61,34 @@ describe('access tokens', () => {
     await expect(verifyAccessToken(hs512, secret)).rejects.toMatchObject({ reason: 'invalid' });
   });
 });
+
+describe('form input schemas', () => {
+  it('normalises and validates login input', async () => {
+    const { loginInputSchema } = await import('./auth');
+    expect(loginInputSchema.parse({ email: '  Ada@Example.COM ', password: 'x' }).email).toBe(
+      'ada@example.com',
+    );
+    expect(loginInputSchema.safeParse({ email: 'nope', password: 'x' }).success).toBe(false);
+    expect(loginInputSchema.safeParse({ email: 'a@b.co', password: '' }).success).toBe(false);
+  });
+
+  it('enforces the registration password bounds of the api', async () => {
+    const { registerInputSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } =
+      await import('./auth');
+    const base = { name: 'Ada', email: 'a@b.co' };
+    expect(
+      registerInputSchema.safeParse({ ...base, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) })
+        .success,
+    ).toBe(false);
+    expect(
+      registerInputSchema.safeParse({ ...base, password: 'x'.repeat(PASSWORD_MIN_LENGTH) }).success,
+    ).toBe(true);
+    expect(
+      registerInputSchema.safeParse({ ...base, password: 'x'.repeat(PASSWORD_MAX_LENGTH + 1) })
+        .success,
+    ).toBe(false);
+    expect(
+      registerInputSchema.safeParse({ ...base, name: '   ', password: 'x'.repeat(12) }).success,
+    ).toBe(false);
+  });
+});

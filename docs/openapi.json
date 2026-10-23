@@ -143,6 +143,35 @@
         "tags": [
           "auth"
         ]
+      },
+      "get": {
+        "description": "The refresh cookie is scoped to /api/auth, so the web edge middleware cannot read it on page requests. When the access token has expired it redirects the browser here; on success the cookies are renewed and the browser is sent to `next`, otherwise to /login?next=<next>.",
+        "operationId": "AuthController_refreshAndRedirect",
+        "parameters": [
+          {
+            "name": "next",
+            "required": false,
+            "in": "query",
+            "description": "Same-origin relative path to return to",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to `next` (or to /login on failure)"
+          }
+        },
+        "security": [
+          {
+            "refresh-cookie": []
+          }
+        ],
+        "summary": "Browser navigation refresh: rotate the session and redirect to `next`",
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/auth/logout": {

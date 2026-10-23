@@ -88,3 +88,32 @@ export async function verifyAccessToken(
     throw new AccessTokenError(error instanceof errors.JWTExpired ? 'expired' : 'invalid');
   }
 }
+
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 128;
+
+const emailInput = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email('Enter a valid email address.').max(254, 'Email is too long.'));
+
+export const loginInputSchema = z.object({
+  email: emailInput,
+  password: z
+    .string()
+    .min(1, 'Enter your password.')
+    .max(PASSWORD_MAX_LENGTH, 'Password is too long.'),
+});
+
+export const registerInputSchema = z.object({
+  name: z.string().trim().min(1, 'Enter your name.').max(100, 'Name is too long.'),
+  email: emailInput,
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)
+    .max(PASSWORD_MAX_LENGTH, 'Password is too long.'),
+});
+
+export type LoginInput = z.infer<typeof loginInputSchema>;
+export type RegisterInput = z.infer<typeof registerInputSchema>;
