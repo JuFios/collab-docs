@@ -18,7 +18,7 @@ import {
   planDrop,
   planKeyboardMove,
 } from '@/lib/documents/move';
-import { useMoveDocument, useRenameDocument, useTree } from '@/lib/documents/queries';
+import { useMoveDocument, useSaveDocumentTitle, useTree } from '@/lib/documents/queries';
 import { ancestorIds, descendantIds, flattenVisible } from '@/lib/documents/tree';
 import { ConnectionBadge } from './connection-badge';
 import { DeleteDocumentDialog } from './delete-document-dialog';
@@ -61,7 +61,7 @@ export function DocumentTree() {
 
   const actions = useDocumentActions(expand);
   const move = useMoveDocument(workspaceId);
-  const rename = useRenameDocument(workspaceId);
+  const rename = useSaveDocumentTitle(workspaceId);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);

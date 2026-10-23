@@ -134,7 +134,7 @@ export function useCreateDocument(workspaceId: string) {
   });
 }
 
-export function useRenameDocument(workspaceId: string) {
+export function useSaveDocumentTitle(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     scope: treeScope(workspaceId),

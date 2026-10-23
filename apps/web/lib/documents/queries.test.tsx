@@ -12,7 +12,7 @@ vi.mock('@/components/workspaces/workspace-provider', () => ({
 }));
 
 import { treeKey } from './keys';
-import { useDeleteDocument, useMoveDocument, useRenameDocument } from './queries';
+import { useDeleteDocument, useMoveDocument, useSaveDocumentTitle } from './queries';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const node = (n: number, parent: number | null, position: string): TreeNode => ({
@@ -112,7 +112,7 @@ describe('tree mutations', () => {
       init?.method === 'PATCH' ? call.promise : Promise.resolve(seed),
     );
     const { queryClient, wrapper } = setup();
-    const { result } = renderHook(() => useRenameDocument('ws'), { wrapper });
+    const { result } = renderHook(() => useSaveDocumentTitle('ws'), { wrapper });
 
     let pending: Promise<unknown> = Promise.resolve();
     act(() => {

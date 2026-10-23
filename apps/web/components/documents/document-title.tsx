@@ -2,7 +2,7 @@
 
 import { type DocumentDetails, DOCUMENT_TITLE_MAX_LENGTH } from '@collab-docs/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRenameDocument } from '@/lib/documents/queries';
+import { useSaveDocumentTitle } from '@/lib/documents/queries';
 import { consumeTitleFocus } from '@/lib/documents/title-focus';
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -26,7 +26,7 @@ export function DocumentTitle({
   inputRef: React.RefObject<HTMLInputElement | null>;
   onSaveState: (state: TitleSaveState) => void;
 }) {
-  const rename = useRenameDocument(workspaceId);
+  const rename = useSaveDocumentTitle(workspaceId);
   const [draft, setDraft] = useState(document.title);
   const draftRef = useRef(draft);
   const dirty = useRef(false);
