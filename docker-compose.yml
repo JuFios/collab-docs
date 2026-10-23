@@ -1,0 +1,198 @@
+# Every ${VAR:-default} below is a "dev only" default so `docker compose up` works without a .env file.
+# Staging overrides live in docker-compose.staging.yml and require real secrets.
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-dev}
+  NODE_ENV: ${NODE_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://collab:dev-only-postgres-password@postgres:5432/collab}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+  S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+  S3_BUCKET: ${S3_BUCKET:-collab-docs}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-dev-only-minio}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-dev-only-minio-secret}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-Collab Docs <noreply@collab-docs.local>}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-jwt-access-secret-change-me}
+  COLLAB_TICKET_SECRET: ${COLLAB_TICKET_SECRET:-dev-only-collab-ticket-secret-change-me}
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-only-internal-api-token-change-me}
+  REVALIDATE_SECRET: ${REVALIDATE_SECRET:-dev-only-revalidate-secret-change-me}
+  WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-dev-only-webhook-signing-secret-change-me}
+  WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+  WEB_INTERNAL_URL: ${WEB_INTERNAL_URL:-http://web:3000}
+  API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
+  COLLAB_INTERNAL_URL: ${COLLAB_INTERNAL_URL:-http://collab:4002}
+  COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:-ws://localhost:4001}
+  TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
+  BILLING_PROVIDER: ${BILLING_PROVIDER:-mock}
+
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: collab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-postgres-password}
+      POSTGRES_DB: collab
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U collab -d collab']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.8-alpine
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    build: docker/minio
+    image: collab-docs/minio:local
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-dev-only-minio}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-dev-only-minio-secret}
+      # browsers upload straight to MinIO with presigned POST, so the web origin must be allowed
+      MINIO_API_CORS_ALLOW_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      MC_HOST_local: http://${S3_ACCESS_KEY:-dev-only-minio}:${S3_SECRET_KEY:-dev-only-minio-secret}@localhost:9000
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio-init:
+    image: collab-docs/minio:local
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: 'no'
+    environment:
+      MC_HOST_local: http://${S3_ACCESS_KEY:-dev-only-minio}:${S3_SECRET_KEY:-dev-only-minio-secret}@minio:9000
+      S3_BUCKET: ${S3_BUCKET:-collab-docs}
+    entrypoint: ['sh', '-c', 'mc mb --ignore-existing "local/$$S3_BUCKET"']
+
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - '${SMTP_HOST_PORT:-1025}:1025'
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot placeholder; will run `prisma migrate deploy` (and the dev seed) once the schema exists.
+  migrate:
+    build: *api-build
+    image: collab-docs/api:local
+    restart: 'no'
+    environment: *app-env
+    command: ['node', '-e', "console.log('migrate: no migrations yet')"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: *api-build
+    image: collab-docs/api:local
+    restart: ${RESTART_POLICY:-no}
+    environment:
+      <<: *app-env
+      PORT: '4000'
+    ports:
+      - '${API_PORT:-4000}:4000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
+
+  worker:
+    build: *api-build
+    image: collab-docs/api:local
+    restart: ${RESTART_POLICY:-no}
+    environment: *app-env
+    command: ['node', 'dist/main.worker.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    # Placeholder: the container is running iff the worker process is alive; a real probe arrives with the queues.
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'process.exit(0)']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  collab:
+    build:
+      context: .
+      dockerfile: apps/collab/Dockerfile
+    restart: ${RESTART_POLICY:-no}
+    environment:
+      <<: *app-env
+      PORT: '4001'
+    # 4001 is the public WebSocket port; the internal API port 4002 is reachable only inside the compose network
+    ports:
+      - '${COLLAB_PORT:-4001}:4001'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: ${RESTART_POLICY:-no}
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+      collab:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:

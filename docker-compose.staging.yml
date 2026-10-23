@@ -1,0 +1,70 @@
+# Staging profile: docker compose --env-file .env.staging -f docker-compose.yml -f docker-compose.staging.yml up -d
+# Secrets are mandatory (no dev defaults); the services additionally reject any value containing "dev-only".
+
+x-staging-env: &staging-env
+  APP_ENV: staging
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env.staging}
+  REDIS_URL: ${REDIS_URL:?set REDIS_URL in .env.staging}
+  S3_ENDPOINT: ${S3_ENDPOINT:?set S3_ENDPOINT in .env.staging}
+  S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?set S3_PUBLIC_ENDPOINT in .env.staging}
+  S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in .env.staging}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env.staging}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env.staging}
+  SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env.staging}
+  SMTP_PORT: ${SMTP_PORT:?set SMTP_PORT in .env.staging}
+  SMTP_FROM: ${SMTP_FROM:?set SMTP_FROM in .env.staging}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env.staging}
+  COLLAB_TICKET_SECRET: ${COLLAB_TICKET_SECRET:?set COLLAB_TICKET_SECRET in .env.staging}
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?set INTERNAL_API_TOKEN in .env.staging}
+  REVALIDATE_SECRET: ${REVALIDATE_SECRET:?set REVALIDATE_SECRET in .env.staging}
+  WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?set WEBHOOK_SIGNING_SECRET in .env.staging}
+  WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN in .env.staging}
+  COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:?set COLLAB_PUBLIC_URL in .env.staging}
+
+services:
+  postgres:
+    restart: unless-stopped
+    ports: !override []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.staging}
+  redis:
+    restart: unless-stopped
+    ports: !override []
+  minio:
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env.staging}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env.staging}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN in .env.staging}
+      MC_HOST_local: http://${S3_ACCESS_KEY}:${S3_SECRET_KEY}@localhost:9000
+    ports: !override
+      - '9000:9000'
+  minio-init:
+    environment:
+      MC_HOST_local: http://${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env.staging}:${S3_SECRET_KEY:?set S3_SECRET_KEY in .env.staging}@minio:9000
+      S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in .env.staging}
+  mailpit:
+    restart: unless-stopped
+    ports: !override
+      - '1025:1025'
+  migrate:
+    environment: *staging-env
+  api:
+    restart: unless-stopped
+    environment:
+      <<: *staging-env
+      PORT: '4000'
+  worker:
+    restart: unless-stopped
+    environment: *staging-env
+  collab:
+    restart: unless-stopped
+    environment:
+      <<: *staging-env
+      PORT: '4001'
+  web:
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
