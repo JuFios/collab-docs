@@ -74,6 +74,18 @@ export class PlanLimitsService {
     if (current + 1 > limit) throw this.exceeded('members', limit, current, plan);
   }
 
+  /**
+   * Throws `403 PLAN_LIMIT_EXCEEDED` when `count` more live documents would not fit (Team: unlimited).
+   * Must run after `lockWorkspace` in the same transaction.
+   */
+  async assertCanAddDocument(tx: Tx, workspaceId: string, count = 1): Promise<void> {
+    const plan = await this.planOf(tx, workspaceId);
+    const limit = limitFor(plan, 'documents');
+    if (limit === null) return;
+    const current = await tx.document.count({ where: { workspaceId, deletedAt: null } });
+    if (current + count > limit) throw this.exceeded('documents', limit, current, plan);
+  }
+
   exceeded(kind: LimitKind, limit: number, current: number, plan: PlanTier): AppException {
     return new AppException(
       'PLAN_LIMIT_EXCEEDED',

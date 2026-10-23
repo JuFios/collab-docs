@@ -12,3 +12,4 @@ export * from './throttle';
 export * from './http';
 export * from './platform';
 export * from './public';
+export * from './document-changed';

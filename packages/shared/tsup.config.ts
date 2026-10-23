@@ -13,4 +13,6 @@ export default defineConfig({
   target: 'node22',
   // keep dependencies external so each consumer's resolver (Node, Jest, Vitest, Next) loads them
   external: ['jose'],
+  // ESM-only and tiny: inlined so CommonJS consumers (Nest, Jest) need no ESM handling
+  noExternal: ['fractional-indexing'],
 });

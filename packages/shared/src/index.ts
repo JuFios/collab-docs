@@ -21,3 +21,4 @@ export async function jwtRoundTrip(subject: string): Promise<string | undefined>
 export * from './plans';
 export * from './permissions';
 export * from './realtime-events';
+export * from './fractional';

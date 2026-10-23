@@ -59,6 +59,7 @@ export class QueueService implements OnApplicationShutdown {
   private readonly workers: Worker[] = [];
   private readonly jobsGauge: Gauge<'queue' | 'state'>;
   private readonly processed: Counter<'queue' | 'result'>;
+  readonly enqueueFailures: Counter<'queue'>;
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
@@ -81,6 +82,12 @@ export class QueueService implements OnApplicationShutdown {
           }),
         ).catch(() => undefined);
       },
+    });
+    this.enqueueFailures = new Counter({
+      name: 'queue_enqueue_failures_total',
+      help: 'Jobs that could not be enqueued (the triggering request still succeeds)',
+      labelNames: ['queue'],
+      registers: [metrics.registry],
     });
     this.processed = new Counter({
       name: 'queue_jobs_processed_total',

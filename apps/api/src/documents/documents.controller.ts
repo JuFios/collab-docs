@@ -1,0 +1,150 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Req,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import type { Request } from 'express';
+import { ParseUuidPipe } from '@collab-docs/shared/nest';
+import { CurrentUser, type RequestUser } from '../auth';
+import { DocumentAccess, WorkspaceRole, documentAccessOf, workspaceRoleOf } from '../permissions';
+import {
+  CreateDocumentDto,
+  DocumentResponse,
+  MoveDocumentDto,
+  MovedDocumentResponse,
+  TrashItemResponse,
+  TreeNodeResponse,
+  UpdateDocumentDto,
+} from './documents.dto';
+import { DocumentsService } from './documents.service';
+
+@ApiTags('documents')
+@ApiBearerAuth()
+@ApiCookieAuth('access-cookie')
+@Controller()
+export class DocumentsController {
+  constructor(@Inject(DocumentsService) private readonly documents: DocumentsService) {}
+
+  @Post('workspaces/:workspaceId/documents')
+  @WorkspaceRole('EDITOR')
+  @ApiOperation({
+    summary: 'Create a document',
+    description:
+      'Editor or above, and EDIT on the parent. The child copies the parent visibility and shares. ' +
+      'Over the plan limit: 403 PLAN_LIMIT_EXCEEDED.',
+  })
+  @ApiCreatedResponse({ type: DocumentResponse })
+  create(
+    @Param('workspaceId', ParseUuidPipe) workspaceId: string,
+    @Body() dto: CreateDocumentDto,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.documents.create(user.id, workspaceId, workspaceRoleOf(req), dto);
+  }
+
+  @Get('workspaces/:workspaceId/documents/tree')
+  @WorkspaceRole('VIEWER')
+  @ApiOperation({
+    summary: 'Flat document tree, filtered by the caller permissions',
+    description:
+      'Sorted by position then id. A document under an inaccessible parent is returned with parentId null.',
+  })
+  @ApiOkResponse({ type: [TreeNodeResponse] })
+  tree(
+    @Param('workspaceId', ParseUuidPipe) workspaceId: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.documents.tree(user.id, workspaceId, workspaceRoleOf(req));
+  }
+
+  @Get('workspaces/:workspaceId/trash')
+  @WorkspaceRole('VIEWER')
+  @ApiOperation({ summary: 'Deleted documents (roots of each deletion) the caller could access' })
+  @ApiOkResponse({ type: [TrashItemResponse] })
+  trash(
+    @Param('workspaceId', ParseUuidPipe) workspaceId: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.documents.trash(user.id, workspaceId, workspaceRoleOf(req));
+  }
+
+  @Get('documents/:id')
+  @DocumentAccess('VIEW', { param: 'id' })
+  @ApiOperation({ summary: 'Document metadata with the caller access level' })
+  @ApiOkResponse({ type: DocumentResponse })
+  get(@CurrentUser() user: RequestUser, @Req() req: Request) {
+    return this.documents.get(user.id, documentAccessOf(req));
+  }
+
+  @Patch('documents/:id')
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({
+    summary: 'Update title, icon or visibility',
+    description: 'Title and icon need EDIT; visibility needs MANAGE or EDIT as the author.',
+  })
+  @ApiOkResponse({ type: DocumentResponse })
+  update(@Body() dto: UpdateDocumentDto, @CurrentUser() user: RequestUser, @Req() req: Request) {
+    return this.documents.update(user.id, documentAccessOf(req), dto);
+  }
+
+  @Delete('documents/:id')
+  @HttpCode(204)
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({
+    summary: 'Move the document and all its descendants to the trash',
+    description: 'Descendants are deleted too, whether or not the caller can see them.',
+  })
+  @ApiNoContentResponse()
+  remove(@CurrentUser() user: RequestUser, @Req() req: Request): Promise<void> {
+    return this.documents.remove(user.id, documentAccessOf(req));
+  }
+
+  @Post('documents/:id/restore')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Restore a deleted document with the descendants deleted together with it',
+    description:
+      'Owner, admin, or the author when an editor. Returns to the root when the parent is still deleted. ' +
+      'Over the plan limit: 403 PLAN_LIMIT_EXCEEDED.',
+  })
+  @ApiOkResponse({ type: DocumentResponse })
+  restore(@Param('id', ParseUuidPipe) id: string, @CurrentUser() user: RequestUser) {
+    return this.documents.restore(user.id, id);
+  }
+
+  @Post('documents/:id/move')
+  @HttpCode(200)
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({
+    summary: 'Move or reorder a document',
+    description:
+      'EDIT on the document and on the new parent, same workspace, no cycles (409). Without beforeId and afterId the document goes last.',
+  })
+  @ApiOkResponse({ type: MovedDocumentResponse })
+  move(
+    @Param('id', ParseUuidPipe) id: string,
+    @Body() dto: MoveDocumentDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.documents.move(user.id, id, dto);
+  }
+}

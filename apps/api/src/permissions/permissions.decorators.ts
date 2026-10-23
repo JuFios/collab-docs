@@ -113,3 +113,10 @@ export function workspaceRoleOf(request: Request): Role {
   if (!role) throw new AppException('INTERNAL_ERROR', 'WorkspaceRole guard missing');
   return role;
 }
+
+/** Access resolved by `@DocumentAccess()`. */
+export function documentAccessOf(request: Request): DocumentAccessResult {
+  const access = (request as PermissionRequest).documentAccess;
+  if (!access) throw new AppException('INTERNAL_ERROR', 'DocumentAccess guard missing');
+  return access;
+}
