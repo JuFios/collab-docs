@@ -21,6 +21,10 @@ describe('health', () => {
     await request(app.getHttpServer()).get('/health').expect(200).expect({ status: 'ok' });
   });
 
+  it('GET /ready returns ok', async () => {
+    await request(app.getHttpServer()).get('/ready').expect(200).expect({ status: 'ok' });
+  });
+
   it('loads @collab-docs/shared and its ESM-only jose dependency', async () => {
     await expect(jwtRoundTrip('user-1')).resolves.toBe('user-1');
   });

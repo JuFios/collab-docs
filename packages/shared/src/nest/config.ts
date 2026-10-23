@@ -1,0 +1,113 @@
+import { z } from 'zod';
+
+/** Marker used by every development-only default; rejected when APP_ENV=staging. */
+export const DEV_ONLY_MARKER = 'dev-only';
+
+const url = z.string().url();
+const secret = z.string().min(16, 'must be at least 16 characters');
+const positiveInt = z.coerce.number().int().positive();
+
+export const envSchema = z.object({
+  APP_ENV: z.enum(['dev', 'staging', 'test']).default('dev'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  PORT: positiveInt.optional(),
+  COLLAB_INTERNAL_PORT: positiveInt.default(4002),
+
+  DATABASE_URL: z.string().min(1).startsWith('postgres'),
+  REDIS_URL: z.string().min(1).startsWith('redis'),
+
+  S3_ENDPOINT: url,
+  S3_PUBLIC_ENDPOINT: url,
+  S3_BUCKET: z.string().min(3),
+  S3_ACCESS_KEY: z.string().min(3),
+  S3_SECRET_KEY: secret,
+
+  SMTP_HOST: z.string().min(1),
+  SMTP_PORT: positiveInt,
+  SMTP_USER: z.string().default(''),
+  SMTP_PASSWORD: z.string().default(''),
+  SMTP_FROM: z.string().min(3),
+
+  JWT_ACCESS_SECRET: secret,
+  COLLAB_TICKET_SECRET: secret,
+  INTERNAL_API_TOKEN: secret,
+  REVALIDATE_SECRET: secret,
+  WEBHOOK_SIGNING_SECRET: secret,
+
+  WEB_ORIGIN: url,
+  WEB_INTERNAL_URL: url,
+  API_INTERNAL_URL: url,
+  COLLAB_INTERNAL_URL: url,
+  COLLAB_PUBLIC_URL: z.string().regex(/^wss?:\/\//, 'must start with ws:// or wss://'),
+  TRUSTED_PROXY_CIDRS: z.string().default(''),
+
+  BILLING_PROVIDER: z.enum(['mock']).default('mock'),
+
+  // CRDT persistence, debounce and version thresholds
+  COLLAB_FLUSH_INTERVAL_MS: positiveInt.default(1000),
+  COLLAB_FLUSH_MAX_WAIT_MS: positiveInt.default(5000),
+  COLLAB_COMPACT_MAX_ROWS: positiveInt.default(100),
+  COLLAB_COMPACT_MAX_BYTES: positiveInt.default(512 * 1024),
+  AUTO_VERSION_INTERVAL_MS: positiveInt.default(10 * 60 * 1000),
+  REVALIDATE_DEBOUNCE_MS: positiveInt.default(3000),
+  SEARCH_DEBOUNCE_MS: positiveInt.default(5000),
+  ISR_REVALIDATE_SECONDS: positiveInt.default(3600),
+
+  // Rate limits and collab limits
+  RATE_LOGIN_PER_MIN_IP_EMAIL: positiveInt.default(5),
+  RATE_LOGIN_PER_MIN_IP: positiveInt.default(20),
+  RATE_REGISTER_PER_HOUR_IP: positiveInt.default(10),
+  RATE_PUBLIC_LINK_PER_HOUR_USER: positiveInt.default(10),
+  COLLAB_MAX_MESSAGES_PER_10S: positiveInt.default(200),
+  COLLAB_MAX_UPDATE_BYTES: positiveInt.default(1024 * 1024),
+  COLLAB_MAX_DOCUMENT_BYTES: positiveInt.default(10 * 1024 * 1024),
+  COLLAB_MAX_CONNECTIONS_PER_DOCUMENT: positiveInt.default(100),
+});
+
+export type AppConfig = z.infer<typeof envSchema>;
+
+export class ConfigError extends Error {
+  constructor(readonly issues: string[]) {
+    super(`Invalid environment configuration:\n${issues.map((i) => `  - ${i}`).join('\n')}`);
+    this.name = 'ConfigError';
+  }
+}
+
+/** Validates the environment; throws ConfigError listing every problem at once. */
+export function parseConfig(env: Record<string, string | undefined>): AppConfig {
+  // Treat empty strings (e.g. `VAR=` in an env file) as unset so defaults apply.
+  const cleaned = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+  const result = envSchema.safeParse(cleaned);
+  if (!result.success) {
+    throw new ConfigError(
+      result.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`),
+    );
+  }
+  const config = result.data;
+
+  if (config.APP_ENV === 'staging') {
+    const issues: string[] = [];
+    if (config.NODE_ENV !== 'production') issues.push('NODE_ENV: must be "production" in staging');
+    for (const [key, value] of Object.entries(config)) {
+      if (typeof value === 'string' && value.includes(DEV_ONLY_MARKER)) {
+        issues.push(`${key}: contains a development placeholder; set a real value for staging`);
+      }
+    }
+    if (issues.length > 0) throw new ConfigError(issues);
+  }
+  return config;
+}
+
+/** Entry point for service startup: prints a readable message and exits instead of a stack trace. */
+export function loadConfigOrExit(env: Record<string, string | undefined> = process.env): AppConfig {
+  try {
+    return parseConfig(env);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      process.stderr.write(`${error.message}\n`);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
