@@ -37,7 +37,7 @@ export default async function WorkspaceLayout({
     <WorkspaceProvider workspaceId={workspace.id} role={workspace.role} initialTree={initialTree}>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[17rem_minmax(0,1fr)]">
         <WorkspaceSidebar />
-        <div className="grid min-w-0 content-start gap-6">
+        <div className="grid grid-cols-[minmax(0,1fr)] content-start gap-6">
           <header className="grid gap-3">
             <div className="flex flex-wrap items-baseline gap-3">
               <h1 className="text-2xl font-semibold">{workspace.name}</h1>

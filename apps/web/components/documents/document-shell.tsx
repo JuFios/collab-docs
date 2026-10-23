@@ -172,7 +172,10 @@ function Frame({
   const [saveState, setSaveState] = useState<TitleSaveState>('idle');
 
   return (
-    <article className="grid gap-4" aria-label={document.title || 'Untitled'}>
+    <article
+      className="grid grid-cols-[minmax(0,1fr)] gap-4"
+      aria-label={document.title || 'Untitled'}
+    >
       {member ? (
         <Breadcrumbs workspaceId={workspaceId} path={trail} current={document.title} />
       ) : (

@@ -310,4 +310,25 @@ test.describe('document tree', () => {
     await page.goto(`/w/${workspaceId}/trash`);
     await expect(page.getByRole('heading', { name: 'The trash is empty' })).toBeVisible();
   });
+
+  test('on a phone the tree is behind a toggle and the page does not scroll sideways', async ({
+    signedInPage: page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    const workspaceId = await createWorkspace(page, 'Phone');
+    const docId = await createDocument(
+      page,
+      workspaceId,
+      'A rather long title for a narrow screen',
+    );
+    await page.goto(`/w/${workspaceId}/d/${docId}`);
+    await expect(page.getByRole('textbox', { name: 'Document title' })).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+
+    await expect(page.getByRole('tree')).toBeHidden();
+    await page.getByRole('button', { name: 'Documents' }).click();
+    await expect(page.getByRole('treeitem', { name: /A rather long title/ })).toBeVisible();
+  });
 });
