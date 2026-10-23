@@ -1,0 +1,92 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Req,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import type { Request } from 'express';
+import { ParseUuidPipe } from '@collab-docs/shared/nest';
+import { CurrentUser, type RequestUser } from '../auth';
+import { DocumentAccess, documentAccessOf } from '../permissions';
+import {
+  CreateShareDto,
+  ShareResponse,
+  SharedDocumentResponse,
+  UpdateShareDto,
+} from './documents.dto';
+import { SharesService } from './shares.service';
+
+@ApiTags('shares')
+@ApiBearerAuth()
+@ApiCookieAuth('access-cookie')
+@Controller()
+export class SharesController {
+  constructor(@Inject(SharesService) private readonly shares: SharesService) {}
+
+  @Get('me/shared-documents')
+  @ApiOperation({ summary: 'Documents shared with the caller' })
+  @ApiOkResponse({ type: [SharedDocumentResponse] })
+  sharedWithMe(@CurrentUser() user: RequestUser) {
+    return this.shares.sharedWith(user.id);
+  }
+
+  @Get('documents/:id/shares')
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({ summary: 'Shares of a document (MANAGE, or EDIT as the author)' })
+  @ApiOkResponse({ type: [ShareResponse] })
+  list(@CurrentUser() user: RequestUser, @Req() req: Request) {
+    return this.shares.list(user.id, documentAccessOf(req));
+  }
+
+  @Post('documents/:id/shares')
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({
+    summary: 'Share with a registered user by email',
+    description: 'Unknown email: 404. An existing share is updated. Shares are not inherited.',
+  })
+  @ApiCreatedResponse({ type: ShareResponse })
+  add(@Body() dto: CreateShareDto, @CurrentUser() user: RequestUser, @Req() req: Request) {
+    return this.shares.add(user.id, documentAccessOf(req), dto.email, dto.role);
+  }
+
+  @Patch('documents/:id/shares/:userId')
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({ summary: 'Change a share role' })
+  @ApiOkResponse({ type: ShareResponse })
+  update(
+    @Param('userId', ParseUuidPipe) userId: string,
+    @Body() dto: UpdateShareDto,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.shares.update(user.id, documentAccessOf(req), userId, dto.role);
+  }
+
+  @Delete('documents/:id/shares/:userId')
+  @HttpCode(204)
+  @DocumentAccess('EDIT', { param: 'id' })
+  @ApiOperation({ summary: 'Revoke a share' })
+  @ApiNoContentResponse()
+  remove(
+    @Param('userId', ParseUuidPipe) userId: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+  ): Promise<void> {
+    return this.shares.remove(user.id, documentAccessOf(req), userId);
+  }
+}

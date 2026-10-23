@@ -730,6 +730,540 @@
           "invites"
         ]
       }
+    },
+    "/api/events/stream": {
+      "get": {
+        "description": "`tree.changed` for the workspace plus the caller's personal events. One connection per browser tab. Members only (404 otherwise); the stream closes when membership is lost.",
+        "operationId": "EventsController_stream",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Server-sent events for a workspace and the caller",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/workspaces/{workspaceId}/documents": {
+      "post": {
+        "description": "Editor or above, and EDIT on the parent. The child copies the parent visibility and shares. Over the plan limit: 403 PLAN_LIMIT_EXCEEDED.",
+        "operationId": "DocumentsController_create",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/workspaces/{workspaceId}/documents/tree": {
+      "get": {
+        "description": "Sorted by position then id. A document under an inaccessible parent is returned with parentId null.",
+        "operationId": "DocumentsController_tree",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TreeNodeResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Flat document tree, filtered by the caller permissions",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/workspaces/{workspaceId}/trash": {
+      "get": {
+        "operationId": "DocumentsController_trash",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrashItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deleted documents (roots of each deletion) the caller could access",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{id}": {
+      "get": {
+        "operationId": "DocumentsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Document metadata with the caller access level",
+        "tags": [
+          "documents"
+        ]
+      },
+      "patch": {
+        "description": "Title and icon need EDIT; visibility needs MANAGE or EDIT as the author.",
+        "operationId": "DocumentsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update title, icon or visibility",
+        "tags": [
+          "documents"
+        ]
+      },
+      "delete": {
+        "description": "Descendants are deleted too, whether or not the caller can see them.",
+        "operationId": "DocumentsController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move the document and all its descendants to the trash",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{id}/restore": {
+      "post": {
+        "description": "Owner, admin, or the author when an editor. Returns to the root when the parent is still deleted. Over the plan limit: 403 PLAN_LIMIT_EXCEEDED.",
+        "operationId": "DocumentsController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore a deleted document with the descendants deleted together with it",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/{id}/move": {
+      "post": {
+        "description": "EDIT on the document and on the new parent, same workspace, no cycles (409). Without beforeId and afterId the document goes last.",
+        "operationId": "DocumentsController_move",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovedDocumentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move or reorder a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/me/shared-documents": {
+      "get": {
+        "operationId": "SharesController_sharedWithMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedDocumentResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Documents shared with the caller",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/documents/{id}/shares": {
+      "get": {
+        "operationId": "SharesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShareResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Shares of a document (MANAGE, or EDIT as the author)",
+        "tags": [
+          "shares"
+        ]
+      },
+      "post": {
+        "description": "Unknown email: 404. An existing share is updated. Shares are not inherited.",
+        "operationId": "SharesController_add",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Share with a registered user by email",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/api/documents/{id}/shares/{userId}": {
+      "patch": {
+        "operationId": "SharesController_update",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShareDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a share role",
+        "tags": [
+          "shares"
+        ]
+      },
+      "delete": {
+        "operationId": "SharesController_remove",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a share",
+        "tags": [
+          "shares"
+        ]
+      }
     }
   },
   "info": {
@@ -1191,6 +1725,346 @@
         },
         "required": [
           "workspaceId",
+          "role"
+        ]
+      },
+      "CreateDocumentDto": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Omit to create at the workspace root"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "example": "Meeting notes"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "DocumentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true,
+            "description": "null when the parent is hidden from the caller"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "object",
+            "nullable": true
+          },
+          "position": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "WORKSPACE",
+              "RESTRICTED"
+            ]
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "myAccess": {
+            "type": "string",
+            "enum": [
+              "VIEW",
+              "COMMENT",
+              "EDIT",
+              "MANAGE"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "parentId",
+          "title",
+          "icon",
+          "position",
+          "visibility",
+          "createdBy",
+          "revision",
+          "myAccess",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "TreeNodeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "object",
+            "nullable": true
+          },
+          "position": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "WORKSPACE",
+              "RESTRICTED"
+            ]
+          },
+          "myAccess": {
+            "type": "string",
+            "enum": [
+              "VIEW",
+              "COMMENT",
+              "EDIT",
+              "MANAGE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "title",
+          "icon",
+          "position",
+          "visibility",
+          "myAccess"
+        ]
+      },
+      "TrashItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "object",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string"
+          },
+          "documentCount": {
+            "type": "number",
+            "description": "Live documents restored together with it"
+          },
+          "canRestore": {
+            "type": "boolean",
+            "description": "Whether the caller may restore it"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "icon",
+          "deletedAt",
+          "documentCount",
+          "canRestore"
+        ]
+      },
+      "UpdateDocumentDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "icon": {
+            "type": "object",
+            "nullable": true,
+            "maxLength": 32,
+            "description": "Emoji; null clears it"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "WORKSPACE",
+              "RESTRICTED"
+            ]
+          }
+        }
+      },
+      "MoveDocumentDto": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true,
+            "description": "New parent; null moves to the root"
+          },
+          "beforeId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Place the document right before this sibling"
+          },
+          "afterId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Place the document right after this sibling"
+          }
+        },
+        "required": [
+          "parentId"
+        ]
+      },
+      "MovedDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "position": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "position"
+        ]
+      },
+      "SharedDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "VIEWER",
+              "EDITOR"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "title",
+          "icon",
+          "role"
+        ]
+      },
+      "ShareResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "VIEWER",
+              "EDITOR"
+            ]
+          }
+        },
+        "required": [
+          "userId",
+          "email",
+          "name",
+          "role"
+        ]
+      },
+      "CreateShareDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "grace@example.com",
+            "description": "Must belong to a registered user"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "VIEWER",
+              "EDITOR"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ]
+      },
+      "UpdateShareDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "VIEWER",
+              "EDITOR"
+            ]
+          }
+        },
+        "required": [
           "role"
         ]
       }
