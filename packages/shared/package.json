@@ -1,0 +1,58 @@
+{
+  "name": "@collab-docs/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./content": {
+      "import": {
+        "types": "./dist/content/index.d.ts",
+        "default": "./dist/content/index.js"
+      },
+      "require": {
+        "types": "./dist/content/index.d.cts",
+        "default": "./dist/content/index.cjs"
+      }
+    },
+    "./nest": {
+      "import": {
+        "types": "./dist/nest/index.d.ts",
+        "default": "./dist/nest/index.js"
+      },
+      "require": {
+        "types": "./dist/nest/index.d.cts",
+        "default": "./dist/nest/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "6.2.13"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.12"
+  }
+}
