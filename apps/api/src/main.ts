@@ -1,10 +1,13 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { loadConfigOrExit } from '@collab-docs/shared/nest';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
+  const config = loadConfigOrExit();
   const app = await NestFactory.create(AppModule);
-  await app.listen(Number(process.env.PORT ?? 4000));
+  app.enableShutdownHooks();
+  await app.listen(config.PORT ?? 4000, '0.0.0.0');
 }
 
 void bootstrap();

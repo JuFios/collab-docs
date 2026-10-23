@@ -1,9 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
 
-@Controller('health')
+@Controller()
 export class HealthController {
-  @Get()
-  check(): { status: 'ok' } {
+  @Get('health')
+  health(): { status: 'ok' } {
+    return { status: 'ok' };
+  }
+
+  // Placeholder: dependency checks (database, redis) arrive with the API platform work.
+  @Get('ready')
+  ready(): { status: 'ok' } {
     return { status: 'ok' };
   }
 }
