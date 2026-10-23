@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import {
@@ -28,6 +29,8 @@ import {
   DocumentResponse,
   MoveDocumentDto,
   MovedDocumentResponse,
+  RecentDocumentResponse,
+  RecentDocumentsQueryDto,
   TrashItemResponse,
   TreeNodeResponse,
   UpdateDocumentDto,
@@ -73,6 +76,22 @@ export class DocumentsController {
     @Req() req: Request,
   ) {
     return this.documents.tree(user.id, workspaceId, workspaceRoleOf(req));
+  }
+
+  @Get('workspaces/:workspaceId/documents/recent')
+  @WorkspaceRole('VIEWER')
+  @ApiOperation({
+    summary: 'Most recently changed documents the caller can open',
+    description: 'Sorted by last change, newest first; only documents with VIEW or higher access.',
+  })
+  @ApiOkResponse({ type: [RecentDocumentResponse] })
+  recent(
+    @Param('workspaceId', ParseUuidPipe) workspaceId: string,
+    @Query() query: RecentDocumentsQueryDto,
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.documents.recent(user.id, workspaceId, workspaceRoleOf(req), query.limit);
   }
 
   @Get('workspaces/:workspaceId/trash')

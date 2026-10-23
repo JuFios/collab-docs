@@ -887,6 +887,60 @@
         ]
       }
     },
+    "/api/workspaces/{workspaceId}/documents/recent": {
+      "get": {
+        "description": "Sorted by last change, newest first; only documents with VIEW or higher access.",
+        "operationId": "DocumentsController_recent",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 20,
+              "default": 8,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecentDocumentResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Most recently changed documents the caller can open",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/api/workspaces/{workspaceId}/trash": {
       "get": {
         "operationId": "DocumentsController_trash",
@@ -1894,6 +1948,41 @@
           "position",
           "visibility",
           "myAccess"
+        ]
+      },
+      "RecentDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "object",
+            "nullable": true
+          },
+          "myAccess": {
+            "type": "string",
+            "enum": [
+              "VIEW",
+              "COMMENT",
+              "EDIT",
+              "MANAGE"
+            ]
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "icon",
+          "myAccess",
+          "updatedAt"
         ]
       },
       "TrashItemResponse": {

@@ -5,11 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
-import {
-  PERM_EVENT_CHANNELS,
-  REALTIME_CHANNEL,
-  type WorkspaceRole,
-} from '@collab-docs/shared';
+import { PERM_EVENT_CHANNELS, REALTIME_CHANNEL, type WorkspaceRole } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/shared/nest';
 import { createTestApp } from '../test/test-app';
 
@@ -303,7 +299,7 @@ describe('documents', () => {
 
     it('workspace routes: viewers read, outsiders get 404', async () => {
       const team = await setupTeam();
-      for (const path of ['documents/tree', 'trash']) {
+      for (const path of ['documents/tree', 'documents/recent', 'trash']) {
         await as(team.viewer).get(`/workspaces/${team.workspaceId}/${path}`).expect(200);
         await as(team.outsider).get(`/workspaces/${team.workspaceId}/${path}`).expect(404);
       }
@@ -643,6 +639,69 @@ describe('documents', () => {
       }
       const titles = (await treeOf(team.owner, team.workspaceId)).map((n) => n.title);
       expect(titles).toEqual(['one', 'renamed']);
+    });
+  });
+
+  describe('recent', () => {
+    const recentOf = async (user: TestUser, workspaceId: string, query = '') =>
+      (await as(user).get(`/workspaces/${workspaceId}/documents/recent${query}`).expect(200))
+        .body as Array<{ id: string; title: string; myAccess: string; updatedAt: string }>;
+
+    it('lists the latest changes first and honours the limit', async () => {
+      const team = await setupTeam();
+      const first = await createDoc(team.owner, team.workspaceId, { title: 'first' });
+      await createDoc(team.owner, team.workspaceId, { title: 'second' });
+      await createDoc(team.owner, team.workspaceId, { title: 'third' });
+      await as(team.editor)
+        .patch(`/documents/${first.id}`)
+        .send({ title: 'first, edited' })
+        .expect(200);
+
+      const all = await recentOf(team.editor, team.workspaceId);
+      expect(all.map((d) => d.title)).toEqual(['first, edited', 'third', 'second']);
+      expect(all[0]?.myAccess).toBe('EDIT');
+      expect(
+        (await recentOf(team.viewer, team.workspaceId, '?limit=2')).map((d) => d.title),
+      ).toEqual(['first, edited', 'third']);
+    });
+
+    it('omits restricted documents the caller has no share on, and applies the limit after filtering', async () => {
+      const team = await setupTeam();
+      const visible = await createDoc(team.owner, team.workspaceId, { title: 'visible' });
+      const hidden = await createDoc(team.owner, team.workspaceId, { title: 'hidden' });
+      const shared = await createDoc(team.owner, team.workspaceId, { title: 'shared' });
+      for (const doc of [hidden, shared]) {
+        await as(team.owner)
+          .patch(`/documents/${doc.id}`)
+          .send({ visibility: 'RESTRICTED' })
+          .expect(200);
+      }
+      await share(team.owner, shared.id, team.viewer, 'VIEWER');
+      // newest of all is the hidden one, so a limit of 1 must still return something the caller can open
+      await as(team.owner).patch(`/documents/${hidden.id}`).send({ title: 'hidden!' }).expect(200);
+
+      const asViewer = await recentOf(team.viewer, team.workspaceId);
+      expect(asViewer.map((d) => [d.title, d.myAccess])).toEqual([
+        ['shared', 'VIEW'],
+        ['visible', 'VIEW'],
+      ]);
+      expect(JSON.stringify(asViewer)).not.toContain(hidden.id);
+      expect(await recentOf(team.viewer, team.workspaceId, '?limit=1')).toHaveLength(1);
+      expect(await recentOf(team.admin, team.workspaceId)).toHaveLength(3);
+      expect(visible.id).toBeDefined();
+    });
+
+    it('skips deleted documents and validates the limit', async () => {
+      const team = await setupTeam();
+      const gone = await createDoc(team.owner, team.workspaceId, { title: 'gone' });
+      await createDoc(team.owner, team.workspaceId, { title: 'kept' });
+      await as(team.owner).delete(`/documents/${gone.id}`).expect(204);
+      expect((await recentOf(team.owner, team.workspaceId)).map((d) => d.title)).toEqual(['kept']);
+      for (const bad of ['0', '21', 'abc']) {
+        await as(team.owner)
+          .get(`/workspaces/${team.workspaceId}/documents/recent?limit=${bad}`)
+          .expect(400);
+      }
     });
   });
 

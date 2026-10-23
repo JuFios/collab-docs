@@ -28,6 +28,7 @@ import type {
   DocumentResponse,
   MoveDocumentDto,
   MovedDocumentResponse,
+  RecentDocumentResponse,
   TrashItemResponse,
   TreeNodeResponse,
   UpdateDocumentDto,
@@ -177,6 +178,57 @@ export class DocumentsService {
     ]);
     const shareByDocument = new Map<string, ShareRole>(shares.map((s) => [s.documentId, s.role]));
     return buildTree(rows, role, shareByDocument);
+  }
+
+  /**
+   * Latest changes first. Visibility is filtered in SQL (so the limit applies to documents the caller may open)
+   * and the access level is then resolved with the same function as the tree.
+   */
+  async recent(
+    userId: string,
+    workspaceId: string,
+    role: WorkspaceRole,
+    limit: number,
+  ): Promise<RecentDocumentResponse[]> {
+    const managesAll = role === 'OWNER' || role === 'ADMIN';
+    const rows = await this.prisma.document.findMany({
+      where: {
+        workspaceId,
+        deletedAt: null,
+        ...(managesAll
+          ? {}
+          : { OR: [{ visibility: 'WORKSPACE' }, { shares: { some: { userId } } }] }),
+      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        icon: true,
+        visibility: true,
+        updatedAt: true,
+        shares: { where: { userId }, select: { role: true } },
+      },
+    });
+    return rows.flatMap((row) => {
+      const access = resolveDocumentAccess({
+        deleted: false,
+        workspaceRole: role,
+        shareRole: row.shares[0]?.role ?? null,
+        visibility: row.visibility,
+      });
+      return access === 'NONE'
+        ? []
+        : [
+            {
+              id: row.id,
+              title: row.title,
+              icon: row.icon,
+              myAccess: access,
+              updatedAt: row.updatedAt.toISOString(),
+            },
+          ];
+    });
   }
 
   // --- update ---------------------------------------------------------------------------------------------

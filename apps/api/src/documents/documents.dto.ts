@@ -1,13 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   ValidateIf,
 } from 'class-validator';
 
@@ -125,6 +128,32 @@ export class TreeNodeResponse {
   @ApiProperty() position!: string;
   @ApiProperty({ enum: VISIBILITIES }) visibility!: (typeof VISIBILITIES)[number];
   @ApiProperty({ enum: ACCESS_LEVELS }) myAccess!: (typeof ACCESS_LEVELS)[number];
+}
+
+export const RECENT_DEFAULT_LIMIT = 8;
+export const RECENT_MAX_LIMIT = 20;
+
+export class RecentDocumentsQueryDto {
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: RECENT_MAX_LIMIT,
+    default: RECENT_DEFAULT_LIMIT,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(RECENT_MAX_LIMIT)
+  limit: number = RECENT_DEFAULT_LIMIT;
+}
+
+export class RecentDocumentResponse {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() title!: string;
+  @ApiProperty({ nullable: true }) icon!: string | null;
+  @ApiProperty({ enum: ACCESS_LEVELS }) myAccess!: (typeof ACCESS_LEVELS)[number];
+  @ApiProperty() updatedAt!: string;
 }
 
 export class MovedDocumentResponse {
