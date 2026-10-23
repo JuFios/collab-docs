@@ -112,6 +112,8 @@ jobs:
       RATE_REGISTER_PER_HOUR_IP: '10000'
       RATE_LOGIN_PER_MIN_IP: '10000'
       RATE_LOGIN_PER_MIN_IP_EMAIL: '10000'
+      # lets the streaming spec observe skeletons before data (read by the web container and by the spec)
+      DASHBOARD_BLOCK_DELAY_MS: '600'
       # bake tags images with the names compose expects for this project
       COMPOSE_PROJECT_NAME: collab-docs
     steps:
@@ -152,7 +154,7 @@ jobs:
             migrate.cache-from=type=gha,scope=migrate
             minio.cache-from=type=gha,scope=minio
       - name: Start the stack
-        run: docker compose up --no-build --wait proxy
+        run: docker compose up --no-build --wait proxy worker
       - run: pnpm test:e2e
       - name: Compose logs
         if: failure()
