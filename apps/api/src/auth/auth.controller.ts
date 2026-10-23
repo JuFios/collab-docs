@@ -114,6 +114,8 @@ export class AuthController {
     @Query('next') nextParam?: string,
   ): Promise<void> {
     const next = sanitizeNextPath(typeof nextParam === 'string' ? nextParam : undefined);
+    // a redirect that rotates the session must never be replayed from a cache
+    res.setHeader('Cache-Control', 'no-store');
     const presented = readCookie(req, REFRESH_COOKIE);
     try {
       if (!presented) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');

@@ -35,7 +35,8 @@ Compose carries development-only defaults for every variable, so nothing else is
 
 | Service    | URL / port                                  | Notes                                                                                    |
 | ---------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `web`      | http://localhost:3000                       | Next.js                                                                                  |
+| `proxy`    | http://localhost:3000                       | nginx, the only public HTTP entry point; sets `X-Forwarded-For` for `web`                |
+| `web`      | - (behind `proxy`)                          | Next.js                                                                                  |
 | `api`      | http://localhost:4000 (`/health`, `/ready`) | NestJS REST API                                                                          |
 | `worker`   | -                                           | Background jobs (same image as `api`)                                                    |
 | `collab`   | `localhost:4001` (`/health`)                | Public WebSocket port. Internal port `4002` is only reachable inside the compose network |
@@ -493,6 +494,17 @@ Login and registration are Server Actions: zod on the client and again on the se
 `cookies().set` with identical attributes. `next` is only honoured for same-origin relative paths
 (`sanitizeNextPath` in `@collab-docs/shared`, also used by the API redirect).
 
+### Client address and the proxy
+
+The API rate-limits logins, registrations and public links per client address, taken from `X-Forwarded-For`
+and honoured only from `TRUSTED_PROXY_CIDRS`. `web` forwards the header it receives, so whoever sets it
+decides the address: an exposed Next server would let a client pick a new "IP" per request and defeat every
+limit. Hence the compose topology `browser → proxy (nginx) → web → api`: nginx is the only published HTTP
+port, replaces `X-Forwarded-For` with the peer address instead of appending to it, and passes `Host` and
+`X-Forwarded-Proto`. The same holds for the staging override, which also unpublishes the api port.
+If you put another load balancer or TLS terminator in front of nginx, configure nginx `real_ip` for it
+(`set_real_ip_from` + `real_ip_header X-Forwarded-For`), otherwise every user shares the balancer's address.
+
 ### Error handling on the frontend
 
 Every client turns a failed response into one `ApiError` (`status`, `code`, `message`, `correlationId`,
@@ -516,14 +528,15 @@ TanStack `QueryCache`/`MutationCache`):
 The Playwright suite (`e2e/`) runs against the production images, not dev servers:
 
 ```bash
-docker compose up --build --wait web   # web plus the api, collab and infrastructure it depends on
+docker compose up --build --wait proxy   # nginx plus web, api, collab and the infrastructure behind them
 pnpm exec playwright install chromium  # first run only
-RATE_REGISTER_PER_HOUR_IP=1000 RATE_LOGIN_PER_MIN_IP=1000 docker compose up -d api   # optional: headroom for repeated runs
+RATE_REGISTER_PER_HOUR_IP=1000 RATE_LOGIN_PER_MIN_IP=1000 docker compose up -d api   # headroom: all tests share one address
 pnpm test:e2e
 ```
 
-Fixtures create users through the API (each call from its own `x-forwarded-for` address, which the API trusts
-only from `TRUSTED_PROXY_CIDRS`) and reuse the session cookies instead of logging in through the UI. Traces
+Every test runs from the same address (the proxy overwrites `X-Forwarded-For`), so CI raises the per-IP limits
+through the `RATE_*` variables; `client-ip.spec.ts` proves that a spoofed header gets no fresh bucket. Fixtures
+create users through the API and reuse the session cookies instead of logging in through the UI. Traces
 and videos are kept for failed tests (`test-results/`, `playwright-report/`). CI runs the same steps in the
 `e2e` job and uploads both folders as artifacts.
 

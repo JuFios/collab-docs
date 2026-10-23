@@ -16,12 +16,6 @@ export function newUser(label = 'user'): TestUser {
   return { name: `E2E ${label}`, email: `e2e-${label}-${unique}@example.test`, password: PASSWORD };
 }
 
-/** Distinct client address per call so per-IP rate limits do not couple unrelated tests (honoured behind the trusted proxy). */
-function forwardedFor(): string {
-  sequence += 1;
-  return `10.77.${Math.floor(sequence / 250) % 250}.${(sequence % 250) + 1}`;
-}
-
 /** Creates an account through the api, the way the app itself would; the context keeps the session cookies. */
 export async function registerViaApi(
   request: APIRequestContext,
@@ -29,7 +23,6 @@ export async function registerViaApi(
 ): Promise<TestUser> {
   const response = await request.post('/api/auth/register', {
     data: user,
-    headers: { 'x-forwarded-for': forwardedFor() },
   });
   expect(response.status(), await response.text()).toBe(201);
   return user;
@@ -57,7 +50,6 @@ export const test = base.extend<Fixtures>({
     const context = await browser.newContext({ baseURL });
     const login = await context.request.post('/api/auth/login', {
       data: { email: user.email, password: user.password },
-      headers: { 'x-forwarded-for': forwardedFor() },
     });
     expect(login.status(), await login.text()).toBe(200);
     await use(await context.newPage());

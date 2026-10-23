@@ -241,6 +241,7 @@ describe('auth', () => {
       const { refresh } = await register();
       const response = await navigate(refresh, '/w/abc?x=1').expect(302);
       expect(response.headers.location).toBe('/w/abc?x=1');
+      expect(response.headers['cache-control']).toBe('no-store');
       expect(cookiesOf(response)[ACCESS_COOKIE]).toBeDefined();
       expect(cookiesOf(response)[REFRESH_COOKIE]).toBeDefined();
     });
