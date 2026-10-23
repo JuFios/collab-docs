@@ -45,9 +45,13 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.32.0
+        ports: ['1025:1025', '8025:8025']
     env:
       DATABASE_URL: postgresql://collab:ci-postgres-password@localhost:5432/collab
       REDIS_URL: redis://localhost:6379
+      MAILPIT_URL: http://localhost:8025
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
