@@ -14,6 +14,7 @@ FROM fetch AS build
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile
 RUN pnpm --filter @collab-docs/shared build \
+  && pnpm --filter @collab-docs/db build \
   && pnpm --filter @collab-docs/api build \
   && pnpm --filter @collab-docs/api deploy --legacy --prod /out
 

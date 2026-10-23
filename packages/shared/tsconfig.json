@@ -1,5 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "module": "ESNext", "moduleResolution": "Bundler", "noEmit": true },
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "experimentalDecorators": true
+  },
   "include": ["src", "tsup.config.ts"]
 }

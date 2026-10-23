@@ -80,14 +80,15 @@ unit tests (with Postgres and Redis service containers), and Docker image builds
 
 ## Development
 
-| Command                   | What it does                                |
-| ------------------------- | ------------------------------------------- |
-| `pnpm lint`               | ESLint (flat config) for the whole repo     |
-| `pnpm typecheck`          | `tsc --noEmit` in every package             |
-| `pnpm test`               | Jest (api, collab) and Vitest (web, shared) |
-| `pnpm build`              | Builds shared libraries, then every app     |
-| `pnpm format`             | Prettier                                    |
-| `pnpm --filter api start` | Runs the built API                          |
+| Command                   | What it does                                 |
+| ------------------------- | -------------------------------------------- |
+| `pnpm lint`               | ESLint (flat config) for the whole repo      |
+| `pnpm typecheck`          | `tsc --noEmit` in every package              |
+| `pnpm test`               | Jest (api, collab) and Vitest (web, shared)  |
+| `pnpm test:integration`   | Integration tests (needs Postgres and Redis) |
+| `pnpm build`              | Builds shared libraries, then every app      |
+| `pnpm format`             | Prettier                                     |
+| `pnpm --filter api start` | Runs the built API                           |
 
 Libraries in `packages/*` are built before type checking and testing (`pnpm build:libs`, run
 automatically by `typecheck` and `test`).
@@ -157,6 +158,77 @@ position) WHERE deleted_at IS NULL`; the rest are plain b-tree indexes on foreig
 All of them read `DATABASE_URL`. Integration tests use `createTestDb()` from
 `@collab-docs/db/testing`: each Jest worker creates its own throwaway database on that server,
 applies the migrations and truncates tables between tests.
+
+## API platform
+
+Shared by `api`, its queue worker and (later) `collab`: it lives in `@collab-docs/shared/nest`, and each
+app only plugs the modules in (`PlatformModule` for HTTP services, `WorkerPlatformModule` for the worker).
+
+- **Prefix**: routes live under `/api`; `/health`, `/ready`, `/metrics` and `/docs` are served without it.
+- **Validation**: a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`), `ParseUuidPipe`
+  for ids, and base DTOs for pagination and id params. Request/response contracts are zod schemas in
+  `@collab-docs/shared`; response DTO classes `implements` the inferred types, and integration tests parse
+  real responses with the same schemas, so backend and frontend cannot drift apart silently.
+- **HTTP hardening**: `helmet`, a CORS allowlist (`WEB_ORIGIN` plus `CORS_ALLOWED_ORIGINS`), `cookie-parser`,
+  a JSON/urlencoded body limit (`HTTP_BODY_LIMIT`, default `1mb`) and `trust proxy` restricted to
+  `TRUSTED_PROXY_CIDRS` (empty means `x-forwarded-for` is never trusted).
+- **Rate limiting**: `@nestjs/throttler` with a Redis store, keyed by the real client IP. A generous global
+  limit (`RATE_GLOBAL_PER_MIN_IP`) applies everywhere; `RateLimit.login()`, `.register()`, `.publicLink()` and
+  `.ticket()` are per-route presets whose limits come from the `RATE_*` variables. If Redis is unavailable
+  the limiter fails open and logs the error.
+- **OpenAPI**: Swagger UI at `/docs`, JSON at `/docs/json`. `pnpm --filter @collab-docs/api openapi:export`
+  writes the committed `docs/openapi.json` (the app is built without connecting to anything).
+
+### Error model
+
+Every error response has the same shape, produced by one global `AllExceptionsFilter`:
+
+```json
+{
+  "statusCode": 400,
+  "code": "VALIDATION_FAILED",
+  "message": "Request validation failed",
+  "details": [
+    { "field": "name", "messages": ["name must be longer than or equal to 1 characters"] }
+  ],
+  "correlationId": "6f1c3f0e-…"
+}
+```
+
+`code` comes from the catalog in `@collab-docs/shared` (`VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`,
+`NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `PLAN_LIMIT_EXCEEDED`, `PAYLOAD_TOO_LARGE`, …) and clients branch on
+it, never on `message`. Application code throws `AppException(code, message, { details })`. Framework and
+library errors are mapped: validation errors become 400, Prisma `P2002` 409, `P2025` 404, throttling 429,
+oversized or malformed bodies 413/400. Anything unrecognised is a 500 with a generic message — the real
+error is logged with the correlation id but never returned.
+
+### Logging & correlation
+
+Logs are JSON (`nestjs-pino`). Each request gets a correlation id: the incoming `x-correlation-id` if it is a
+short, log-safe token, otherwise a new UUID. It is stored in `AsyncLocalStorage`, added to every log line,
+returned in the `x-correlation-id` response header and in every error body. When code enqueues a job the id
+is written into the job data, and the worker restores it before running the processor, so one id follows a
+change from the browser through the API into background work (and later the collab server). Secrets are
+redacted from logs (`authorization`, `cookie`, `set-cookie`, passwords, tokens); business events are logged
+with `logEvent('document.published', { … })`.
+
+### Observability
+
+- `GET /health` — liveness. `GET /ready` — readiness: pings Postgres and Redis and answers `503` with the
+  per-dependency state when one is down.
+- `GET /metrics` — Prometheus: default process metrics, `http_request_duration_seconds{route,method,status}`
+  (labelled by route pattern, not raw URL) and queue metrics (`queue_jobs{queue,state}`,
+  `queue_jobs_processed_total{queue,result}`). The endpoint is unauthenticated, so keep it off public ingress.
+
+### Queues
+
+BullMQ queues (`search-sync`, `public-revalidate`, `mail`, `billing-webhook`, `link-expiry`, `version-prune`)
+are created through `QueueService`, with default retries (5 attempts, exponential backoff) and bounded
+history. The worker runs from the same image as the API (`node dist/main.worker.js`) and shuts down
+gracefully, finishing active jobs. `enqueueDebounced(queue, documentId, delayMs)` coalesces bursts of
+changes into one delayed job using BullMQ deduplication; the job reads the latest state when it runs, and a
+change made while it is processing schedules a new job. A fixed `jobId` per document is deliberately not
+used, because BullMQ remembers finished ids and would drop later changes.
 
 ## Decisions
 

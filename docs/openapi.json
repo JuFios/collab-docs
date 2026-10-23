@@ -1,0 +1,126 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ops"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Collab Docs API",
+    "description": "REST API of the Collab Docs workspace. Document content is edited over WebSocket (CRDT).",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      },
+      "access-cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "cd_at"
+      },
+      "refresh-cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "cd_rt"
+      }
+    },
+    "schemas": {
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ReadyResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down"
+              ]
+            }
+          }
+        },
+        "required": [
+          "status",
+          "checks"
+        ]
+      }
+    }
+  }
+}
