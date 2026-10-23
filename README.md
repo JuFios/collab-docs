@@ -75,8 +75,8 @@ pnpm dev
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request: lint and typecheck,
-unit tests (with Postgres and Redis service containers), and Docker image builds for `web`, `api`,
-`collab` and `minio`.
+unit tests (with Postgres and Redis service containers), Docker image builds for `web`, `api`,
+`collab` and `minio`, and the Playwright `e2e` job against the compose stack (see [Running e2e](#running-e2e)).
 
 ## Development
 
@@ -234,13 +234,14 @@ used, because BullMQ remembers finished ids and would drop later changes.
 
 Own JWT auth in the API (`apps/api/src/auth`), no external identity provider.
 
-| Endpoint                  | Purpose                                                 |
-| ------------------------- | ------------------------------------------------------- |
-| `POST /api/auth/register` | Create an account and sign in (409 if the email exists) |
-| `POST /api/auth/login`    | Sign in                                                 |
-| `POST /api/auth/refresh`  | Rotate the refresh token, issue a new access token      |
-| `POST /api/auth/logout`   | Revoke the refresh-token family, clear the cookies      |
-| `GET /api/auth/me`        | The signed-in user (read from the database)             |
+| Endpoint                  | Purpose                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
+| `POST /api/auth/register` | Create an account and sign in (409 if the email exists)                                       |
+| `POST /api/auth/login`    | Sign in                                                                                       |
+| `POST /api/auth/refresh`  | Rotate the refresh token, issue a new access token                                            |
+| `GET /api/auth/refresh`   | Same rotation for browser navigations; `302` to `?next=` (relative paths only) or to `/login` |
+| `POST /api/auth/logout`   | Revoke the refresh-token family, clear the cookies                                            |
+| `GET /api/auth/me`        | The signed-in user (read from the database)                                                   |
 
 Register, login and refresh answer `{ user, accessToken, expiresIn }` and set two cookies. The access token
 is also accepted as `Authorization: Bearer` (Swagger, tests, non-browser clients).
@@ -437,6 +438,94 @@ runs. A failed enqueue is logged and counted (`queue_enqueue_failures_total`) bu
 that also re-checks membership, `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no` so a
 rewrite proxy does not buffer it. One connection per browser tab carries the workspace's `tree.changed` events
 and the caller's personal events.
+
+## Frontend
+
+`apps/web` is a Next.js 15 App Router application (Tailwind, shadcn/ui primitives on Radix, Geist fonts
+bundled through npm so builds need no network).
+
+### Frontend: Server vs Client boundary
+
+Server Component is the default: anything that reads data and needs no browser state. A Client Component
+(`"use client"`) exists only where the browser is required, and each one is listed here with the reason:
+
+| Client component                                           | Why                                                                                 |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `components/providers.tsx`                                 | TanStack Query provider and the toast outlet                                        |
+| `components/auth/login-form.tsx`, `register-form.tsx`      | `useActionState` (pending state, field errors) and a zod pass before the round trip |
+| `components/user-menu.tsx`                                 | Radix menu; the logout Server Action runs from its event handler                    |
+| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner` | Radix/Sonner primitives that need effects and event handlers                        |
+| `app/error.tsx`                                            | Error boundaries must be Client Components                                          |
+
+Route groups keep the rendering mode of each area separate:
+
+- `app/(public)` — landing, `/login`, `/register` (later `/p/[slug]`, `/e/[token]`, `/invite/[token]`).
+- `app/(app)` — everything behind a session (`/w`, later documents, settings, billing).
+- The root `app/layout.tsx` is static: it never calls `cookies()` or `headers()`. Only `(app)/layout.tsx`
+  reads the session, so public pages stay statically renderable (the build output marks `/` as static).
+
+Three API clients, one per rendering context (all parse responses with the zod schemas of
+`@collab-docs/shared`; there is no `any` at the boundary):
+
+| Client              | Used from                 | Behaviour                                                                                             |
+| ------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `lib/api/server.ts` | Server Components/Actions | Forwards the user's cookies, `x-forwarded-for`, `x-correlation-id` and `Origin`; never cached         |
+| `lib/api/public.ts` | Statically rendered pages | No cookies, no headers (reading either would opt the page out of ISR); accepts `next.revalidate/tags` |
+| `lib/api/client.ts` | Browser (TanStack Query)  | Same-origin `/api/*`; on 401 one single-flight `POST /auth/refresh`, one retry, then login            |
+
+`/api/*` is a Next rewrite to `API_INTERNAL_URL`, so the browser only ever talks to its own origin: cookies,
+the CSRF `Origin` check and SSE all work without CORS. The rewrite target is compiled into the build (Next
+bakes rewrites into its routes manifest; the Dockerfile exposes it as a build arg), whereas
+`JWT_ACCESS_SECRET`, `API_INTERNAL_URL` and `WEB_ORIGIN` used by the middleware and Server Actions are read at
+request time — an image built without them works once they are set on the container.
+
+**Edge middleware** (`middleware.ts`) is UX routing, not a security boundary: every Server Component, Server
+Action and REST call is authorized again by the API. It verifies `cd_at` with `jose`, redirects anonymous users
+off private routes, bounces signed-in users off `/login` and `/register`, and stamps `x-correlation-id`. The
+refresh cookie is scoped to `/api/auth`, so the browser never sends it on a page navigation, and the access
+cookie expires together with its JWT (an expired session looks like a missing cookie). For a private route
+without a valid access token the middleware therefore redirects to `GET /api/auth/refresh?next=…`: the API
+rotates the session and redirects back, or sends anonymous visitors on to `/login?next=…`. The routing decision itself is a pure function
+(`lib/auth/route-policy.ts`).
+
+Login and registration are Server Actions: zod on the client and again on the server, field errors from
+`VALIDATION_FAILED`, a `Retry-After`-aware message on 429, and the API's `Set-Cookie` headers replayed through
+`cookies().set` with identical attributes. `next` is only honoured for same-origin relative paths
+(`sanitizeNextPath` in `@collab-docs/shared`, also used by the API redirect).
+
+### Error handling on the frontend
+
+Every client turns a failed response into one `ApiError` (`status`, `code`, `message`, `correlationId`,
+`fieldErrors`). Query and mutation failures pass through one handler (`lib/api/error-handler.ts`, wired into the
+TanStack `QueryCache`/`MutationCache`):
+
+| Case                  | Behaviour                                                                     |
+| --------------------- | ----------------------------------------------------------------------------- |
+| 401                   | Client refreshes once and retries; if that fails the user is sent to `/login` |
+| 403 (query)           | No toast: the screen renders `ForbiddenState`                                 |
+| 404 (query)           | No toast: the screen renders its not-found state                              |
+| 403 (mutation)        | Toast "You don't have permission to do that"                                  |
+| `PLAN_LIMIT_EXCEEDED` | `plan-limit-exceeded` window event for the upgrade dialog; no toast           |
+| 429, network, 5xx     | Friendly toast; the correlation id is shown as a reference                    |
+
+`app/error.tsx` and `app/not-found.tsx` cover render-time failures; `EmptyState`, `ErrorState`,
+`ForbiddenState` and `LoadingState` are the shared building blocks.
+
+### Running e2e
+
+The Playwright suite (`e2e/`) runs against the production images, not dev servers:
+
+```bash
+docker compose up --build --wait web   # web plus the api, collab and infrastructure it depends on
+pnpm exec playwright install chromium  # first run only
+RATE_REGISTER_PER_HOUR_IP=1000 RATE_LOGIN_PER_MIN_IP=1000 docker compose up -d api   # optional: headroom for repeated runs
+pnpm test:e2e
+```
+
+Fixtures create users through the API (each call from its own `x-forwarded-for` address, which the API trusts
+only from `TRUSTED_PROXY_CIDRS`) and reuse the session cookies instead of logging in through the UI. Traces
+and videos are kept for failed tests (`test-results/`, `playwright-report/`). CI runs the same steps in the
+`e2e` job and uploads both folders as artifacts.
 
 ## Decisions
 
