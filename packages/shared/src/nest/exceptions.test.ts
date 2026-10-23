@@ -98,3 +98,13 @@ describe('toErrorResponse', () => {
     expect(body.message).toBe('Service unavailable');
   });
 });
+
+describe('AppException headers', () => {
+  it('exposes extra response headers such as Retry-After', () => {
+    const error = new AppException('RATE_LIMITED', 'Slow down', {
+      headers: { 'Retry-After': '12' },
+    });
+    expect(error.headers).toEqual({ 'Retry-After': '12' });
+    expect(new AppException('NOT_FOUND', 'x').headers).toEqual({});
+  });
+});

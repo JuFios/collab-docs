@@ -48,6 +48,11 @@ export const envSchema = z.object({
     .regex(/^\d+(kb|mb)$/i, 'e.g. 1mb')
     .default('1mb'),
 
+  // argon2id parameters (defaults follow the OWASP minimum: 19 MiB, 2 iterations, 1 lane)
+  ARGON2_MEMORY_KIB: positiveInt.default(19456),
+  ARGON2_TIME_COST: positiveInt.default(2),
+  ARGON2_PARALLELISM: positiveInt.default(1),
+
   BILLING_PROVIDER: z.enum(['mock']).default('mock'),
 
   // CRDT persistence, debounce and version thresholds

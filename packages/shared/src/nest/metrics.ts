@@ -1,6 +1,7 @@
 import { Controller, Get, Global, Inject, Injectable, Module, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from './public';
 import type { NextFunction, Request, Response } from 'express';
 import { collectDefaultMetrics, Histogram, Registry } from 'prom-client';
 
@@ -36,6 +37,7 @@ export class MetricsService {
 }
 
 @ApiExcludeController()
+@Public()
 @SkipThrottle()
 @Controller()
 export class MetricsController {

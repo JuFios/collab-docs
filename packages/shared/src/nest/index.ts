@@ -11,3 +11,4 @@ export * from './queue';
 export * from './throttle';
 export * from './http';
 export * from './platform';
+export * from './public';

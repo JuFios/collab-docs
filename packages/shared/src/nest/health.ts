@@ -6,6 +6,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from './public';
 import type { Response } from 'express';
 import type { Redis } from 'ioredis';
 import { type HealthResponse, type ReadyResponse } from '../pagination';
@@ -70,6 +71,7 @@ export class ReadyResponseDto implements ReadyResponse {
 }
 
 @ApiTags('ops')
+@Public()
 @SkipThrottle()
 @Controller()
 export class HealthController {
