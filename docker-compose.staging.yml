@@ -53,6 +53,9 @@ services:
     environment: *staging-env
   api:
     restart: unless-stopped
+    # reachable only through web (server-side calls and the /api rewrite); a published port would let
+    # clients talk to it directly with a spoofed X-Forwarded-For
+    ports: !override []
     environment:
       <<: *staging-env
       PORT: '4000'
@@ -68,3 +71,7 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: staging
+      WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN in .env.staging}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env.staging}
+  proxy:
+    restart: unless-stopped
