@@ -1,0 +1,13 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+onlyBuiltDependencies:
+  - '@swc/core'
+  - esbuild
+  - sharp
+  - unrs-resolver
+
+overrides:
+  # next@15 pins postcss 8.4.31, which has published advisories; use the patched release
+  'next>postcss': 8.5.31
