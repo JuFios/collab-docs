@@ -55,6 +55,13 @@ export function useDocumentQuery(documentId: string, initialData: DocumentDetail
   });
 }
 
+/**
+ * Tree writes of one workspace run one after another, in the order the user made them. Without a scope, quick
+ * successive keyboard moves are separate parallel requests and the server may apply them in a different order than
+ * the one the optimistic tree on screen shows.
+ */
+const treeScope = (workspaceId: string) => ({ id: `tree:${workspaceId}` });
+
 interface TreeSnapshot {
   previous: TreeNode[] | undefined;
 }
@@ -79,6 +86,7 @@ function rollback(queryClient: QueryClient, workspaceId: string, snapshot?: Tree
 export function useMoveDocument(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    scope: treeScope(workspaceId),
     mutationFn: ({ id, plan }: { id: string; plan: MovePlan }) =>
       apiClient.request(`/documents/${id}/move`, {
         method: 'POST',
@@ -107,6 +115,7 @@ function toNode(document: DocumentDetails): TreeNode {
 export function useCreateDocument(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    scope: treeScope(workspaceId),
     mutationFn: ({ parentId }: { parentId?: string }) =>
       apiClient.request(`/workspaces/${workspaceId}/documents`, {
         method: 'POST',
@@ -128,6 +137,7 @@ export function useCreateDocument(workspaceId: string) {
 export function useRenameDocument(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    scope: treeScope(workspaceId),
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       apiClient.request(`/documents/${id}`, {
         method: 'PATCH',
@@ -147,6 +157,7 @@ export function useRenameDocument(workspaceId: string) {
 export function useDeleteDocument(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    scope: treeScope(workspaceId),
     mutationFn: ({ id }: { id: string }) =>
       apiClient.request(`/documents/${id}`, { method: 'DELETE' }),
     onMutate: ({ id }) =>
@@ -165,6 +176,7 @@ export function useDeleteDocument(workspaceId: string) {
 export function useRestoreDocument(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    scope: treeScope(workspaceId),
     mutationFn: ({ id }: { id: string }) =>
       apiClient.request(`/documents/${id}/restore`, { method: 'POST', schema: documentSchema }),
     onSettled: () => {

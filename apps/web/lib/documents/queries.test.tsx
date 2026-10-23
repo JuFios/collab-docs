@@ -129,4 +129,32 @@ describe('tree mutations', () => {
       expect(cached(queryClient)?.find((n) => n.id === id(3))?.title).toBe('Doc 3'),
     );
   });
+
+  it('sends tree writes one at a time, in the order they were made', async () => {
+    const answers: ((value: unknown) => void)[] = [];
+    request.mockImplementation((path: string) =>
+      path.endsWith('/move')
+        ? new Promise((resolve) => {
+            answers.push(resolve);
+          })
+        : Promise.resolve(seed),
+    );
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useMoveDocument('ws'), { wrapper });
+
+    act(() => {
+      result.current.mutate({ id: id(3), plan: { parentId: id(1) } });
+      result.current.mutate({ id: id(3), plan: { parentId: null, beforeId: id(1) } });
+    });
+    await waitFor(() => expect(answers).toHaveLength(1));
+    const moves = () => request.mock.calls.filter(([path]) => String(path).endsWith('/move'));
+    expect(moves()).toHaveLength(1);
+
+    answers[0]?.({ id: id(3), parentId: id(1), position: 'a1' });
+    await waitFor(() => expect(answers).toHaveLength(2));
+    expect(moves().map(([, init]) => init.body)).toEqual([
+      { parentId: id(1) },
+      { parentId: null, beforeId: id(1) },
+    ]);
+  });
 });
