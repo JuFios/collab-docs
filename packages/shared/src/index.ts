@@ -25,3 +25,4 @@ export * from './plans';
 export * from './permissions';
 export * from './realtime-events';
 export * from './fractional';
+export * from './collab';
