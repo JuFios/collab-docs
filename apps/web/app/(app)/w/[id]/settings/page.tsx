@@ -10,7 +10,7 @@ import {
   getInvites,
   getMembers,
   getUsage,
-  getWorkspace,
+  requireWorkspace,
 } from '@/lib/workspaces/data';
 
 export const metadata: Metadata = { title: 'Settings · Collab Docs' };
@@ -36,7 +36,7 @@ function Section({
 
 export default async function SettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const workspace = await getWorkspace(id);
+  const workspace = await requireWorkspace(id);
   // the nav hides this page from editors and viewers; opening the URL directly lands here
   if (!roleAtLeast(workspace.role, 'ADMIN')) {
     return (

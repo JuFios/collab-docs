@@ -463,6 +463,10 @@ Server Component is the default: anything that reads data and needs no browser s
 | `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                    |
 | `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                        |
 | `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action |
+| `components/workspaces/workspace-provider.tsx`                                                              | Owns the tab's single SSE connection and hands the workspace role, the initial tree and the connection state to the sidebar   |
+| `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server           |
+| `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                        |
+| `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                |
 | `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                            |
 | `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                               |
 | `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                  |
@@ -470,13 +474,16 @@ Server Component is the default: anything that reads data and needs no browser s
 
 Screens and where they render (everything not listed as a client island is a Server Component):
 
-| Screen                | Renders in                             | Why                                                                                                                                                                              |
-| --------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/w`                  | RSC page + client create form          | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present |
-| `/w/[id]` (dashboard) | RSC, four async RSC blocks             | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                |
-| `/w/[id]/settings`    | RSC page + client forms/tables         | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                           |
-| `/invite/[token]`     | RSC                                    | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                  |
-| Navbar                | RSC shell + switcher/user-menu islands | The workspace list is fetched in the layout and passed down as typed props                                                                                                       |
+| Screen                | Renders in                             | Why                                                                                                                                                                                                             |
+| --------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/w`                  | RSC page + client create form          | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                |
+| `/w/[id]` (dashboard) | RSC, four async RSC blocks             | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                               |
+| `/w/[id]/settings`    | RSC page + client forms/tables         | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                          |
+| `/invite/[token]`     | RSC                                    | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                 |
+| `/w/[id]/d/[docId]`   | RSC page + client shell                | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island for the inline title and live refresh |
+| `/w/[id]/trash`       | RSC page + client list                 | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                |
+| `/shared`             | RSC                                    | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                |
+| Navbar                | RSC shell + switcher/user-menu islands | The workspace list is fetched in the layout and passed down as typed props                                                                                                                                      |
 
 **Dashboard streaming.** `app/(app)/w/[id]/page.tsx` awaits nothing but the workspace the layout already loaded
 (deduplicated by `React.cache`). The blocks (`components/dashboard/blocks.tsx`: recent documents, members,
@@ -484,6 +491,51 @@ plan and usage, shared with me) are async Server Components under their own `<Su
 block never holds back the others. The e2e suite asserts this on the raw response: with
 `DASHBOARD_BLOCK_DELAY_MS` set (ignored when `APP_ENV=staging`) the first flush contains the skeletons and not
 the data, and the data arrives later in the same response.
+
+### Document tree and live updates
+
+The sidebar of every `/w/[id]/…` page is a Client Component fed by a Server Component: the layout fetches the flat
+tree (`GET /workspaces/:id/documents/tree`) next to the workspace and passes it as `initialData` of the TanStack
+Query that owns it, so the first paint already has the tree and no skeleton flashes. If only that fetch fails,
+the sidebar loads the tree itself (skeleton, then a retry button). Everything else is the same query: the
+document page reads breadcrumbs from it, and mutations update it.
+
+- **Structure.** The api returns a flat list; `lib/documents/tree.ts` groups it by parent, orders siblings by
+  their fractional position and flattens the open branches into visible rows. A node whose parent is not in the
+  list (the api sends `parentId: null` under a parent the caller cannot see) is a root.
+- **Moving.** A drop (pointer) or an `Alt+Arrow` (keyboard) is turned into the body of `POST /documents/:id/move`
+  by pure functions in `lib/documents/move.ts` (`planDrop`, `planKeyboardMove`): which parent, and which sibling
+  it goes before or after. They check what the api checks (EDIT on the node and on the new parent, no cycle into
+  its own subtree) and drop moves that change nothing. The pointer position maps to a zone of the row under it:
+  upper quarter = before, middle = inside, lower quarter = after (after an open parent = its first child). The api
+  stays the source of truth: a refused move rolls the cache back to the snapshot taken before the optimistic
+  update, and every settled mutation refetches.
+- **Ordering of writes.** All tree mutations of a workspace share a mutation `scope`, so they reach the api one
+  after another in the order the user made them; otherwise quick successive keyboard moves would be parallel
+  requests that the server could apply in a different order than the one on screen.
+- **Keyboard.** The tree is an ARIA tree with a roving tab stop: `↑ ↓ Home End` move focus, `→ ←` open, close or
+  step to the child or parent, `Enter` opens the document, `F2` renames, `Delete` asks before moving to the
+  trash, `Shift+F10` or the context-menu key opens the row menu, and `Alt+↑ ↓` reorder, `Alt+→` indents under the
+  previous sibling and `Alt+←` outdents. Drag and drop itself is pointer-only (`@dnd-kit/react`, grip handle on
+  every row the caller can edit); the keyboard path does not need pointer geometry.
+- **Open branches** are remembered per workspace in `localStorage` (guarded with try/catch: private mode just
+  forgets). The first render uses only the ancestors of the open document, so the markup matches the server's;
+  the remembered set is merged right after mount.
+- **Live updates.** `WorkspaceProvider` mounts the tab's only `EventSource` on `GET /api/events/stream`
+  (`lib/realtime/event-stream.ts`). A `tree.changed` event invalidates the tree, the trash and every open
+  document query. While the connection merely drops, the browser's own retry applies; when the browser gives up
+  (a 401 closes an `EventSource` for good), the session is refreshed and a new source is opened with exponential
+  backoff (1 s to 30 s). After any interruption the stream asks for a refetch, since events in between are gone.
+  The sidebar shows the state (`Live`, `Connecting…`, `Reconnecting…`, `Offline`). Other features subscribe
+  through the provider instead of opening a second stream (`notification.created` uses the same connection).
+- **Permissions in the UI** only hide or disable what would be refused (`myAccess` per node, the workspace
+  role): no drag handle, "+" or menu on read-only nodes, no title field for a reader (a "Read-only" badge
+  instead). The api checks every request again.
+- **Deleted and unavailable documents.** The api answers 404 for both. A member's trash lists what they may
+  restore, so the document page and the open shell look the id up there: found means "This document was
+  deleted" with Restore, otherwise "no longer available". A guest (a user with a share but no membership)
+  opens `/w/[id]/d/[docId]` without the workspace frame: the layout renders its children bare when the user is
+  not a member, and every other page of the segment answers 404 through `requireWorkspace`.
 
 ### Server Actions vs REST vs WebSocket
 
@@ -606,6 +658,11 @@ through the `RATE_*` variables; `client-ip.spec.ts` proves that a spoofed header
 create users through the API and reuse the session cookies instead of logging in through the UI. Traces
 and videos are kept for failed tests (`test-results/`, `playwright-report/`). CI runs the same steps in the
 `e2e` job and uploads both folders as artifacts.
+
+Streaming leaves a hidden copy of a boundary's content in the DOM until React reveals it, and a strict
+`getByText`/`getByLabel`/`getByTestId` that runs in that moment fails with a strict-mode violation instead of
+retrying. Specs therefore use role-based locators (hidden elements are excluded) for pages that sit behind
+`loading.tsx`, and `persisted(page, …)` in `documents.spec.ts` waits for the api call before a reload.
 
 ## Decisions
 

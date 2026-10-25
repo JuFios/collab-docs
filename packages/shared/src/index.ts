@@ -3,6 +3,7 @@ export * from './pagination';
 export * from './auth';
 export * from './workspaces';
 export * from './next-path';
+export * from './documents';
 
 import { SignJWT, jwtVerify } from 'jose';
 

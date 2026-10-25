@@ -1,15 +1,20 @@
 import {
   authUserSchema,
+  documentSchema,
   inviteListSchema,
   memberListSchema,
   recentDocumentListSchema,
   sharedDocumentListSchema,
+  trashItemListSchema,
+  treeNodeListSchema,
   usageSchema,
   workspaceListSchema,
   workspaceSchema,
 } from '@collab-docs/shared';
+import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { apiServer } from '@/lib/api/server';
+import { isApiError } from '@/lib/api/errors';
 
 /**
  * Read models for Server Components. Each is wrapped in `cache`, so a layout and the page below it that ask for
@@ -38,4 +43,24 @@ export const getRecentDocuments = cache((id: string, limit: number) =>
 );
 export const getSharedDocuments = cache(() =>
   apiServer('/me/shared-documents', { schema: sharedDocumentListSchema }),
+);
+
+/** Page-level guard: a non-member (a guest with a share, or a stranger) gets the same 404 as an unknown id. */
+export async function requireWorkspace(id: string) {
+  try {
+    return await getWorkspace(id);
+  } catch (error) {
+    if (isApiError(error) && (error.status === 404 || error.status === 400)) notFound();
+    throw error;
+  }
+}
+
+export const getTree = cache((id: string) =>
+  apiServer(`/workspaces/${segment(id)}/documents/tree`, { schema: treeNodeListSchema }),
+);
+export const getTrash = cache((id: string) =>
+  apiServer(`/workspaces/${segment(id)}/trash`, { schema: trashItemListSchema }),
+);
+export const getDocument = cache((id: string) =>
+  apiServer(`/documents/${segment(id)}`, { schema: documentSchema }),
 );
