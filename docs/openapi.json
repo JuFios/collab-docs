@@ -1573,6 +1573,145 @@
           "versions"
         ]
       }
+    },
+    "/api/documents/{id}/attachments/presign": {
+      "post": {
+        "description": "Needs EDIT. Only png, jpeg, webp and gif up to the configured size are accepted. The size is reserved against the workspace quota; the returned policy pins the key, the content type and the exact length. POST `fields` followed by the file to `url`, then call `complete`.",
+        "operationId": "AttachmentsController_presign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignAttachmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedAttachmentResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PLAN_LIMIT_EXCEEDED with `details.kind = \"storage\"`"
+          },
+          "413": {
+            "description": "The file is larger than the per-file limit"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a one-time form to upload an image straight to storage",
+        "tags": [
+          "attachments"
+        ]
+      }
+    },
+    "/api/attachments/{id}/complete": {
+      "post": {
+        "description": "Needs EDIT on the document. Checks the stored size, content type and magic number; a file that does not match what was declared is deleted. Calling it again for a completed upload is a no-op.",
+        "operationId": "AttachmentsController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The upload is missing or does not match (`details.reason`)"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify an uploaded image and make it usable",
+        "tags": [
+          "attachments"
+        ]
+      }
+    },
+    "/api/attachments/{id}/url": {
+      "get": {
+        "description": "Needs VIEW on the document the image belongs to. The URL is valid for 5 minutes.",
+        "operationId": "AttachmentsController_url",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentUrlResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Short-lived URL to read an image",
+        "tags": [
+          "attachments"
+        ]
+      }
     }
   },
   "info": {
@@ -2615,6 +2754,125 @@
         },
         "required": [
           "revision"
+        ]
+      },
+      "PresignAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "diagram.png",
+            "description": "Original file name; its extension has to belong to `mime`"
+          },
+          "mime": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "image/gif"
+            ]
+          },
+          "size": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Exact file size in bytes"
+          }
+        },
+        "required": [
+          "filename",
+          "mime",
+          "size"
+        ]
+      },
+      "PresignedAttachmentResponse": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "description": "Upload target: POST multipart/form-data here"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Form fields to send before the `file` part (the file must be the last field)"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachmentId",
+          "url",
+          "fields",
+          "expiresAt"
+        ]
+      },
+      "AttachmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mime": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "image/gif"
+            ]
+          },
+          "size": {
+            "type": "number",
+            "description": "Bytes"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "READY"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "documentId",
+          "mime",
+          "size",
+          "status",
+          "createdAt"
+        ]
+      },
+      "AttachmentUrlResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Short-lived download URL"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
         ]
       }
     }

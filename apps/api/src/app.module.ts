@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PlatformModule } from '@collab-docs/shared/nest';
+import { AttachmentsModule } from './attachments';
 import { AuthModule } from './auth';
 import { CollabModule } from './collab';
 import { DocumentsModule } from './documents';
@@ -20,6 +21,7 @@ import { WorkspacesModule } from './workspaces';
     DocumentsModule,
     CollabModule,
     VersionsModule,
+    AttachmentsModule,
   ],
 })
 export class AppModule {}

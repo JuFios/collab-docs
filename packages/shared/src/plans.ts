@@ -36,3 +36,8 @@ export function limitFor(plan: PlanTier, kind: LimitKind): number | null {
       return limits.maxStorageBytes;
   }
 }
+
+/** True when `addBytes` more storage still fits the plan (the limit itself is allowed). */
+export function storageFits(plan: PlanTier, currentBytes: number, addBytes: number): boolean {
+  return currentBytes + addBytes <= PLAN_CATALOG[plan].maxStorageBytes;
+}

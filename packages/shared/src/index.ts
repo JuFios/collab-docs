@@ -28,3 +28,4 @@ export * from './fractional';
 export * from './collab';
 export * from './state-vector';
 export * from './versions';
+export * from './attachments';

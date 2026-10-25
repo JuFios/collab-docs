@@ -16,6 +16,7 @@ export const QUEUE_NAMES = {
   billingWebhook: 'billing-webhook',
   linkExpiry: 'link-expiry',
   versionPrune: 'version-prune',
+  attachmentCleanup: 'attachment-cleanup',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
