@@ -1381,6 +1381,198 @@
           "collab"
         ]
       }
+    },
+    "/api/documents/{id}/versions": {
+      "get": {
+        "description": "Automatic snapshots (every 10 minutes while the document changes, 50 kept), manual ones and the snapshots taken before a restore.",
+        "operationId": "VersionsController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VersionResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Version history, newest first",
+        "tags": [
+          "versions"
+        ]
+      },
+      "post": {
+        "description": "Needs EDIT. The collaboration service is asked to write its buffer first (2 s limit); if it cannot be reached the stored state is snapshotted and `flushed` is false. At most 100 saved versions per document.",
+        "operationId": "VersionsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVersionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedVersionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The document already has 100 saved versions"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save the current content as a named version",
+        "tags": [
+          "versions"
+        ]
+      }
+    },
+    "/api/documents/{id}/versions/{versionId}": {
+      "get": {
+        "operationId": "VersionsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionContentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One version with its content as sanitised ProseMirror JSON",
+        "tags": [
+          "versions"
+        ]
+      }
+    },
+    "/api/documents/{id}/versions/{versionId}/restore": {
+      "post": {
+        "description": "Needs EDIT. The current content is saved as a \"before restore\" version first; connected editors converge on the restored content and the history is not rewritten.",
+        "operationId": "VersionsController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoredVersionResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The collaboration service is not available"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the content with a version",
+        "tags": [
+          "versions"
+        ]
+      }
     }
   },
   "info": {
@@ -2236,6 +2428,193 @@
         "required": [
           "ticket",
           "wsUrl"
+        ]
+      },
+      "VersionAuthorResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "VersionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "MANUAL",
+              "PRE_RESTORE"
+            ]
+          },
+          "label": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "The document title when the snapshot was taken"
+          },
+          "author": {
+            "nullable": true,
+            "description": "null for automatic snapshots",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VersionAuthorResponse"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "title",
+          "author",
+          "createdAt"
+        ]
+      },
+      "VersionContentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "MANUAL",
+              "PRE_RESTORE"
+            ]
+          },
+          "label": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "The document title when the snapshot was taken"
+          },
+          "author": {
+            "nullable": true,
+            "description": "null for automatic snapshots",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VersionAuthorResponse"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The content as sanitised ProseMirror JSON ({ type: \"doc\", content: [...] })"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "title",
+          "author",
+          "createdAt",
+          "content"
+        ]
+      },
+      "CreateVersionDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "Before the review"
+          }
+        }
+      },
+      "CreatedVersionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "MANUAL",
+              "PRE_RESTORE"
+            ]
+          },
+          "label": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "The document title when the snapshot was taken"
+          },
+          "author": {
+            "nullable": true,
+            "description": "null for automatic snapshots",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VersionAuthorResponse"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "flushed": {
+            "type": "boolean",
+            "description": "false when the collaboration service could not write its buffer first, so the snapshot may miss the last seconds of editing"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "title",
+          "author",
+          "createdAt",
+          "flushed"
+        ]
+      },
+      "RestoredVersionResponse": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number",
+            "description": "documents.revision after the restore"
+          }
+        },
+        "required": [
+          "revision"
         ]
       }
     }
