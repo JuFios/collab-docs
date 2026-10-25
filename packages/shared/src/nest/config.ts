@@ -53,6 +53,11 @@ export const envSchema = z.object({
   ARGON2_TIME_COST: positiveInt.default(2),
   ARGON2_PARALLELISM: positiveInt.default(1),
 
+  /** Largest single image accepted by the upload policy (bytes). */
+  ATTACHMENT_MAX_BYTES: positiveInt.max(100 * 1024 * 1024).default(10 * 1024 * 1024),
+  /** An upload that was never completed is swept after this many hours. */
+  ATTACHMENT_PENDING_TTL_HOURS: positiveInt.default(24),
+
   BILLING_PROVIDER: z.enum(['mock']).default('mock'),
 
   // CRDT persistence, debounce and version thresholds
