@@ -101,5 +101,17 @@ guest's session when an EDIT link expires.
 ## Rooms
 
 A room is created when the first client connects (`DocumentStore.load`) and unloaded `COLLAB_ROOM_IDLE_MS` after
-the last one leaves, after the store has flushed. `DocumentStore` is the only way a room touches storage; the
-in-memory implementation currently behind it is replaced by the database-backed one with the persistence work.
+the last one leaves, after the store has written its buffer and compacted the log (a room that could not be
+written stays loaded and is retried). `DocumentStore` is the only way a room touches storage; the Postgres
+implementation is described in the README ("CRDT persistence strategy").
+
+## Internal API (port 4002)
+
+Not published; every request needs `Authorization: Bearer <INTERNAL_API_TOKEN>`.
+
+| Request                                                   | Effect                                                                                         |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `POST /internal/documents/:id/flush`                      | Writes the buffered updates; `{ revision }`. 500 if the database refuses (the buffer is kept). |
+| `POST /internal/documents/:id/restore {versionId,userId}` | Snapshots the current content (`PRE_RESTORE`), replaces it with the version's; `{ revision }`. |
+| `POST /internal/documents/:id/close`                      | Final flush, `deleted` event, close 4410 for every connection; `{ closed }`, idempotent.       |
+| `GET /internal/status`                                    | `{ rooms, connections }`.                                                                      |
