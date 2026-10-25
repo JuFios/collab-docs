@@ -13,7 +13,7 @@ pnpm monorepo:
 | ----------------- | ----------------------------------------------------------------------- |
 | `apps/web`        | Next.js 15 (App Router, Tailwind). Route groups `(public)` and `(app)`. |
 | `apps/api`        | NestJS REST API (`GET /health`).                                        |
-| `apps/collab`     | NestJS real-time collaboration server (`GET /health`).                  |
+| `apps/collab`     | NestJS WebSocket server for document co-editing (Yjs), `GET /health`.   |
 | `packages/shared` | Shared code with entry points `.`, `./content` and `./nest`.            |
 | `packages/db`     | Prisma schema, migrations, seed and integration-test harness.           |
 
@@ -441,6 +441,72 @@ runs. A failed enqueue is logged and counted (`queue_enqueue_failures_total`) bu
 that also re-checks membership, `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no` so a
 rewrite proxy does not buffer it. One connection per browser tab carries the workspace's `tree.changed` events
 and the caller's personal events.
+
+## Content model
+
+`@collab-docs/shared/content` is the single definition of what a document may contain; the editor, the
+publishing endpoints, search and comments all build on it, and it imports neither `/nest` nor `@collab-docs/db`.
+
+- **Allowlist as data** (`schema.ts`): nodes `paragraph`, `heading` (1-3), `bulletList`, `orderedList`, `listItem`,
+  `taskList`, `taskItem`, `image`, `codeBlock`, `hardBreak`, `mention`; marks `bold`, `italic`, `code`, `link`;
+  each with its attributes. The editor configuration and the sanitiser read the same table.
+- **Storage format**: a `Y.XmlFragment` named `content` inside the `Y.Doc`, the field the Tiptap Collaboration
+  extension must be configured with (`field: 'content'`; its default is `'default'`). `yDocToContentJson` reads
+  it with `@tiptap/y-tiptap`, the library Tiptap v3 itself uses, so the XML shape is the editor's own.
+- **`sanitizeContent`** turns any JSON into a valid document: unknown nodes are unwrapped (their text survives
+  as text), unknown marks and attributes are dropped, `link.href` must be an absolute `http`, `https` or `mailto`
+  URL (everything else, including `javascript:`, `data:` and relative references, loses the link mark) and gets
+  `rel="noopener noreferrer nofollow ugc"`, images keep only `attachmentId` (a UUID) and `alt`, code languages come
+  from a list, control and bidirectional-override characters are removed, and depth, node count and text length
+  are capped (the walk over hostile input is bounded too). Anything that leaves the server as content goes through it.
+- `extractPlainText`, `extractMeta` (description of at most 160 characters, first image), `extractMentions` and
+  `extractBlockIds` serve search, social previews, notifications and comment anchors.
+
+The tests include an XSS corpus and a round trip ProseMirror JSON -> `Y.Doc` -> encoded update -> JSON.
+
+## Collaboration service
+
+`apps/collab` owns document content. A document is a `Y.Doc` held in a room while someone has it open; clients
+exchange Yjs updates with the room over a WebSocket, and nothing else writes content. The wire protocol,
+close codes and the `persisted` / `access` / `deleted` room events are specified in
+[docs/collab-protocol.md](docs/collab-protocol.md).
+
+- **Transport.** A custom adapter (`ws/collab-ws.adapter.ts`) lets the Nest gateway take binary frames on
+  `/ws/<documentId>`; Nest's stock `WsAdapter` matches exact paths and expects JSON messages, neither of which
+  fits the `y-websocket` protocol. The server is a plain `ws` + `y-protocols` implementation, the client is
+  `y-websocket`.
+- **Authentication and permissions.** The api issues a 60 s ticket (`POST /documents/:id/collab-ticket`, at
+  least `VIEW`, limited per user); collab verifies it and reads the document permissions **from the database**
+  with the same pure resolver as the api (`resolveDocumentAccess`), so the ticket cannot carry stale rights. A
+  user below `EDIT` is connected read-only: their updates are dropped before they touch the document.
+- **Permission changes** reach open sockets through the Redis events of the api and a 60 s re-check
+  (see the protocol document); downgrade, revoke and delete all take effect without a reconnect.
+- **Hot path.** A client update goes through size and permission checks, `Y.applyUpdate` inside `try/catch`, a
+  duplicate check, and out to the other sockets and the `DocumentStore`: no HTTP call, no database read.
+- **Presence.** Cursors are relayed; the server sets `user.id`, `name` and `color` from the authenticated
+  identity, so a client cannot impersonate anybody.
+- **Limits** (env, defaults from the spec): 200 messages per 10 s per connection, 1 MB per update, 10 MB per
+  document, 100 connections per document, 4 KB per presence state. Violations are rejected, counted and logged
+  as `collab.update_rejected` without disturbing the other clients.
+- **Metrics** (`/metrics`): `collab_connections`, `collab_rooms`, `collab_updates_applied_total`,
+  `collab_updates_duplicate_total`, `collab_updates_rejected_total{reason}`, `collab_rate_limited_total`,
+  `collab_ws_close_total{code}`, `collab_access_changes_total{outcome}`, plus the platform metrics.
+- **Internal port 4002** is a second application inside the same process (sharing the rooms), never published
+  by compose; every route needs `Authorization: Bearer <INTERNAL_API_TOKEN>`.
+- **Persistence.** Rooms talk to storage only through the `DocumentStore` interface (`load`, `enqueue`,
+  `onPersisted`, `flush`). The implementation behind it is currently in memory, so a restart of the service loses
+  document content until the database-backed store replaces it.
+
+### Scaling the collab service
+
+One instance is supported, deliberately: a document's room lives in the memory of one process, which makes
+ordering and the `persisted` acknowledgement simple. To run several instances you would route every connection
+for a document to the same instance (consistent hashing on the document id at the load balancer), or give every
+instance a room per document and fan updates and awareness out between them over Redis pub/sub, with the stored
+update log as the source of truth for a room that starts cold. Both need a decision about who persists and who
+acknowledges, which is why the second is more work than it looks. The rest of the service is already
+stateless: tickets are verified with a shared secret, permissions are read from Postgres, and permission events
+arrive through Redis, which every instance would subscribe to.
 
 ## Frontend
 
