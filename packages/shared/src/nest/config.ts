@@ -76,6 +76,11 @@ export const envSchema = z.object({
   COLLAB_MAX_UPDATE_BYTES: positiveInt.default(1024 * 1024),
   COLLAB_MAX_DOCUMENT_BYTES: positiveInt.default(10 * 1024 * 1024),
   COLLAB_MAX_CONNECTIONS_PER_DOCUMENT: positiveInt.default(100),
+  COLLAB_MAX_AWARENESS_BYTES: positiveInt.default(4096),
+  /** An unused room is unloaded after this long without connections. */
+  COLLAB_ROOM_IDLE_MS: positiveInt.default(30_000),
+  /** Every open socket gets its permissions re-read this often (a safety net for lost Redis events). */
+  COLLAB_ACCESS_RECHECK_MS: positiveInt.default(60_000),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

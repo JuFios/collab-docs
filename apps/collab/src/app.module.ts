@@ -1,5 +1,23 @@
 import { Module } from '@nestjs/common';
-import { HealthController } from './health.controller';
+import {
+  AppConfigModule,
+  HealthModule,
+  MetricsModule,
+  PlatformLoggerModule,
+  RedisModule,
+} from '@collab-docs/shared/nest';
+import { CollabModule } from './collab.module';
+import { PrismaModule } from './prisma/prisma.module';
 
-@Module({ controllers: [HealthController] })
+@Module({
+  imports: [
+    AppConfigModule.forRoot(),
+    PlatformLoggerModule,
+    RedisModule,
+    MetricsModule,
+    HealthModule,
+    PrismaModule,
+    CollabModule,
+  ],
+})
 export class AppModule {}

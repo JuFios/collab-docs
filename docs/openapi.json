@@ -1347,6 +1347,40 @@
           "shares"
         ]
       }
+    },
+    "/api/documents/{id}/collab-ticket": {
+      "post": {
+        "description": "Requires at least VIEW. The ticket only identifies the caller: the collab service reads the permissions from the database when the socket opens and again whenever they change, so a viewer gets a read-only connection from the same ticket.",
+        "operationId": "CollabTicketController_issue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollabTicketResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ticket for the collaboration WebSocket of a document",
+        "tags": [
+          "collab"
+        ]
+      }
     }
   },
   "info": {
@@ -2184,6 +2218,24 @@
         },
         "required": [
           "role"
+        ]
+      },
+      "CollabTicketResponse": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "Short-lived (60 s) token for one WebSocket connection; fetch a new one per attempt."
+          },
+          "wsUrl": {
+            "type": "string",
+            "description": "Base URL for y-websocket; the provider appends `/<documentId>?ticket=<ticket>`. Closes: 4401 ticket invalid (fetch a new one), 4403 no access, 4404 not found, 4410 deleted, 4429 rate limited.",
+            "example": "ws://localhost:4001/ws"
+          }
+        },
+        "required": [
+          "ticket",
+          "wsUrl"
         ]
       }
     }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PlatformModule } from '@collab-docs/shared/nest';
 import { AuthModule } from './auth';
+import { CollabModule } from './collab';
 import { DocumentsModule } from './documents';
 import { PermissionsModule } from './permissions';
 import { PrismaModule } from './prisma/prisma.module';
@@ -16,6 +17,7 @@ import { WorkspacesModule } from './workspaces';
     WorkspacesModule,
     RealtimeEventsModule,
     DocumentsModule,
+    CollabModule,
   ],
 })
 export class AppModule {}
