@@ -1,6 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
-import { type LimitKind, type PlanTier, PLAN_CATALOG, limitFor } from '@collab-docs/shared';
+import {
+  type LimitKind,
+  type PlanTier,
+  PLAN_CATALOG,
+  limitFor,
+  storageFits,
+} from '@collab-docs/shared';
 import { AppException } from '@collab-docs/shared/nest';
 
 export type Tx = Prisma.TransactionClient;
@@ -86,6 +92,27 @@ export class PlanLimitsService {
     if (current + count > limit) throw this.exceeded('documents', limit, current, plan);
   }
 
+  /** Bytes held by the workspace's attachments, uploads still in flight included (their size is reserved). */
+  async storageBytes(tx: Tx | PrismaClient, workspaceId: string): Promise<number> {
+    const { _sum } = await tx.attachment.aggregate({
+      where: { workspaceId },
+      _sum: { size: true },
+    });
+    return _sum.size ?? 0;
+  }
+
+  /**
+   * Throws `403 PLAN_LIMIT_EXCEEDED` (`kind: 'storage'`) when `bytes` more would not fit.
+   * Must run after `lockWorkspace` in the same transaction.
+   */
+  async assertCanAddStorage(tx: Tx, workspaceId: string, bytes: number): Promise<void> {
+    const plan = await this.planOf(tx, workspaceId);
+    const current = await this.storageBytes(tx, workspaceId);
+    if (!storageFits(plan, current, bytes)) {
+      throw this.exceeded('storage', PLAN_CATALOG[plan].maxStorageBytes, current, plan);
+    }
+  }
+
   exceeded(kind: LimitKind, limit: number, current: number, plan: PlanTier): AppException {
     return new AppException(
       'PLAN_LIMIT_EXCEEDED',
@@ -98,9 +125,10 @@ export class PlanLimitsService {
 
   async usage(workspaceId: string): Promise<Usage> {
     const plan = await this.planOf(this.prisma, workspaceId);
-    const [slots, documents] = await Promise.all([
+    const [slots, documents, storageBytes] = await Promise.all([
       this.countMemberSlots(this.prisma, workspaceId),
       this.prisma.document.count({ where: { workspaceId, deletedAt: null } }),
+      this.storageBytes(this.prisma, workspaceId),
     ]);
     return {
       plan,
@@ -110,8 +138,7 @@ export class PlanLimitsService {
         limit: limitFor(plan, 'members') as number,
       },
       documents: { current: documents, limit: limitFor(plan, 'documents') },
-      // attachments arrive with the storage module
-      storage: { currentBytes: 0, limitBytes: limitFor(plan, 'storage') as number },
+      storage: { currentBytes: storageBytes, limitBytes: limitFor(plan, 'storage') as number },
     };
   }
 }
