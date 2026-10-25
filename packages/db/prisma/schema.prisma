@@ -57,6 +57,14 @@ enum SubscriptionStatus {
   @@map("subscription_status")
 }
 
+enum DocumentVersionKind {
+  AUTO
+  MANUAL
+  PRE_RESTORE
+
+  @@map("document_version_kind")
+}
+
 enum PublicLinkMode {
   VIEW
   EDIT
@@ -79,6 +87,7 @@ model User {
   documentsCreated   Document[]
   documentShares     DocumentShare[]
   publicLinksCreated PublicLink[]
+  versionsCreated    DocumentVersion[]
 
   @@map("users")
 }
@@ -185,12 +194,15 @@ model Document {
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  parent    Document?       @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children  Document[]      @relation("DocumentTree")
-  author    User            @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  parent    Document?         @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Document[]        @relation("DocumentTree")
+  author    User              @relation(fields: [createdBy], references: [id], onDelete: Restrict)
   shares    DocumentShare[]
   links     PublicLink[]
+  updates   DocumentUpdate[]
+  state     DocumentState?
+  versions  DocumentVersion[]
 
   // partial in the migration: WHERE deleted_at IS NULL
   @@index([workspaceId, parentId, position], map: "documents_tree_idx")
@@ -230,4 +242,54 @@ model PublicLink {
 
   @@unique([documentId, mode])
   @@map("public_links")
+}
+
+// CRDT storage (spec §5): an append-only log of Yjs updates (the tail) plus one compacted state that covers
+// every log row up to `last_update_id`. Compaction folds the tail into the state and deletes the folded rows.
+model DocumentUpdate {
+  // bigserial: the compaction cut-off ("rows up to this id are in the state") needs a total order
+  id         BigInt   @id @default(autoincrement())
+  documentId String   @map("document_id") @db.Uuid
+  update     Bytes
+  // sha256 (hex) of `update`; a retried flush cannot insert the same bytes twice
+  updateHash String   @map("update_hash")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, updateHash])
+  @@index([documentId, id])
+  @@map("document_updates")
+}
+
+model DocumentState {
+  documentId   String   @id @map("document_id") @db.Uuid
+  state        Bytes
+  // highest document_updates.id folded into `state`
+  lastUpdateId BigInt   @map("last_update_id")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_states")
+}
+
+model DocumentVersion {
+  id         String              @id @default(uuid(7)) @db.Uuid
+  documentId String              @map("document_id") @db.Uuid
+  // the whole document as one Yjs update
+  state      Bytes
+  kind       DocumentVersionKind
+  label      String?
+  // the document title at the time of the snapshot
+  title      String
+  // null for automatic snapshots
+  createdBy  String?             @map("created_by") @db.Uuid
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author   User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt(sort: Desc)])
+  @@map("document_versions")
 }
