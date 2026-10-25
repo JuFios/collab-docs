@@ -88,6 +88,7 @@ model User {
   documentShares     DocumentShare[]
   publicLinksCreated PublicLink[]
   versionsCreated    DocumentVersion[]
+  attachments        Attachment[]
 
   @@map("users")
 }
@@ -123,6 +124,7 @@ model Workspace {
   invites      WorkspaceInvite[]
   subscription Subscription?
   documents    Document[]
+  attachments  Attachment[]
 
   @@map("workspaces")
 }
@@ -194,15 +196,16 @@ model Document {
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  parent    Document?         @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children  Document[]        @relation("DocumentTree")
-  author    User              @relation(fields: [createdBy], references: [id], onDelete: Restrict)
-  shares    DocumentShare[]
-  links     PublicLink[]
-  updates   DocumentUpdate[]
-  state     DocumentState?
-  versions  DocumentVersion[]
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  parent      Document?         @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    Document[]        @relation("DocumentTree")
+  author      User              @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  shares      DocumentShare[]
+  links       PublicLink[]
+  updates     DocumentUpdate[]
+  state       DocumentState?
+  versions    DocumentVersion[]
+  attachments Attachment[]
 
   // partial in the migration: WHERE deleted_at IS NULL
   @@index([workspaceId, parentId, position], map: "documents_tree_idx")
@@ -292,4 +295,36 @@ model DocumentVersion {
 
   @@index([documentId, createdAt(sort: Desc)])
   @@map("document_versions")
+}
+
+enum AttachmentStatus {
+  PENDING
+  READY
+
+  @@map("attachment_status")
+}
+
+// An uploaded image. The object lives in S3 under `key`; rows stay when their document is soft-deleted.
+model Attachment {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  workspaceId String           @map("workspace_id") @db.Uuid
+  documentId  String           @map("document_id") @db.Uuid
+  // ws/{workspaceId}/doc/{documentId}/{id}
+  key         String           @unique
+  // bytes; declared at presign time (and enforced by the upload policy), re-checked on completion
+  size        Int
+  mime        String
+  status      AttachmentStatus @default(PENDING)
+  uploadedBy  String           @map("uploaded_by") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  document  Document  @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  uploader  User      @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, status])
+  @@index([documentId])
+  // stale PENDING sweep
+  @@index([status, createdAt])
+  @@map("attachments")
 }
