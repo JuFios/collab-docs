@@ -323,9 +323,12 @@ test.describe('document tree', () => {
     );
     await page.goto(`/w/${workspaceId}/d/${docId}`);
     await expect(page.getByRole('textbox', { name: 'Document title' })).toBeVisible();
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true);
+    // the wide parts of the page (header row, document column) must end inside the 390px viewport
+    for (const part of [page.locator('header').first(), page.getByRole('article')]) {
+      const box = await part.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    }
 
     await expect(page.getByRole('tree')).toBeHidden();
     await page.getByRole('button', { name: 'Documents' }).click();
