@@ -14,6 +14,7 @@ export class WsConnection implements RoomConnection {
     readonly userId: string | null,
     readonly name: string,
     readonly color: string,
+    readonly correlationId?: string,
   ) {}
 
   send(data: Uint8Array): void {

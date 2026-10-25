@@ -117,6 +117,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     if (!UUID.test(documentId)) return fail(COLLAB_CLOSE.notFound, 'document not found');
 
     let identity: Identity;
+    let ticketCorrelationId: string | undefined;
     try {
       const claims = await verifyCollabTicket(
         this.config.COLLAB_TICKET_SECRET,
@@ -124,7 +125,8 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
       );
       if (claims.docId !== documentId) return fail(COLLAB_CLOSE.ticketInvalid, 'ticket invalid');
       identity = { userId: claims.sub, linkId: claims.linkId };
-      if (claims.correlationId) log.setBindings({ ticketCorrelationId: claims.correlationId });
+      ticketCorrelationId = claims.correlationId;
+      if (ticketCorrelationId) log.setBindings({ ticketCorrelationId });
     } catch {
       return fail(COLLAB_CLOSE.ticketInvalid, 'ticket invalid');
     }
@@ -150,6 +152,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
         identity.userId ?? null,
         name,
         presenceColor(identity.userId ?? identity.linkId ?? 'guest'),
+        ticketCorrelationId ?? correlationId,
       );
       if (!room.connect(conn, outcome.access)) return;
       state.conn = conn;

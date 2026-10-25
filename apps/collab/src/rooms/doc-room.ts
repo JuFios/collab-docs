@@ -24,6 +24,8 @@ export interface RoomConnection {
   readonly userId: string | null;
   readonly name: string;
   readonly color: string;
+  /** Correlation id of the request that issued the ticket, for the logs. */
+  readonly correlationId?: string;
   send(data: Uint8Array): void;
   close(code: number, reason?: string): void;
 }
@@ -364,6 +366,7 @@ export class DocRoom {
         documentId: this.documentId,
         connectionId: state.conn.id,
         userId: state.conn.userId,
+        correlationId: state.conn.correlationId,
         err: error instanceof Error ? error.message : undefined,
       },
       'collab.update_rejected',
