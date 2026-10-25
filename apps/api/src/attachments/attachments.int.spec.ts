@@ -435,7 +435,9 @@ describe('attachments', () => {
     it('keeps attachments when their document is deleted, but stops serving them', async () => {
       const { owner, documentId } = await setup();
       const attachmentId = await uploadedPng(owner, documentId);
-      await as(owner).delete(`/documents/${documentId}`).expect(204);
+      // soft-deleted straight in the database: the API would publish `doc.deleted`, and Redis pub/sub is not
+      // scoped to a database, so a parallel suite that listens for that channel would see this event
+      await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
       expect(await prisma.attachment.count({ where: { id: attachmentId } })).toBe(1);
       await as(owner).get(`/attachments/${attachmentId}/url`).expect(404);
       await presign(owner, documentId).expect(404);
