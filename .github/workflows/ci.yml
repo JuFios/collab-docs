@@ -65,6 +65,20 @@ jobs:
         run: |
           pnpm --filter @collab-docs/db db:deploy
           pnpm --filter @collab-docs/db db:drift
+      # The upload tests talk to a real MinIO. Its image is built from source, so reuse the layer cache that
+      # the docker-build job writes under the same scope.
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/bake-action@v6
+        with:
+          files: docker-compose.yml
+          targets: minio
+          load: true
+          set: |
+            minio.cache-from=type=gha,scope=minio
+      - name: Start MinIO
+        run: |
+          docker compose up --no-build --wait -d minio
+          docker compose run --rm --no-deps minio-init
       - run: pnpm test:integration
       - name: OpenAPI document is up to date
         run: |
