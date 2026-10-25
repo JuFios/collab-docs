@@ -38,7 +38,9 @@ describe('collab ticket', () => {
   };
 
   async function setup() {
-    const [owner, viewer, outsider] = await Promise.all(['owner', 'viewer', 'outsider'].map(register));
+    const [owner, viewer, outsider] = await Promise.all(
+      ['owner', 'viewer', 'outsider'].map(register),
+    );
     const workspace = await post(owner!, '/workspaces').send({ name: 'Docs' }).expect(201);
     const workspaceId = workspace.body.id as string;
     await prisma.workspaceMember.create({
@@ -47,7 +49,12 @@ describe('collab ticket', () => {
     const document = await post(owner!, `/workspaces/${workspaceId}/documents`)
       .send({ title: 'Doc' })
       .expect(201);
-    return { owner: owner!, viewer: viewer!, outsider: outsider!, documentId: document.body.id as string };
+    return {
+      owner: owner!,
+      viewer: viewer!,
+      outsider: outsider!,
+      documentId: document.body.id as string,
+    };
   }
 
   beforeAll(async () => {
@@ -80,7 +87,9 @@ describe('collab ticket', () => {
     const { outsider, documentId } = await setup();
     await post(outsider, `/documents/${documentId}/collab-ticket`).expect(404);
     await post(null, `/documents/${documentId}/collab-ticket`).expect(401);
-    await post(outsider, '/documents/0198d6c0-0000-7000-8000-000000000000/collab-ticket').expect(404);
+    await post(outsider, '/documents/0198d6c0-0000-7000-8000-000000000000/collab-ticket').expect(
+      404,
+    );
   });
 
   it('answers 404 once the document is deleted', async () => {

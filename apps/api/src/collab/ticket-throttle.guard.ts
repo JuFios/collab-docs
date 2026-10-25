@@ -8,7 +8,7 @@ import {
   REDIS_CLIENT,
   getRootLogger,
 } from '@collab-docs/shared/nest';
-import type { AuthenticatedRequest } from '../auth';
+import type { RequestUser } from '../auth';
 
 const WINDOW_SECONDS = 60;
 
@@ -24,7 +24,7 @@ export class TicketThrottleGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request & AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<Request & { user?: RequestUser }>();
     const userId = request.user?.id;
     if (!userId) return true; // the auth guard has already rejected anonymous callers
     const key = `rl:collab-ticket:${userId}`;

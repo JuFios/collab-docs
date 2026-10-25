@@ -3,7 +3,8 @@ import type { CollabTicket } from '@collab-docs/shared';
 
 export class CollabTicketResponse implements CollabTicket {
   @ApiProperty({
-    description: 'Short-lived (60 s) token for one WebSocket connection; fetch a new one per attempt.',
+    description:
+      'Short-lived (60 s) token for one WebSocket connection; fetch a new one per attempt.',
   })
   ticket!: string;
 
