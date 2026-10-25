@@ -1,0 +1,439 @@
+import * as awarenessProtocol from 'y-protocols/awareness';
+import * as syncProtocol from 'y-protocols/sync';
+import * as decoding from 'lib0/decoding';
+import * as encoding from 'lib0/encoding';
+import * as Y from 'yjs';
+import {
+  type Access,
+  COLLAB_CLOSE,
+  COLLAB_MESSAGE,
+  type CollabRoomEvent,
+  accessAtLeast,
+} from '@collab-docs/shared';
+import {
+  type AwarenessEntry,
+  decodeAwarenessUpdate,
+  encodeAwarenessUpdate,
+} from './awareness-codec';
+import type { DocumentStore } from './document-store';
+
+/** One WebSocket as the room sees it; the transport (and its tests) provide the implementation. */
+export interface RoomConnection {
+  readonly id: string;
+  /** `null` for a guest holding an EDIT link. */
+  readonly userId: string | null;
+  readonly name: string;
+  readonly color: string;
+  send(data: Uint8Array): void;
+  close(code: number, reason?: string): void;
+}
+
+export interface RoomLimits {
+  maxMessagesPer10s: number;
+  maxUpdateBytes: number;
+  maxDocumentBytes: number;
+  maxConnections: number;
+  maxAwarenessBytes: number;
+}
+
+export type RejectReason =
+  'read_only' | 'too_large' | 'document_too_large' | 'invalid' | 'awareness_invalid';
+
+export interface RoomObserver {
+  updateApplied(): void;
+  updateDuplicate(): void;
+  updateRejected(reason: RejectReason): void;
+  rateLimited(): void;
+}
+
+export interface RoomLogger {
+  warn(fields: Record<string, unknown>, message: string): void;
+}
+
+const NOOP_OBSERVER: RoomObserver = {
+  updateApplied: () => undefined,
+  updateDuplicate: () => undefined,
+  updateRejected: () => undefined,
+  rateLimited: () => undefined,
+};
+
+const RATE_WINDOW_MS = 10_000;
+/** A connection normally has one awareness client id (its Y.Doc's); a few spare ones cover provider restarts. */
+const MAX_AWARENESS_IDS_PER_CONNECTION = 4;
+/** Update of a Y.Doc without structs and deletions. */
+const EMPTY_UPDATE_BYTES = 2;
+
+interface ConnectionState {
+  readonly conn: RoomConnection;
+  access: Access;
+  readOnly: boolean;
+  /** Awareness client ids this connection owns; it may only change those. */
+  readonly awarenessIds: Set<number>;
+  windowStart: number;
+  messages: number;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
+
+function frame(type: number, write: (encoder: encoding.Encoder) => void): Uint8Array {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, type);
+  write(encoder);
+  return encoding.toUint8Array(encoder);
+}
+
+/**
+ * The live state of one document: its `Y.Doc`, the connections editing it and their presence. Pure in the
+ * sense that matters for the hot path: it performs no I/O, it only calls the `DocumentStore` hand-over.
+ */
+export class DocRoom {
+  readonly doc = new Y.Doc();
+  readonly awareness = new awarenessProtocol.Awareness(this.doc);
+  /** Called when the last connection leaves; the manager schedules the unload. */
+  onEmpty: (() => void) | null = null;
+
+  private readonly connections = new Map<string, ConnectionState>();
+  /** Awareness client id → owner; `null` reserves the server's own id. */
+  private readonly awarenessOwners = new Map<number, ConnectionState | null>();
+  private persistedStateVector: Uint8Array;
+  private approximateBytes: number;
+  private appliedChange = false;
+  private readonly unsubscribe: () => void;
+  private destroyed = false;
+
+  constructor(
+    readonly documentId: string,
+    initialState: Uint8Array | null,
+    private readonly store: DocumentStore,
+    private readonly limits: RoomLimits,
+    private readonly observer: RoomObserver = NOOP_OBSERVER,
+    private readonly logger: RoomLogger = { warn: () => undefined },
+    private readonly clock: () => number = Date.now,
+  ) {
+    if (initialState) Y.applyUpdate(this.doc, initialState, 'load');
+    this.approximateBytes = initialState?.byteLength ?? 0;
+    // everything loaded from the store is durable by definition
+    this.persistedStateVector = Y.encodeStateVector(this.doc);
+    this.awareness.setLocalState(null);
+    this.awarenessOwners.set(this.doc.clientID, null);
+
+    this.doc.on('update', this.onDocUpdate);
+    this.awareness.on('update', this.onAwarenessUpdate);
+    this.unsubscribe = store.onPersisted(documentId, this.onPersisted);
+  }
+
+  get size(): number {
+    return this.connections.size;
+  }
+
+  get isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
+  /** The connections currently in the room. */
+  members(): RoomConnection[] {
+    return [...this.connections.values()].map((state) => state.conn);
+  }
+
+  /** Admits a connection; returns `false` (after closing it) when the room is full. */
+  connect(conn: RoomConnection, access: Access): boolean {
+    if (this.connections.size >= this.limits.maxConnections) {
+      conn.close(COLLAB_CLOSE.rateLimited, 'too many connections');
+      return false;
+    }
+    const state: ConnectionState = {
+      conn,
+      access,
+      readOnly: !accessAtLeast(access, 'EDIT'),
+      awarenessIds: new Set(),
+      windowStart: this.clock(),
+      messages: 0,
+    };
+    this.connections.set(conn.id, state);
+
+    this.send(
+      state,
+      frame(COLLAB_MESSAGE.sync, (encoder) => syncProtocol.writeSyncStep1(encoder, this.doc)),
+    );
+    const present = [...this.awareness.getStates().keys()];
+    if (present.length > 0) {
+      this.send(
+        state,
+        frame(COLLAB_MESSAGE.awareness, (encoder) =>
+          encoding.writeVarUint8Array(
+            encoder,
+            awarenessProtocol.encodeAwarenessUpdate(this.awareness, present),
+          ),
+        ),
+      );
+    }
+    this.sendEvent(state, { type: 'access', level: access, readOnly: state.readOnly });
+    this.sendEvent(state, { type: 'persisted', sv: toBase64(this.persistedStateVector) });
+    return true;
+  }
+
+  disconnect(conn: RoomConnection): void {
+    const state = this.connections.get(conn.id);
+    if (!state) return;
+    this.connections.delete(conn.id);
+    const ids = [...state.awarenessIds];
+    for (const id of ids) this.awarenessOwners.delete(id);
+    // removes the presence of the departed client and tells everyone else
+    awarenessProtocol.removeAwarenessStates(this.awareness, ids, null);
+    if (this.connections.size === 0) this.onEmpty?.();
+  }
+
+  /** Access level the connection currently has (`NONE` if it is not in the room). */
+  accessOf(conn: RoomConnection): Access {
+    return this.connections.get(conn.id)?.access ?? 'NONE';
+  }
+
+  /** Applies a changed permission to a live connection: read-only or not, and tells the client. */
+  setAccess(conn: RoomConnection, access: Access): void {
+    const state = this.connections.get(conn.id);
+    if (!state || state.access === access) return;
+    state.access = access;
+    state.readOnly = !accessAtLeast(access, 'EDIT');
+    this.sendEvent(state, { type: 'access', level: access, readOnly: state.readOnly });
+  }
+
+  /** Sends `event` (if any) to every connection and closes them with `code`. */
+  closeAll(code: number, reason: string, event?: CollabRoomEvent): void {
+    for (const state of [...this.connections.values()]) {
+      if (event) this.sendEvent(state, event);
+      state.conn.close(code, reason);
+    }
+  }
+
+  /** Sends `event` (if any) to one connection and closes it with `code`. */
+  kick(conn: RoomConnection, code: number, reason: string, event?: CollabRoomEvent): void {
+    const state = this.connections.get(conn.id);
+    if (!state) return;
+    if (event) this.sendEvent(state, event);
+    conn.close(code, reason);
+  }
+
+  /** Processes one binary message from `conn`. Never throws: a hostile client must not take the room down. */
+  receive(conn: RoomConnection, data: Uint8Array): void {
+    const state = this.connections.get(conn.id);
+    if (!state || !this.allowMessage(state)) return;
+    try {
+      const decoder = decoding.createDecoder(data);
+      switch (decoding.readVarUint(decoder)) {
+        case COLLAB_MESSAGE.sync:
+          this.handleSync(state, decoder);
+          break;
+        case COLLAB_MESSAGE.awareness:
+          this.handleAwareness(state, decoding.readVarUint8Array(decoder));
+          break;
+        case COLLAB_MESSAGE.queryAwareness:
+          this.sendAllAwareness(state);
+          break;
+        default:
+          // auth (2) and unknown types carry nothing the server acts on
+          break;
+      }
+    } catch (error) {
+      this.reject(state, 'invalid', error);
+    }
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.unsubscribe();
+    this.doc.off('update', this.onDocUpdate);
+    this.awareness.off('update', this.onAwarenessUpdate);
+    this.awareness.destroy();
+    this.doc.destroy();
+    this.connections.clear();
+    this.awarenessOwners.clear();
+  }
+
+  // --- message handling -------------------------------------------------------------------------------
+
+  private allowMessage(state: ConnectionState): boolean {
+    const now = this.clock();
+    if (now - state.windowStart >= RATE_WINDOW_MS) {
+      state.windowStart = now;
+      state.messages = 0;
+    }
+    state.messages += 1;
+    if (state.messages <= this.limits.maxMessagesPer10s) return true;
+    if (state.messages === this.limits.maxMessagesPer10s + 1) {
+      this.observer.rateLimited();
+      state.conn.close(COLLAB_CLOSE.rateLimited, 'rate limited');
+    }
+    return false;
+  }
+
+  private handleSync(state: ConnectionState, decoder: decoding.Decoder): void {
+    switch (decoding.readVarUint(decoder)) {
+      case syncProtocol.messageYjsSyncStep1:
+        this.send(
+          state,
+          frame(COLLAB_MESSAGE.sync, (encoder) =>
+            syncProtocol.readSyncStep1(decoder, encoder, this.doc),
+          ),
+        );
+        break;
+      case syncProtocol.messageYjsSyncStep2:
+      case syncProtocol.messageYjsUpdate:
+        this.applyClientUpdate(state, decoding.readVarUint8Array(decoder));
+        break;
+      default:
+        throw new Error('unknown sync message');
+    }
+  }
+
+  private applyClientUpdate(state: ConnectionState, update: Uint8Array): void {
+    // a client answering our sync step 1 with nothing to add sends an empty update; that is not an event
+    if (update.byteLength <= EMPTY_UPDATE_BYTES) return;
+    if (state.readOnly) return this.reject(state, 'read_only');
+    if (update.byteLength > this.limits.maxUpdateBytes) return this.reject(state, 'too_large');
+    if (this.approximateBytes + update.byteLength > this.limits.maxDocumentBytes) {
+      return this.reject(state, 'document_too_large');
+    }
+    this.appliedChange = false;
+    try {
+      Y.applyUpdate(this.doc, update, state);
+    } catch (error) {
+      return this.reject(state, 'invalid', error);
+    }
+    if (this.appliedChange) this.observer.updateApplied();
+    else this.observer.updateDuplicate();
+  }
+
+  private handleAwareness(state: ConnectionState, payload: Uint8Array): void {
+    if (payload.byteLength > this.limits.maxAwarenessBytes) {
+      return this.reject(state, 'awareness_invalid');
+    }
+    let entries: AwarenessEntry[];
+    try {
+      entries = decodeAwarenessUpdate(payload);
+    } catch (error) {
+      return this.reject(state, 'awareness_invalid', error);
+    }
+    const accepted: AwarenessEntry[] = [];
+    for (const entry of entries) {
+      if (!this.claimAwarenessId(state, entry.clientId)) continue;
+      if (entry.state === null) {
+        accepted.push(entry);
+      } else if (isRecord(entry.state)) {
+        accepted.push({ ...entry, state: this.presenceOf(state, entry.state) });
+      }
+    }
+    if (accepted.length === 0) return;
+    awarenessProtocol.applyAwarenessUpdate(this.awareness, encodeAwarenessUpdate(accepted), state);
+  }
+
+  /** The server decides who a cursor belongs to; only the cursor position comes from the client. */
+  private presenceOf(
+    state: ConnectionState,
+    sent: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const { conn } = state;
+    const presence: Record<string, unknown> = {
+      user: { id: conn.userId ?? `guest-${conn.id}`, name: conn.name, color: conn.color },
+    };
+    const cursor = sent.cursor;
+    if (cursor !== undefined && JSON.stringify(cursor).length <= this.limits.maxAwarenessBytes) {
+      presence.cursor = cursor;
+    }
+    return presence;
+  }
+
+  private claimAwarenessId(state: ConnectionState, clientId: number): boolean {
+    if (state.awarenessIds.has(clientId)) return true;
+    if (this.awarenessOwners.has(clientId)) return false;
+    if (state.awarenessIds.size >= MAX_AWARENESS_IDS_PER_CONNECTION) return false;
+    state.awarenessIds.add(clientId);
+    this.awarenessOwners.set(clientId, state);
+    return true;
+  }
+
+  private reject(state: ConnectionState, reason: RejectReason, error?: unknown): void {
+    this.observer.updateRejected(reason);
+    this.logger.warn(
+      {
+        event: 'collab.update_rejected',
+        reason,
+        documentId: this.documentId,
+        connectionId: state.conn.id,
+        userId: state.conn.userId,
+        err: error instanceof Error ? error.message : undefined,
+      },
+      'collab.update_rejected',
+    );
+  }
+
+  // --- fan-out ----------------------------------------------------------------------------------------
+
+  private readonly onDocUpdate = (update: Uint8Array, origin: unknown): void => {
+    this.appliedChange = true;
+    this.approximateBytes += update.byteLength;
+    const message = frame(COLLAB_MESSAGE.sync, (encoder) =>
+      syncProtocol.writeUpdate(encoder, update),
+    );
+    for (const state of this.connections.values()) {
+      if (state !== origin) this.send(state, message);
+    }
+    this.store.enqueue(this.documentId, update);
+  };
+
+  private readonly onAwarenessUpdate = (
+    change: { added: number[]; updated: number[]; removed: number[] },
+    origin: unknown,
+  ): void => {
+    void origin;
+    const changed = [...change.added, ...change.updated, ...change.removed];
+    if (changed.length === 0) return;
+    const message = frame(COLLAB_MESSAGE.awareness, (encoder) =>
+      encoding.writeVarUint8Array(
+        encoder,
+        awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed),
+      ),
+    );
+    for (const state of this.connections.values()) this.send(state, message);
+  };
+
+  private readonly onPersisted = (stateVector: Uint8Array): void => {
+    this.persistedStateVector = stateVector;
+    const event: CollabRoomEvent = { type: 'persisted', sv: toBase64(stateVector) };
+    for (const state of this.connections.values()) this.sendEvent(state, event);
+  };
+
+  private sendAllAwareness(state: ConnectionState): void {
+    const ids = [...this.awareness.getStates().keys()];
+    if (ids.length === 0) return;
+    this.send(
+      state,
+      frame(COLLAB_MESSAGE.awareness, (encoder) =>
+        encoding.writeVarUint8Array(
+          encoder,
+          awarenessProtocol.encodeAwarenessUpdate(this.awareness, ids),
+        ),
+      ),
+    );
+  }
+
+  private sendEvent(state: ConnectionState, event: CollabRoomEvent): void {
+    this.send(
+      state,
+      frame(COLLAB_MESSAGE.roomEvent, (encoder) =>
+        encoding.writeVarString(encoder, JSON.stringify(event)),
+      ),
+    );
+  }
+
+  private send(state: ConnectionState, message: Uint8Array): void {
+    try {
+      state.conn.send(message);
+    } catch {
+      // a socket that cannot be written to is closed by the transport; the room keeps serving the others
+    }
+  }
+}

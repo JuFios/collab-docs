@@ -1,0 +1,568 @@
+import './test/setup-env';
+import { randomBytes, randomUUID } from 'node:crypto';
+import * as decoding from 'lib0/decoding';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
+import WebSocket from 'ws';
+import { PrismaClient } from '@collab-docs/db';
+import {
+  COLLAB_CLOSE,
+  COLLAB_MESSAGE,
+  type CollabRoomEvent,
+  PERM_EVENT_CHANNELS,
+} from '@collab-docs/shared';
+import { REDIS_CLIENT, currentConfig, signCollabTicket } from '@collab-docs/shared/nest';
+import type { Redis } from 'ioredis';
+import { DOCUMENT_STORE, type InMemoryDocumentStore } from './rooms/document-store';
+import { RoomManager } from './rooms/room-manager';
+import { type RunningCollab, startCollab } from './test/collab-app';
+
+const SECRET = currentConfig().COLLAB_TICKET_SECRET;
+const IDLE_MS = currentConfig().COLLAB_ROOM_IDLE_MS;
+const RECHECK_MS = currentConfig().COLLAB_ACCESS_RECHECK_MS;
+
+interface TestUser {
+  id: string;
+}
+
+/** A y-websocket client the way the editor will use it, with the room events and close codes recorded. */
+class Client {
+  readonly doc = new Y.Doc();
+  readonly events: CollabRoomEvent[] = [];
+  readonly closes: number[] = [];
+  readonly provider: WebsocketProvider;
+
+  constructor(wsUrl: string, documentId: string, ticket: string) {
+    this.provider = new WebsocketProvider(wsUrl, documentId, this.doc, {
+      WebSocketPolyfill: WebSocket as never,
+      params: { ticket },
+      disableBc: true,
+      maxBackoffTime: 100,
+    });
+    this.provider.messageHandlers[COLLAB_MESSAGE.roomEvent] = (_encoder, decoder) => {
+      this.events.push(JSON.parse(decoding.readVarString(decoder)) as CollabRoomEvent);
+    };
+    this.provider.on('connection-close', (event: { code: number } | null) => {
+      if (event) {
+        this.closes.push(event.code);
+        // as the real client does: reconnecting after these codes cannot succeed
+        if ([4401, 4403, 4404, 4410, 4429].includes(event.code)) this.provider.disconnect();
+      }
+    });
+  }
+
+  get synced(): boolean {
+    return this.provider.synced;
+  }
+
+  paragraph(): Y.XmlText {
+    const fragment = this.doc.getXmlFragment('content');
+    if (fragment.length === 0) {
+      const element = new Y.XmlElement('paragraph');
+      element.insert(0, [new Y.XmlText()]);
+      fragment.insert(0, [element]);
+    }
+    return (fragment.get(0) as Y.XmlElement).get(0) as Y.XmlText;
+  }
+
+  text(): string {
+    const first = this.doc.getXmlFragment('content').get(0) as Y.XmlElement | undefined;
+    return (first?.get(0) as Y.XmlText | undefined)?.toString() ?? '';
+  }
+
+  event<T extends CollabRoomEvent['type']>(
+    type: T,
+  ): Extract<CollabRoomEvent, { type: T }> | undefined {
+    return [...this.events].reverse().find((e) => e.type === type) as never;
+  }
+
+  destroy(): void {
+    this.provider.destroy();
+    this.doc.destroy();
+  }
+}
+
+async function waitFor(
+  condition: () => boolean | Promise<boolean>,
+  what: string,
+  timeoutMs = 5000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+const settle = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe('collab gateway', () => {
+  let collab: RunningCollab;
+  let prisma: PrismaClient;
+  let redis: Redis;
+  let store: InMemoryDocumentStore;
+  let rooms: RoomManager;
+  const clients: Client[] = [];
+
+  async function makeUser(): Promise<TestUser> {
+    const user = await prisma.user.create({
+      data: {
+        email: `collab-${randomBytes(6).toString('hex')}@collab-test.example`,
+        name: 'Test User',
+        passwordHash: 'x',
+      },
+    });
+    return { id: user.id };
+  }
+
+  /** A workspace with one user per role and a document everybody in the workspace can open. */
+  async function setup() {
+    const [owner, editor, viewer, outsider] = await Promise.all([
+      makeUser(),
+      makeUser(),
+      makeUser(),
+      makeUser(),
+    ]);
+    const workspace = await prisma.workspace.create({
+      data: {
+        name: 'Collab',
+        slug: `collab-${randomBytes(6).toString('hex')}`,
+        ownerId: owner.id,
+        subscription: { create: {} },
+      },
+    });
+    await prisma.workspaceMember.createMany({
+      data: [
+        { workspaceId: workspace.id, userId: owner.id, role: 'OWNER' },
+        { workspaceId: workspace.id, userId: editor.id, role: 'EDITOR' },
+        { workspaceId: workspace.id, userId: viewer.id, role: 'VIEWER' },
+      ],
+    });
+    const document = await prisma.document.create({
+      data: { workspaceId: workspace.id, createdBy: owner.id, position: 'a0', title: 'Doc' },
+    });
+    return { workspace, owner, editor, viewer, outsider, documentId: document.id };
+  }
+
+  async function connect(user: TestUser, documentId: string): Promise<Client> {
+    const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: user.id });
+    const client = new Client(collab.wsUrl, documentId, ticket);
+    clients.push(client);
+    return client;
+  }
+
+  const publish = (channel: string, payload: object) =>
+    redis.publish(channel, JSON.stringify({ ...payload, correlationId: 'test-event' }));
+
+  /** Opens a raw socket to learn the close code of a refused connection. */
+  function closeCodeOf(documentId: string, ticket: string | null): Promise<number> {
+    const query = ticket === null ? '' : `?ticket=${encodeURIComponent(ticket)}`;
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(`${collab.wsUrl}/${documentId}${query}`);
+      socket.on('close', (code) => resolve(code));
+      socket.on('error', reject);
+    });
+  }
+
+  beforeAll(async () => {
+    collab = await startCollab();
+    prisma = collab.app.get(PrismaClient);
+    redis = collab.app.get(REDIS_CLIENT);
+    store = collab.app.get(DOCUMENT_STORE);
+    rooms = collab.app.get(RoomManager);
+    await redis.flushdb();
+  });
+
+  afterEach(() => {
+    clients.splice(0).forEach((client) => client.destroy());
+  });
+
+  afterAll(async () => {
+    await collab.stop();
+  });
+
+  describe('editing', () => {
+    it('lets two clients converge, including a concurrent edit of the same paragraph', async () => {
+      const { editor, owner, documentId } = await setup();
+      const a = await connect(editor, documentId);
+      const b = await connect(owner, documentId);
+      await waitFor(() => a.synced && b.synced, 'both clients to sync');
+
+      a.paragraph().insert(0, 'base');
+      await waitFor(() => b.text() === 'base', 'b to receive the first paragraph');
+
+      a.paragraph().insert(2, 'AAA');
+      b.paragraph().insert(2, 'BBB');
+      await waitFor(() => a.text() === b.text() && a.text().length === 10, 'a and b to converge');
+      expect(a.text()).toContain('AAA');
+      expect(a.text()).toContain('BBB');
+      expect(store.snapshot(documentId).getXmlFragment('content').toString()).toBe(
+        a.doc.getXmlFragment('content').toString(),
+      );
+    });
+
+    it('tells a client when its changes are durable', async () => {
+      const { editor, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      client.paragraph().insert(0, 'saved');
+      await waitFor(() => {
+        const persisted = client.event('persisted');
+        if (!persisted) return false;
+        const sv = Y.decodeStateVector(Buffer.from(persisted.sv, 'base64'));
+        const local = Y.decodeStateVector(Y.encodeStateVector(client.doc));
+        return [...local].every(([id, clock]) => (sv.get(id) ?? 0) >= clock);
+      }, 'the persisted event to cover the local state');
+    });
+
+    it('lets a viewer read but not change the document', async () => {
+      const { editor, viewer, documentId } = await setup();
+      const writer = await connect(editor, documentId);
+      await waitFor(() => writer.synced, 'writer sync');
+      writer.paragraph().insert(0, 'original');
+
+      const reader = await connect(viewer, documentId);
+      await waitFor(() => reader.text() === 'original', 'viewer to receive the content');
+      expect(reader.event('access')).toEqual({ type: 'access', level: 'VIEW', readOnly: true });
+
+      reader.paragraph().insert(0, 'FORGED ');
+      await settle(300);
+      expect(writer.text()).toBe('original');
+      expect(store.snapshot(documentId).getXmlFragment('content').toString()).not.toContain(
+        'FORGED',
+      );
+    });
+
+    it('survives an oversized frame (closed with 1009) and keeps serving the others', async () => {
+      const { editor, documentId } = await setup();
+      const healthy = await connect(editor, documentId);
+      await waitFor(() => healthy.synced, 'sync');
+
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: editor.id });
+      const socket = new WebSocket(`${collab.wsUrl}/${documentId}?ticket=${ticket}`);
+      const closed = new Promise<number>((resolve) => socket.on('close', (code) => resolve(code)));
+      await new Promise((resolve) => socket.on('open', resolve));
+      socket.send(Buffer.alloc(currentConfig().COLLAB_MAX_UPDATE_BYTES + 1024, 1));
+      await expect(closed).resolves.toBe(COLLAB_CLOSE.messageTooBig);
+
+      healthy.paragraph().insert(0, 'still works');
+      await waitFor(
+        () =>
+          store.snapshot(documentId).getXmlFragment('content').toString().includes('still works'),
+        'the healthy client to keep saving',
+      );
+    });
+
+    it('refuses connections beyond the per-document limit with 4429', async () => {
+      const { editor, documentId } = await setup();
+      const limit = currentConfig().COLLAB_MAX_CONNECTIONS_PER_DOCUMENT;
+      for (let i = 0; i < limit; i += 1) await connect(editor, documentId);
+      await waitFor(() => clients.every((c) => c.synced), 'the allowed clients to sync');
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: editor.id });
+      await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.rateLimited);
+    });
+  });
+
+  describe('presence', () => {
+    it('shows collaborators with the identity the server knows, not the one the client claims', async () => {
+      const { editor, owner, documentId } = await setup();
+      await prisma.user.update({ where: { id: editor.id }, data: { name: 'Eddie Editor' } });
+      const a = await connect(editor, documentId);
+      const b = await connect(owner, documentId);
+      await waitFor(() => a.synced && b.synced, 'sync');
+
+      a.provider.awareness.setLocalState({
+        user: { id: owner.id, name: 'The Owner', color: '#000000' },
+        cursor: { anchor: 1, head: 1 },
+      });
+      await waitFor(() => b.provider.awareness.getStates().has(a.doc.clientID), 'presence of a');
+      expect(b.provider.awareness.getStates().get(a.doc.clientID)).toMatchObject({
+        user: { id: editor.id, name: 'Eddie Editor' },
+        cursor: { anchor: 1, head: 1 },
+      });
+
+      a.destroy();
+      await waitFor(
+        () => !b.provider.awareness.getStates().has(a.doc.clientID),
+        'presence to clear',
+      );
+    });
+  });
+
+  describe('tickets and permissions at connect time', () => {
+    it('closes with 4401 for a missing, malformed, expired or foreign ticket', async () => {
+      const { editor, documentId } = await setup();
+      const other = await setup();
+      const expired = await signCollabTicket(
+        SECRET,
+        { docId: documentId, sub: editor.id },
+        new Date(Date.now() - 5 * 60_000),
+      );
+      const forged = await signCollabTicket('another-secret-of-sufficient-length', {
+        docId: documentId,
+        sub: editor.id,
+      });
+      const forOtherDocument = await signCollabTicket(SECRET, {
+        docId: other.documentId,
+        sub: editor.id,
+      });
+      for (const ticket of [null, '', 'garbage', expired, forged, forOtherDocument]) {
+        await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.ticketInvalid);
+      }
+    });
+
+    it('closes with 4403 for a user without access to the document', async () => {
+      const { outsider, documentId } = await setup();
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: outsider.id });
+      await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.forbidden);
+    });
+
+    it('closes with 4403 for a restricted document without a share, and admits with one', async () => {
+      const { viewer, documentId } = await setup();
+      await prisma.document.update({
+        where: { id: documentId },
+        data: { visibility: 'RESTRICTED' },
+      });
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: viewer.id });
+      await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.forbidden);
+
+      await prisma.documentShare.create({
+        data: { documentId, userId: viewer.id, role: 'EDITOR' },
+      });
+      const client = await connect(viewer, documentId);
+      await waitFor(() => client.synced, 'sync after the share');
+      expect(client.event('access')).toMatchObject({ readOnly: false });
+    });
+
+    it('closes with 4404 for a document that does not exist and 4410 for a deleted one', async () => {
+      const { editor, documentId } = await setup();
+      const missing = randomUUID();
+      const missingTicket = await signCollabTicket(SECRET, { docId: missing, sub: editor.id });
+      await expect(closeCodeOf(missing, missingTicket)).resolves.toBe(COLLAB_CLOSE.notFound);
+
+      await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: editor.id });
+      await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.deleted);
+    });
+
+    it('refuses a path that is not a document id', async () => {
+      const ticket = await signCollabTicket(SECRET, { docId: 'x', sub: randomUUID() });
+      await expect(closeCodeOf('not-a-uuid', ticket)).resolves.toBe(COLLAB_CLOSE.notFound);
+    });
+  });
+
+  describe('permission changes on open sockets', () => {
+    it('downgrades an editor to read-only on perm.changed and upgrades again', async () => {
+      const { editor, workspace, owner, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      const watcher = await connect(owner, documentId);
+      await waitFor(() => client.synced && watcher.synced, 'sync');
+      expect(client.event('access')).toMatchObject({ level: 'EDIT', readOnly: false });
+
+      await prisma.workspaceMember.update({
+        where: { workspaceId_userId: { workspaceId: workspace.id, userId: editor.id } },
+        data: { role: 'VIEWER' },
+      });
+      await publish(PERM_EVENT_CHANNELS.permChanged, {
+        workspaceId: workspace.id,
+        userId: editor.id,
+        reason: 'role_changed',
+      });
+      await waitFor(() => client.event('access')?.readOnly === true, 'the read-only notice');
+
+      client.paragraph().insert(0, 'after downgrade');
+      await settle(300);
+      expect(watcher.text()).toBe('');
+      expect(client.closes).toEqual([]);
+
+      await prisma.workspaceMember.update({
+        where: { workspaceId_userId: { workspaceId: workspace.id, userId: editor.id } },
+        data: { role: 'EDITOR' },
+      });
+      await publish(PERM_EVENT_CHANNELS.permChanged, {
+        workspaceId: workspace.id,
+        userId: editor.id,
+        reason: 'role_changed',
+      });
+      await waitFor(() => client.event('access')?.readOnly === false, 'the editable notice');
+    });
+
+    it('closes the socket with 4403 when the member is removed', async () => {
+      const { editor, workspace, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      await prisma.workspaceMember.delete({
+        where: { workspaceId_userId: { workspaceId: workspace.id, userId: editor.id } },
+      });
+      await publish(PERM_EVENT_CHANNELS.permChanged, {
+        workspaceId: workspace.id,
+        userId: editor.id,
+        reason: 'member_removed',
+      });
+      await waitFor(() => client.closes.includes(COLLAB_CLOSE.forbidden), 'the 4403 close');
+    });
+
+    it('re-evaluates everybody when a document changes visibility (no user in the event)', async () => {
+      const { editor, viewer, workspace, documentId } = await setup();
+      const a = await connect(editor, documentId);
+      const b = await connect(viewer, documentId);
+      await waitFor(() => a.synced && b.synced, 'sync');
+      await prisma.document.update({
+        where: { id: documentId },
+        data: { visibility: 'RESTRICTED' },
+      });
+      await publish(PERM_EVENT_CHANNELS.permChanged, {
+        workspaceId: workspace.id,
+        documentId,
+        reason: 'visibility_changed',
+      });
+      await waitFor(
+        () =>
+          a.closes.includes(COLLAB_CLOSE.forbidden) && b.closes.includes(COLLAB_CLOSE.forbidden),
+        'both sockets to be closed',
+      );
+    });
+
+    it('sends "deleted" and closes with 4410 when the document is deleted', async () => {
+      const { editor, owner, workspace, documentId } = await setup();
+      const a = await connect(editor, documentId);
+      const b = await connect(owner, documentId);
+      await waitFor(() => a.synced && b.synced, 'sync');
+      a.paragraph().insert(0, 'last words');
+      await waitFor(() => b.text() === 'last words', 'delivery before deletion');
+
+      await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+      await publish(PERM_EVENT_CHANNELS.docDeleted, {
+        workspaceId: workspace.id,
+        documentIds: [documentId],
+      });
+      await waitFor(
+        () => a.closes.includes(COLLAB_CLOSE.deleted) && b.closes.includes(COLLAB_CLOSE.deleted),
+        'both sockets to close with 4410',
+      );
+      expect(a.event('deleted')).toEqual({ type: 'deleted' });
+      // the content is kept for a later restore
+      expect(store.snapshot(documentId).getXmlFragment('content').toString()).toContain(
+        'last words',
+      );
+    });
+
+    it('notices a revoked or expired guest link on the timer, without any event', async () => {
+      const { owner, documentId } = await setup();
+      const link = await prisma.publicLink.create({
+        data: {
+          documentId,
+          mode: 'EDIT',
+          tokenHash: randomBytes(16).toString('hex'),
+          createdBy: owner.id,
+        },
+      });
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, linkId: link.id });
+      const guest = new Client(collab.wsUrl, documentId, ticket);
+      clients.push(guest);
+      await waitFor(() => guest.synced, 'guest sync');
+      expect(guest.event('access')).toMatchObject({ level: 'EDIT', readOnly: false });
+
+      await prisma.publicLink.update({
+        where: { id: link.id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      await waitFor(
+        () => guest.closes.includes(COLLAB_CLOSE.forbidden),
+        'the guest to be cut off',
+        RECHECK_MS * 5,
+      );
+    });
+
+    it('refuses a guest ticket for a revoked link', async () => {
+      const { owner, documentId } = await setup();
+      const link = await prisma.publicLink.create({
+        data: {
+          documentId,
+          mode: 'EDIT',
+          tokenHash: randomBytes(16).toString('hex'),
+          createdBy: owner.id,
+          revokedAt: new Date(),
+        },
+      });
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, linkId: link.id });
+      await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.forbidden);
+    });
+  });
+
+  describe('rooms', () => {
+    it('unloads an idle room and brings the document back from the store', async () => {
+      const { editor, documentId } = await setup();
+      const first = await connect(editor, documentId);
+      await waitFor(() => first.synced, 'sync');
+      first.paragraph().insert(0, 'remember me');
+      await waitFor(
+        () =>
+          store.snapshot(documentId).getXmlFragment('content').toString().includes('remember me'),
+        'the update to reach the store',
+      );
+      expect(rooms.roomCount()).toBeGreaterThan(0);
+      first.destroy();
+      await waitFor(
+        async () => (await rooms.find(documentId)) === undefined,
+        'the room to unload',
+        IDLE_MS * 10,
+      );
+
+      const second = await connect(editor, documentId);
+      await waitFor(() => second.text() === 'remember me', 'the cold start to restore the content');
+    });
+  });
+
+  describe('operations', () => {
+    it('serves health, readiness and metrics', async () => {
+      await expect(fetch(`${collab.httpUrl}/health`).then((r) => r.json())).resolves.toEqual({
+        status: 'ok',
+      });
+      const ready = await fetch(`${collab.httpUrl}/ready`);
+      expect(ready.status).toBe(200);
+      expect(await ready.json()).toMatchObject({
+        status: 'ok',
+        checks: { redis: 'up', postgres: 'up' },
+      });
+
+      const { editor, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      client.paragraph().insert(0, 'metrics');
+      await settle(200);
+      const metrics = await (await fetch(`${collab.httpUrl}/metrics`)).text();
+      expect(metrics).toMatch(/collab_connections \d+/);
+      expect(metrics).toMatch(/collab_rooms \d+/);
+      expect(metrics).toMatch(/collab_updates_applied_total [1-9]/);
+      expect(metrics).toContain('collab_updates_duplicate_total');
+      expect(metrics).toContain('collab_ws_close_total');
+    });
+
+    it('requires the internal token on port 4002', async () => {
+      const url = `${collab.internalUrl}/internal/status`;
+      expect((await fetch(url)).status).toBe(401);
+      expect((await fetch(url, { headers: { authorization: 'Bearer wrong' } })).status).toBe(401);
+      expect(
+        (await fetch(url, { headers: { 'x-internal-token': currentConfig().INTERNAL_API_TOKEN } }))
+          .status,
+      ).toBe(401);
+      const ok = await fetch(url, {
+        headers: { authorization: `Bearer ${currentConfig().INTERNAL_API_TOKEN}` },
+      });
+      expect(ok.status).toBe(200);
+      expect(await ok.json()).toEqual({
+        rooms: expect.any(Number),
+        connections: expect.any(Number),
+      });
+    });
+
+    it('does not expose the internal API on the public port', async () => {
+      const response = await fetch(`${collab.httpUrl}/internal/status`, {
+        headers: { authorization: `Bearer ${currentConfig().INTERNAL_API_TOKEN}` },
+      });
+      expect(response.status).toBe(404);
+    });
+  });
+});
