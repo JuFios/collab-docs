@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import { createTestDb, makeDocument, makeUser, makeWorkspace, type TestDb } from '../testing';
+import { createTestDb, makeDocument, makeWorkspace, type TestDb } from '../testing';
 import { DocumentStateReader, DocumentStateWriter, DocumentVersions, hashUpdate } from './index';
 
 /** A document that records every update it produces, like a client typing. */
