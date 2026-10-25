@@ -29,6 +29,8 @@ const defaults: Record<string, string> = {
   // short intervals so that the timer-driven behaviour can be observed in a test
   COLLAB_FLUSH_INTERVAL_MS: '60',
   COLLAB_FLUSH_MAX_WAIT_MS: '300',
+  COLLAB_COMPACT_MAX_ROWS: '6',
+  AUTO_VERSION_INTERVAL_MS: '700',
   COLLAB_ACCESS_RECHECK_MS: '400',
   COLLAB_ROOM_IDLE_MS: '300',
   COLLAB_MAX_CONNECTIONS_PER_DOCUMENT: '4',

@@ -29,6 +29,8 @@ export interface PersistenceHooks {
   contentPersisted(documentId: string, revision: number): void;
   /** The document's in-memory bookkeeping is dropped. */
   released(documentId: string): void;
+  /** Resolves when the work started by `contentPersisted` is done; called at shutdown, before connections close. */
+  drain(): Promise<void>;
 }
 
 export interface PersistenceLogger {
@@ -168,6 +170,7 @@ export class PostgresDocumentStore implements DocumentStore {
       }
     });
     for (const state of this.states.values()) this.clearTimers(state);
+    await this.hooks.drain();
   }
 
   /** Updates buffered but not yet written (metrics, tests). */

@@ -25,9 +25,21 @@ export class PersistenceHooksService implements PersistenceHooks {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
+  /** Work started by `contentPersisted`; shutdown waits for it so it does not run against closed connections. */
+  private readonly inflight = new Set<Promise<unknown>>();
+
   contentPersisted(documentId: string, revision: number): void {
-    void emitDocumentChanged(this.queues, { documentId, revision, reason: 'content' });
-    void this.snapshotIfDue(documentId);
+    this.track(emitDocumentChanged(this.queues, { documentId, revision, reason: 'content' }));
+    this.track(this.snapshotIfDue(documentId));
+  }
+
+  async drain(): Promise<void> {
+    await Promise.allSettled([...this.inflight]);
+  }
+
+  private track(work: Promise<unknown>): void {
+    const tracked = work.catch(() => undefined).finally(() => this.inflight.delete(tracked));
+    this.inflight.add(tracked);
   }
 
   released(documentId: string): void {

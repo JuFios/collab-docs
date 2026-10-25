@@ -88,7 +88,11 @@ function setup(overrides: Partial<ConstructorParameters<typeof PostgresDocumentS
     compactionFailed: jest.fn(),
     badLogRows: jest.fn(),
   } satisfies PersistenceObserver;
-  const hooks = { contentPersisted: jest.fn(), released: jest.fn() } satisfies PersistenceHooks;
+  const hooks = {
+    contentPersisted: jest.fn(),
+    released: jest.fn(),
+    drain: jest.fn(() => Promise.resolve()),
+  } satisfies PersistenceHooks;
   const logger = { warn: jest.fn(), error: jest.fn() };
   const store = new PostgresDocumentStore(
     storage,

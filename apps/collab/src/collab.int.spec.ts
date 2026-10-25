@@ -4,7 +4,7 @@ import * as decoding from 'lib0/decoding';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import WebSocket from 'ws';
-import { DocumentStateReader, PrismaClient } from '@collab-docs/db';
+import { DocumentStateReader, DocumentStateWriter, PrismaClient } from '@collab-docs/db';
 import {
   COLLAB_CLOSE,
   COLLAB_MESSAGE,
@@ -515,6 +515,84 @@ describe('collab gateway', () => {
 
       const second = await connect(editor, documentId);
       await waitFor(() => second.text() === 'remember me', 'the cold start to restore the content');
+    });
+  });
+
+  describe('persistence on timers', () => {
+    const count = (documentId: string, kind: 'AUTO' | 'MANUAL' | 'PRE_RESTORE') =>
+      prisma.documentVersion.count({ where: { documentId, kind } });
+
+    it('writes on its own shortly after the last keystroke and then reports it as durable', async () => {
+      const { editor, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      client.paragraph().insert(0, 'timer');
+      await waitFor(async () => (await stored(documentId)).includes('timer'), 'the flush timer');
+      await waitFor(() => {
+        const persisted = client.event('persisted');
+        return !!persisted && persisted.sv.length > 0;
+      }, 'the persisted event');
+    });
+
+    it('keeps the update log bounded by compacting it', async () => {
+      const { editor, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      const limit = currentConfig().COLLAB_COMPACT_MAX_ROWS;
+      let most = 0;
+      for (let i = 0; i < 16; i += 1) {
+        client.paragraph().insert(client.paragraph().length, `w${i} `);
+        await settle(110); // longer than the flush interval: every edit becomes its own row
+        most = Math.max(most, await prisma.documentUpdate.count({ where: { documentId } }));
+      }
+      expect(most).toBeLessThanOrEqual(limit);
+      expect(await prisma.documentState.count({ where: { documentId } })).toBe(1);
+      const doc = await stateReader.readDoc(documentId);
+      expect(doc.getXmlFragment('content').toString()).toContain('w15');
+      expect(doc.getXmlFragment('content').toString()).toContain('w0');
+    });
+
+    it('takes an automatic version at most once per interval, and only when there are changes', async () => {
+      const { editor, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      await settle(900);
+      expect(await count(documentId, 'AUTO')).toBe(0);
+
+      client.paragraph().insert(0, 'a');
+      await waitFor(
+        async () => (await count(documentId, 'AUTO')) === 1,
+        'the first automatic version',
+      );
+      client.paragraph().insert(1, 'b');
+      await settle(300);
+      expect(await count(documentId, 'AUTO')).toBe(1);
+
+      await settle(700);
+      client.paragraph().insert(2, 'c');
+      await waitFor(
+        async () => (await count(documentId, 'AUTO')) === 2,
+        'the second automatic version',
+      );
+    });
+
+    it('retries a failed write by itself', async () => {
+      const { editor, documentId } = await setup();
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      const append = jest
+        .spyOn(DocumentStateWriter.prototype, 'append')
+        .mockRejectedValueOnce(new Error('connection reset'));
+      client.paragraph().insert(0, 'retried');
+      await waitFor(() => append.mock.calls.length >= 1, 'the failing write');
+      expect(await stored(documentId)).toBe('');
+      await waitFor(
+        async () => (await stored(documentId)).includes('retried'),
+        'the retry to succeed',
+        8000,
+      );
+      expect(append.mock.calls.length).toBeGreaterThanOrEqual(2);
+      jest.restoreAllMocks();
     });
   });
 
