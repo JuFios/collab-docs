@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
 import type { CollabRoomEvent } from '@collab-docs/shared';
 import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/shared/nest';
 import type { Identity } from '../access/access.service';
@@ -24,11 +24,12 @@ interface Entry {
 
 /** Owns the loaded rooms: loads them lazily, unloads them after a period without connections. */
 @Injectable()
-export class RoomManager implements OnApplicationShutdown {
+export class RoomManager implements BeforeApplicationShutdown {
   private readonly entries = new Map<string, Entry>();
   private readonly sessions = new Map<string, Session>();
   private readonly limits: RoomLimits;
   private readonly idleMs: number;
+  private shuttingDown = false;
 
   constructor(
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
@@ -133,16 +134,23 @@ export class RoomManager implements OnApplicationShutdown {
   }
 
   /** Deleted documents: write what is pending (restore needs the content), tell the clients, drop the room. */
-  async closeDocument(documentId: string, code: number, reason: string, event?: CollabRoomEvent) {
+  async closeDocument(
+    documentId: string,
+    code: number,
+    reason: string,
+    event?: CollabRoomEvent,
+  ): Promise<boolean> {
     const entry = this.entries.get(documentId);
-    if (!entry || entry.closing) return;
+    if (!entry || entry.closing) return false;
     const room = await entry.room.catch(() => undefined);
-    if (!room) return;
+    if (!room) return false;
     await this.store.flush(documentId).catch((error: unknown) => {
+      // the updates stay buffered and keep being retried; closing the sockets does not depend on them
       getRootLogger().error({ err: error, documentId }, 'flush before closing a room failed');
     });
     room.closeAll(code, reason, event);
     await this.unload(documentId);
+    return true;
   }
 
   private scheduleUnload(documentId: string): void {
@@ -173,10 +181,14 @@ export class RoomManager implements OnApplicationShutdown {
     entry.closing = (async () => {
       const room = await entry.room.catch(() => undefined);
       try {
-        // the store writes pending updates and compacts before the state leaves memory
-        await this.store.flush(documentId);
+        // the store writes what is buffered and compacts the log before the state leaves memory
+        await this.store.release(documentId);
       } catch (error) {
-        getRootLogger().error({ err: error, documentId }, 'flush while unloading a room failed');
+        // keep the room (and the store's buffer) and try again later: dropping it would lose the updates
+        getRootLogger().error({ err: error, documentId }, 'releasing a room failed, will retry');
+        entry.closing = null;
+        if (!this.shuttingDown) this.scheduleUnload(documentId);
+        return;
       }
       for (const session of this.matching({ documentIds: [documentId] })) {
         this.sessions.delete(session.conn.id);
@@ -187,7 +199,9 @@ export class RoomManager implements OnApplicationShutdown {
     return entry.closing;
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  async beforeApplicationShutdown(): Promise<void> {
+    // runs before the database and queue connections are closed, so the final flush can still be written
+    this.shuttingDown = true;
     const ids = [...this.entries.keys()];
     for (const id of ids) {
       const entry = this.entries.get(id);
@@ -197,5 +211,6 @@ export class RoomManager implements OnApplicationShutdown {
       room?.closeAll(1001, 'server shutting down');
     }
     await Promise.all(ids.map((id) => this.unload(id)));
+    await this.store.close();
   }
 }

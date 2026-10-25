@@ -3,7 +3,7 @@ import {
   Inject,
   Injectable,
   Module,
-  type OnModuleDestroy,
+  type OnApplicationShutdown,
   type OnModuleInit,
 } from '@nestjs/common';
 import { createPrismaClient, PrismaClient } from '@collab-docs/db';
@@ -11,7 +11,7 @@ import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/share
 
 /** Registers the Postgres probe and closes the connection pool on shutdown. */
 @Injectable()
-class PrismaLifecycle implements OnModuleInit, OnModuleDestroy {
+class PrismaLifecycle implements OnModuleInit, OnApplicationShutdown {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(ReadinessService) private readonly readiness: ReadinessService,
@@ -21,7 +21,8 @@ class PrismaLifecycle implements OnModuleInit, OnModuleDestroy {
     this.readiness.register('postgres', () => this.prisma.$queryRaw`SELECT 1`);
   }
 
-  async onModuleDestroy(): Promise<void> {
+  // after beforeApplicationShutdown, where the rooms write their last updates
+  async onApplicationShutdown(): Promise<void> {
     await this.prisma.$disconnect();
   }
 }

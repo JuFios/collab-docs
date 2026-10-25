@@ -26,3 +26,4 @@ export * from './permissions';
 export * from './realtime-events';
 export * from './fractional';
 export * from './collab';
+export * from './state-vector';

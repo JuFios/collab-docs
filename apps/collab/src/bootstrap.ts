@@ -8,6 +8,8 @@ import {
   createValidationPipe,
 } from '@collab-docs/shared/nest';
 import { InternalModule } from './internal/internal.module';
+import { VersionRestoreService } from './persistence/version-restore.service';
+import { DOCUMENT_STORE } from './rooms/document-store';
 import { RoomManager } from './rooms/room-manager';
 import { CollabWsAdapter } from './ws/collab-ws.adapter';
 
@@ -28,7 +30,12 @@ export async function createInternalApp(
   config: AppConfig,
 ): Promise<NestExpressApplication> {
   const internal = await NestFactory.create<NestExpressApplication>(
-    InternalModule.forRoot({ config, rooms: app.get(RoomManager) }),
+    InternalModule.forRoot({
+      config,
+      rooms: app.get(RoomManager),
+      store: app.get(DOCUMENT_STORE),
+      restore: app.get(VersionRestoreService),
+    }),
     { logger: ['error', 'warn'] },
   );
   internal.use(correlationMiddleware);

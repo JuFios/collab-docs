@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Counter, Gauge } from 'prom-client';
+import { Counter, Gauge, Histogram } from 'prom-client';
 import { MetricsService } from '@collab-docs/shared/nest';
 import type { RejectReason, RoomObserver } from '../rooms/doc-room';
+import type { PersistenceObserver } from '../rooms/postgres-document-store';
 
 /** Prometheus metrics of the collab service (spec §12); scraped at `/metrics` together with the platform ones. */
 @Injectable()
-export class CollabMetrics implements RoomObserver {
+export class CollabMetrics implements RoomObserver, PersistenceObserver {
   private readonly applied: Counter;
   private readonly duplicate: Counter;
   private readonly rejected: Counter<'reason'>;
@@ -14,6 +15,12 @@ export class CollabMetrics implements RoomObserver {
   private readonly accessChanges: Counter<'outcome'>;
   private readonly connections: Gauge;
   private readonly rooms: Gauge;
+  private readonly persistDuration: Histogram;
+  private readonly persistFailures: Counter;
+  private readonly compactionDuration: Histogram;
+  private readonly compactionRows: Counter;
+  private readonly compactionFailures: Counter;
+  private readonly badRows: Counter;
   private source: { connectionCount(): number; roomCount(): number } | null = null;
 
   constructor(@Inject(MetricsService) metrics: MetricsService) {
@@ -51,6 +58,38 @@ export class CollabMetrics implements RoomObserver {
       labelNames: ['outcome'],
       registers,
     });
+    this.persistDuration = new Histogram({
+      name: 'collab_persist_duration_seconds',
+      help: 'Time to write one flush (merged updates + revision bump) to Postgres',
+      buckets: [0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+      registers,
+    });
+    this.persistFailures = new Counter({
+      name: 'collab_persist_failures_total',
+      help: 'Flushes that failed; the updates stay buffered and are retried',
+      registers,
+    });
+    this.compactionDuration = new Histogram({
+      name: 'collab_compaction_duration_seconds',
+      help: 'Time to fold the update log into the compacted state',
+      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+      registers,
+    });
+    this.compactionRows = new Counter({
+      name: 'collab_compaction_rows_total',
+      help: 'Log rows folded into compacted states',
+      registers,
+    });
+    this.compactionFailures = new Counter({
+      name: 'collab_compaction_failures_total',
+      help: 'Compactions that failed (the log keeps growing until the next one succeeds)',
+      registers,
+    });
+    this.badRows = new Counter({
+      name: 'collab_bad_log_rows_total',
+      help: 'Update-log rows that could not be decoded and were skipped when a document was loaded',
+      registers,
+    });
     this.connections = new Gauge({
       name: 'collab_connections',
       help: 'Open document connections',
@@ -84,6 +123,27 @@ export class CollabMetrics implements RoomObserver {
 
   rateLimited(): void {
     this.rateLimitedTotal.inc();
+  }
+
+  persisted(seconds: number): void {
+    this.persistDuration.observe(seconds);
+  }
+
+  persistFailed(): void {
+    this.persistFailures.inc();
+  }
+
+  compacted(seconds: number, rows: number): void {
+    this.compactionDuration.observe(seconds);
+    this.compactionRows.inc(rows);
+  }
+
+  compactionFailed(): void {
+    this.compactionFailures.inc();
+  }
+
+  badLogRows(count: number): void {
+    this.badRows.inc(count);
   }
 
   socketClosed(code: number): void {

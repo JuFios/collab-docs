@@ -3,6 +3,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
 import * as Y from 'yjs';
+import { CONTENT_FIELD } from '@collab-docs/shared/content';
 import {
   type Access,
   COLLAB_CLOSE,
@@ -59,6 +60,8 @@ const NOOP_OBSERVER: RoomObserver = {
   rateLimited: () => undefined,
 };
 
+/** Origin of changes the server makes itself; they are broadcast to every connection. */
+const SERVER_ORIGIN = 'server';
 const RATE_WINDOW_MS = 10_000;
 /** A connection normally has one awareness client id (its Y.Doc's); a few spare ones cover provider restarts. */
 const MAX_AWARENESS_IDS_PER_CONNECTION = 4;
@@ -208,6 +211,25 @@ export class DocRoom {
       if (event) this.sendEvent(state, event);
       state.conn.close(code, reason);
     }
+  }
+
+  /**
+   * Replaces the body with a copy of `source`'s, as a single transaction by the server (restore of a version).
+   * Connected clients receive it like any other update and converge on it.
+   */
+  replaceContent(source: Y.Doc): void {
+    this.doc.transact(() => {
+      const fragment = this.doc.getXmlFragment(CONTENT_FIELD);
+      fragment.delete(0, fragment.length);
+      fragment.insert(
+        0,
+        source
+          .getXmlFragment(CONTENT_FIELD)
+          .toArray()
+          .filter((node): node is Y.XmlElement | Y.XmlText => !(node instanceof Y.XmlHook))
+          .map((node) => node.clone()),
+      );
+    }, SERVER_ORIGIN);
   }
 
   /** Sends `event` (if any) to one connection and closes it with `code`. */

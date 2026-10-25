@@ -4,6 +4,7 @@ import {
   HealthModule,
   MetricsModule,
   PlatformLoggerModule,
+  QueueModule,
   RedisModule,
 } from '@collab-docs/shared/nest';
 import { CollabModule } from './collab.module';
@@ -15,6 +16,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PlatformLoggerModule,
     RedisModule,
     MetricsModule,
+    QueueModule,
     HealthModule,
     PrismaModule,
     CollabModule,

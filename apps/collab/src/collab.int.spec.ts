@@ -4,7 +4,7 @@ import * as decoding from 'lib0/decoding';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import WebSocket from 'ws';
-import { PrismaClient } from '@collab-docs/db';
+import { DocumentStateReader, PrismaClient } from '@collab-docs/db';
 import {
   COLLAB_CLOSE,
   COLLAB_MESSAGE,
@@ -13,7 +13,6 @@ import {
 } from '@collab-docs/shared';
 import { REDIS_CLIENT, currentConfig, signCollabTicket } from '@collab-docs/shared/nest';
 import type { Redis } from 'ioredis';
-import { DOCUMENT_STORE, type InMemoryDocumentStore } from './rooms/document-store';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
 
@@ -101,7 +100,7 @@ describe('collab gateway', () => {
   let collab: RunningCollab;
   let prisma: PrismaClient;
   let redis: Redis;
-  let store: InMemoryDocumentStore;
+  let stateReader: DocumentStateReader;
   let rooms: RoomManager;
   const clients: Client[] = [];
 
@@ -152,6 +151,14 @@ describe('collab gateway', () => {
     return client;
   }
 
+  /** The document as the database has it. */
+  async function stored(documentId: string): Promise<string> {
+    const doc = await stateReader.readDoc(documentId);
+    const text = doc.getXmlFragment('content').toString();
+    doc.destroy();
+    return text;
+  }
+
   const publish = (channel: string, payload: object) =>
     redis.publish(channel, JSON.stringify({ ...payload, correlationId: 'test-event' }));
 
@@ -169,7 +176,7 @@ describe('collab gateway', () => {
     collab = await startCollab();
     prisma = collab.app.get(PrismaClient);
     redis = collab.app.get(REDIS_CLIENT);
-    store = collab.app.get(DOCUMENT_STORE);
+    stateReader = collab.app.get(DocumentStateReader);
     rooms = collab.app.get(RoomManager);
     await redis.flushdb();
   });
@@ -197,8 +204,9 @@ describe('collab gateway', () => {
       await waitFor(() => a.text() === b.text() && a.text().length === 10, 'a and b to converge');
       expect(a.text()).toContain('AAA');
       expect(a.text()).toContain('BBB');
-      expect(store.snapshot(documentId).getXmlFragment('content').toString()).toBe(
-        a.doc.getXmlFragment('content').toString(),
+      await waitFor(
+        async () => (await stored(documentId)) === a.doc.getXmlFragment('content').toString(),
+        'the database to hold the converged document',
       );
     });
 
@@ -229,9 +237,8 @@ describe('collab gateway', () => {
       reader.paragraph().insert(0, 'FORGED ');
       await settle(300);
       expect(writer.text()).toBe('original');
-      expect(store.snapshot(documentId).getXmlFragment('content').toString()).not.toContain(
-        'FORGED',
-      );
+      await settle(400);
+      expect(await stored(documentId)).not.toContain('FORGED');
     });
 
     it('survives an oversized frame (closed with 1009) and keeps serving the others', async () => {
@@ -248,8 +255,7 @@ describe('collab gateway', () => {
 
       healthy.paragraph().insert(0, 'still works');
       await waitFor(
-        () =>
-          store.snapshot(documentId).getXmlFragment('content').toString().includes('still works'),
+        async () => (await stored(documentId)).includes('still works'),
         'the healthy client to keep saving',
       );
     });
@@ -443,9 +449,7 @@ describe('collab gateway', () => {
       );
       expect(a.event('deleted')).toEqual({ type: 'deleted' });
       // the content is kept for a later restore
-      expect(store.snapshot(documentId).getXmlFragment('content').toString()).toContain(
-        'last words',
-      );
+      expect(await stored(documentId)).toContain('last words');
     });
 
     it('notices a revoked or expired guest link on the timer, without any event', async () => {
@@ -498,9 +502,8 @@ describe('collab gateway', () => {
       await waitFor(() => first.synced, 'sync');
       first.paragraph().insert(0, 'remember me');
       await waitFor(
-        () =>
-          store.snapshot(documentId).getXmlFragment('content').toString().includes('remember me'),
-        'the update to reach the store',
+        async () => (await stored(documentId)).includes('remember me'),
+        'the update to reach the database',
       );
       expect(rooms.roomCount()).toBeGreaterThan(0);
       first.destroy();

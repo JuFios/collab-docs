@@ -2,24 +2,24 @@ import { Module } from '@nestjs/common';
 import { AccessReevaluator } from './access/access-reevaluator.service';
 import { AccessService } from './access/access.service';
 import { PermissionEventsService } from './events/permission-events.service';
-import { CollabMetrics } from './metrics/collab-metrics.service';
-import { DOCUMENT_STORE, InMemoryDocumentStore } from './rooms/document-store';
+import { PersistenceModule } from './persistence/persistence.module';
+import { CollabMetricsModule } from './metrics/collab-metrics.module';
+import { VersionRestoreService } from './persistence/version-restore.service';
 import { RoomManager } from './rooms/room-manager';
 import { CollabGateway } from './ws/collab.gateway';
 import { ConnectionService } from './ws/connection.service';
 
 @Module({
+  imports: [CollabMetricsModule, PersistenceModule],
   providers: [
-    CollabMetrics,
     AccessService,
     AccessReevaluator,
     RoomManager,
     ConnectionService,
     CollabGateway,
     PermissionEventsService,
-    // replaced by the database-backed store with the persistence work
-    { provide: DOCUMENT_STORE, useClass: InMemoryDocumentStore },
+    VersionRestoreService,
   ],
-  exports: [RoomManager, DOCUMENT_STORE, AccessReevaluator, PermissionEventsService],
+  exports: [RoomManager, VersionRestoreService, PersistenceModule],
 })
 export class CollabModule {}
