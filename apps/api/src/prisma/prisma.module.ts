@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Module,
+  Optional,
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
@@ -14,11 +15,12 @@ import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/share
 class PrismaLifecycle implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(ReadinessService) private readonly readiness: ReadinessService,
+    // the worker process has no health endpoint, hence no readiness registry
+    @Optional() @Inject(ReadinessService) private readonly readiness?: ReadinessService,
   ) {}
 
   onModuleInit(): void {
-    this.readiness.register('postgres', () => this.prisma.$queryRaw`SELECT 1`);
+    this.readiness?.register('postgres', () => this.prisma.$queryRaw`SELECT 1`);
   }
 
   async onModuleDestroy(): Promise<void> {

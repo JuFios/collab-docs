@@ -11,4 +11,8 @@ export type {
   Document,
   DocumentShare,
   PublicLink,
+  DocumentUpdate,
+  DocumentState,
+  DocumentVersion,
 } from './generated/client';
+export * from './crdt';

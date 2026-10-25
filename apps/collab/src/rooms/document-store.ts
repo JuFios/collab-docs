@@ -19,8 +19,17 @@ export interface DocumentStore {
    */
   onPersisted(documentId: string, listener: (stateVector: Uint8Array) => void): () => void;
 
-  /** Writes pending updates now (before a room is closed because the document was deleted). */
+  /**
+   * Writes pending updates now and resolves once they are durable; rejects if they could not be written (they
+   * stay buffered and are retried). Used before a room is closed, before a version is taken, before publishing.
+   */
   flush(documentId: string): Promise<void>;
+
+  /** The room is going away: flush, compact the log and drop the document's in-memory bookkeeping. */
+  release(documentId: string): Promise<void>;
+
+  /** Process shutdown: flush everything that is buffered. */
+  close(): Promise<void>;
 }
 
 /** Keeps documents in memory: the store for tests, and the default until persistence lands. */
@@ -51,6 +60,14 @@ export class InMemoryDocumentStore implements DocumentStore {
   }
 
   flush(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  release(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  close(): Promise<void> {
     return Promise.resolve();
   }
 

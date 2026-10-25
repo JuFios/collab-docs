@@ -6,6 +6,7 @@ import { DocumentsModule } from './documents';
 import { PermissionsModule } from './permissions';
 import { PrismaModule } from './prisma/prisma.module';
 import { RealtimeEventsModule } from './realtime';
+import { VersionsModule } from './versions';
 import { WorkspacesModule } from './workspaces';
 
 @Module({
@@ -18,6 +19,7 @@ import { WorkspacesModule } from './workspaces';
     RealtimeEventsModule,
     DocumentsModule,
     CollabModule,
+    VersionsModule,
   ],
 })
 export class AppModule {}
