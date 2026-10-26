@@ -1,9 +1,11 @@
 'use client';
 
 import { type DocumentDetails, accessAtLeast } from '@collab-docs/shared';
-import { History, Link2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { History, Link2, MessageSquare, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { CommentsPanel } from '@/components/comments/comments-panel';
+import { useCommentsUi } from '@/components/comments/use-comments-ui';
 import { CollabErrorState } from '@/components/editor/collab-error-state';
 import { DocumentEditor } from '@/components/editor/document-editor';
 import { PresenceAvatars } from '@/components/editor/presence-avatars';
@@ -20,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { ShareDialog } from '@/components/sharing/share-dialog';
 import { useOptionalWorkspace } from '@/components/workspaces/workspace-provider';
 import { isApiError } from '@/lib/api/errors';
+import type { Viewer } from '@/lib/comments/queries';
 import { useDocumentQuery, useTree } from '@/lib/documents/queries';
 import { descendantIds, pathTo } from '@/lib/documents/tree';
 import { type TitleSaveState, deriveSaveStatus } from '@/lib/collab/save-status';
@@ -40,9 +43,14 @@ import { useDocumentActions } from './use-document-actions';
 export function DocumentShell({
   workspaceId,
   initial,
+  viewer,
+  initialThreadId = null,
 }: {
   workspaceId: string;
   initial: DocumentDetails;
+  viewer: Viewer;
+  /** Thread to open on arrival (`?thread=` from a notification or an email). */
+  initialThreadId?: string | null;
 }) {
   const workspace = useOptionalWorkspace();
   const query = useDocumentQuery(initial.id, initial);
@@ -57,7 +65,12 @@ export function DocumentShell({
   }
   const document = query.data ?? initial;
   return workspace ? (
-    <MemberShell workspaceId={workspaceId} document={document} />
+    <MemberShell
+      workspaceId={workspaceId}
+      document={document}
+      viewer={viewer}
+      initialThreadId={initialThreadId}
+    />
   ) : (
     <Frame
       workspaceId={workspaceId}
@@ -65,6 +78,8 @@ export function DocumentShell({
       trail={[]}
       menu={() => null}
       member={false}
+      viewer={viewer}
+      initialThreadId={initialThreadId}
     />
   );
 }
@@ -72,9 +87,13 @@ export function DocumentShell({
 function MemberShell({
   workspaceId,
   document,
+  viewer,
+  initialThreadId,
 }: {
   workspaceId: string;
   document: DocumentDetails;
+  viewer: Viewer;
+  initialThreadId: string | null;
 }) {
   const tree = useTree();
   const actions = useDocumentActions();
@@ -90,6 +109,8 @@ function MemberShell({
         document={document}
         trail={trail}
         member
+        viewer={viewer}
+        initialThreadId={initialThreadId}
         menu={(focusTitle) =>
           canDelete ? (
             <DocumentMenu
@@ -163,16 +184,22 @@ function Frame({
   trail,
   menu,
   member,
+  viewer,
+  initialThreadId,
 }: {
   workspaceId: string;
   document: DocumentDetails;
   trail: ReturnType<typeof pathTo>;
   menu: (focusTitle: () => void) => React.ReactNode;
   member: boolean;
+  viewer: Viewer;
+  initialThreadId: string | null;
 }) {
   const titleField = useRef<HTMLInputElement>(null);
   const [saveState, setSaveState] = useState<TitleSaveState>('idle');
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sidePanel, setSidePanel] = useState<'history' | 'comments' | null>(null);
+  const commentsToggle = useRef<HTMLButtonElement>(null);
+  const openComments = useCallback(() => setSidePanel('comments'), []);
   const online = useOnlineStatus();
   const connection = useCollabConnection(document.id, {
     onDowngrade: ({ discardedChanges }) =>
@@ -184,7 +211,15 @@ function Frame({
   });
   const presence = usePresence(connection.provider);
   // the REST answer decides until the server reports the live level on connect
-  const editable = accessAtLeast(connection.accessLevel ?? document.myAccess, 'EDIT');
+  const accessLevel = connection.accessLevel ?? document.myAccess;
+  const editable = accessAtLeast(accessLevel, 'EDIT');
+  const canComment = accessAtLeast(accessLevel, 'COMMENT');
+  const comments = useCommentsUi({
+    documentId: document.id,
+    canComment,
+    initialThreadId,
+    openPanel: openComments,
+  });
   const status = deriveSaveStatus({
     connection: connection.status,
     synced: connection.synced,
@@ -255,11 +290,22 @@ function Frame({
             />
           ) : null}
           <Button
+            ref={commentsToggle}
             type="button"
             variant="ghost"
             size="sm"
-            aria-pressed={historyOpen}
-            onClick={() => setHistoryOpen((open) => !open)}
+            aria-pressed={sidePanel === 'comments'}
+            onClick={() => setSidePanel((open) => (open === 'comments' ? null : 'comments'))}
+          >
+            <MessageSquare className="h-4 w-4" aria-hidden /> Comments
+            {comments.openCount > 0 ? ` (${comments.openCount})` : ''}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-pressed={sidePanel === 'history'}
+            onClick={() => setSidePanel((open) => (open === 'history' ? null : 'history'))}
           >
             <History className="h-4 w-4" aria-hidden /> History
           </Button>
@@ -269,7 +315,7 @@ function Frame({
           })}
         </span>
       </div>
-      <div className={historyOpen ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]' : 'grid gap-4'}>
+      <div className={sidePanel ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]' : 'grid gap-4'}>
         <div className="min-w-0">
           {connection.error ? (
             <CollabErrorState
@@ -287,16 +333,36 @@ function Frame({
               provider={connection.provider}
               synced={connection.synced}
               editable={editable}
+              blockComments={comments.controller}
+              onEditor={comments.setEditor}
             />
           ) : (
             <LoadingState label="Opening the document…" />
           )}
         </div>
-        {historyOpen ? (
+        {sidePanel === 'history' ? (
           <VersionsPanel
             documentId={document.id}
             canEdit={editable}
-            onClose={() => setHistoryOpen(false)}
+            onClose={() => setSidePanel(null)}
+          />
+        ) : null}
+        {sidePanel === 'comments' ? (
+          <CommentsPanel
+            documentId={document.id}
+            viewer={viewer}
+            canComment={canComment}
+            editor={comments.editor}
+            composeBlockId={comments.composeBlockId}
+            onComposeEnd={comments.endCompose}
+            activeThreadId={comments.activeThreadId}
+            onSelectThread={comments.select}
+            onClose={() => {
+              comments.endCompose();
+              setSidePanel(null);
+              // the panel held the focus; hand it back to the button that opened it
+              requestAnimationFrame(() => commentsToggle.current?.focus());
+            }}
           />
         ) : null}
       </div>

@@ -1,11 +1,13 @@
 'use client';
 
 import { ATTACHMENT_MIME_TYPES } from '@collab-docs/shared';
+import type { Editor } from '@tiptap/core';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { BlockCommentsController } from './block-comments';
 import { EditorToolbar } from './editor-toolbar';
 import { createEditorExtensions } from './extensions';
 import { useImageUpload } from './use-image-upload';
@@ -26,6 +28,8 @@ export function DocumentEditor({
   synced,
   editable,
   images = true,
+  blockComments,
+  onEditor,
 }: {
   documentId: string;
   ydoc: Y.Doc;
@@ -34,6 +38,10 @@ export function DocumentEditor({
   editable: boolean;
   /** False for guests with an edit link: the attachments api needs a signed-in user. */
   images?: boolean;
+  /** Comment markers next to blocks; the page drives them through the controller. */
+  blockComments?: BlockCommentsController;
+  /** Hands the page the editor once its content is shown (for the comments panel); `null` before that and on teardown. */
+  onEditor?: (editor: Editor | null) => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const pickImageClick = useCallback(() => fileInput.current?.click(), []);
@@ -47,8 +55,8 @@ export function DocumentEditor({
 
   const extensions = useMemo(
     // a change of access rebuilds the editor: the extensions differ for readers (see `editable` there)
-    () => createEditorExtensions({ ydoc, provider, pickImage, editable }),
-    [ydoc, provider, pickImage, editable],
+    () => createEditorExtensions({ ydoc, provider, pickImage, editable, blockComments }),
+    [ydoc, provider, pickImage, editable, blockComments],
   );
   const editor = useEditor(
     {
@@ -90,6 +98,10 @@ export function DocumentEditor({
     },
     [extensions],
   );
+  useEffect(() => {
+    onEditor?.(ready ? editor : null);
+    return () => onEditor?.(null);
+  }, [editor, ready, onEditor]);
   const { upload, uploads } = useImageUpload(documentId, editor);
   uploadRef.current = upload;
 

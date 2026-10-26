@@ -1,16 +1,20 @@
 import type { AuthUser, Workspace } from '@collab-docs/shared';
 import Link from 'next/link';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { UserMenu } from '@/components/user-menu';
 import { WorkspaceSwitcher } from '@/components/workspaces/workspace-switcher';
 
-/** Server Component shell; the switcher and the user menu are the only client islands. */
+/** Server Component shell; the switcher, the notification bell and the user menu are the only client islands. */
 export function Navbar({
   user,
   workspaces,
+  unreadCount,
 }: {
   user: AuthUser;
   /** `null` when the list could not be loaded; the rest of the page still works. */
   workspaces: readonly Workspace[] | null;
+  /** `undefined` when it could not be loaded; the bell then fetches it itself. */
+  unreadCount?: number;
 }) {
   return (
     <header className="border-b bg-background">
@@ -24,7 +28,10 @@ export function Navbar({
           </Link>
           {workspaces ? <WorkspaceSwitcher workspaces={workspaces} /> : null}
         </div>
-        <UserMenu user={user} />
+        <div className="flex items-center gap-1">
+          <NotificationBell initialCount={unreadCount} />
+          <UserMenu user={user} />
+        </div>
       </nav>
     </header>
   );

@@ -1,19 +1,26 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { z } from 'zod';
 import { DocumentGone } from '@/components/documents/document-gone';
 import { DocumentShell } from '@/components/documents/document-shell';
 import { ForbiddenState } from '@/components/states';
 import { isApiError } from '@/lib/api/errors';
-import { getDocument, getTrash } from '@/lib/workspaces/data';
+import { getCurrentUser, getDocument, getTrash } from '@/lib/workspaces/data';
 
 export const metadata: Metadata = { title: 'Document · Collab Docs' };
 
+const threadParam = z.string().uuid();
+
 export default async function DocumentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; docId: string }>;
+  searchParams: Promise<{ thread?: string | string[] }>;
 }) {
-  const { id, docId } = await params;
+  const [{ id, docId }, query] = await Promise.all([params, searchParams]);
+  // a link from a notification or an email: `?thread=<id>` opens that thread; anything else is ignored
+  const thread = threadParam.safeParse(query.thread);
   let document;
   try {
     document = await getDocument(docId);
@@ -31,5 +38,15 @@ export default async function DocumentPage({
   }
   // a document reached through another workspace's URL is not shown there
   if (document.workspaceId !== id) notFound();
-  return <DocumentShell key={document.id} workspaceId={id} initial={document} />;
+  // already fetched by the layout; `cache` makes this the same request
+  const user = await getCurrentUser();
+  return (
+    <DocumentShell
+      key={document.id}
+      workspaceId={id}
+      initial={document}
+      viewer={{ id: user.id, name: user.name }}
+      initialThreadId={thread.success ? thread.data : null}
+    />
+  );
 }
