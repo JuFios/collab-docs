@@ -1,55 +1,28 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
+import { Controller, Get, HttpCode, Inject, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
-  ApiCreatedResponse,
-  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiPayloadTooLargeResponse,
+  ApiParam,
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
-import { ParseUuidPipe } from '@collab-docs/shared/nest';
-import { CurrentUser, type RequestUser } from '../auth';
-import { DocumentAccess } from '../permissions';
-import {
-  AttachmentResponse,
-  AttachmentUrlResponse,
-  PresignAttachmentDto,
-  PresignedAttachmentResponse,
-} from './attachments.dto';
+import { AttachmentAccess, CurrentAttachment, type AttachmentRow } from './attachment-access';
+import { AttachmentResponse, AttachmentUrlResponse } from './attachments.dto';
 import { AttachmentsService } from './attachments.service';
 
 @ApiTags('attachments')
 @ApiBearerAuth()
 @ApiCookieAuth('access-cookie')
-@Controller()
+@ApiParam({ name: 'id', type: String })
+@Controller('attachments')
 export class AttachmentsController {
   constructor(@Inject(AttachmentsService) private readonly attachments: AttachmentsService) {}
 
-  @Post('documents/:id/attachments/presign')
-  @DocumentAccess('EDIT', { param: 'id' })
-  @ApiOperation({
-    summary: 'Get a one-time form to upload an image straight to storage',
-    description:
-      'Needs EDIT. Only png, jpeg, webp and gif up to the configured size are accepted. The size is ' +
-      'reserved against the workspace quota; the returned policy pins the key, the content type and the ' +
-      'exact length. POST `fields` followed by the file to `url`, then call `complete`.',
-  })
-  @ApiCreatedResponse({ type: PresignedAttachmentResponse })
-  @ApiForbiddenResponse({ description: 'PLAN_LIMIT_EXCEEDED with `details.kind = "storage"`' })
-  @ApiPayloadTooLargeResponse({ description: 'The file is larger than the per-file limit' })
-  presign(
-    @Param('id', ParseUuidPipe) id: string,
-    @Body() dto: PresignAttachmentDto,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.attachments.presign(id, user.id, dto);
-  }
-
-  @Post('attachments/:id/complete')
+  @Post(':id/complete')
   @HttpCode(200)
+  @AttachmentAccess('EDIT')
   @ApiOperation({
     summary: 'Verify an uploaded image and make it usable',
     description:
@@ -60,17 +33,18 @@ export class AttachmentsController {
   @ApiUnprocessableEntityResponse({
     description: 'The upload is missing or does not match (`details.reason`)',
   })
-  complete(@Param('id', ParseUuidPipe) id: string, @CurrentUser() user: RequestUser) {
-    return this.attachments.complete(id, user.id);
+  complete(@CurrentAttachment() attachment: AttachmentRow) {
+    return this.attachments.complete(attachment);
   }
 
-  @Get('attachments/:id/url')
+  @Get(':id/url')
+  @AttachmentAccess('VIEW')
   @ApiOperation({
     summary: 'Short-lived URL to read an image',
     description: 'Needs VIEW on the document the image belongs to. The URL is valid for 5 minutes.',
   })
   @ApiOkResponse({ type: AttachmentUrlResponse })
-  url(@Param('id', ParseUuidPipe) id: string, @CurrentUser() user: RequestUser) {
-    return this.attachments.url(id, user.id);
+  url(@CurrentAttachment() attachment: AttachmentRow) {
+    return this.attachments.url(attachment);
   }
 }

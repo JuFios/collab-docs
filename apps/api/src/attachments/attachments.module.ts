@@ -4,13 +4,15 @@ import { StorageModule } from '../storage';
 import { WorkspacesModule } from '../workspaces';
 import { AttachmentCleanupProcessor } from './attachment-cleanup.processor';
 import { AttachmentSweeper } from './attachment-sweeper';
+import { AttachmentAccessGuard } from './attachment-access';
 import { AttachmentsController } from './attachments.controller';
 import { AttachmentsService } from './attachments.service';
+import { DocumentAttachmentsController } from './document-attachments.controller';
 
 @Module({
   imports: [StorageModule, WorkspacesModule],
-  controllers: [AttachmentsController],
-  providers: [AttachmentsService, AttachmentSweeper],
+  controllers: [DocumentAttachmentsController, AttachmentsController],
+  providers: [AttachmentsService, AttachmentSweeper, AttachmentAccessGuard],
   exports: [AttachmentSweeper],
 })
 export class AttachmentsModule {}
