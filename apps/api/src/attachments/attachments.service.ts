@@ -21,9 +21,9 @@ import {
   ValidationFailedException,
   logEvent,
 } from '@collab-docs/shared/nest';
-import { PermissionsService, notFound } from '../permissions';
-import { S3Storage } from '../storage';
-import { PlanLimitsService } from '../workspaces';
+import { PermissionsService, notFound } from '../permissions/permissions.service';
+import { S3Storage } from '../storage/s3.service';
+import { PlanLimitsService } from '../workspaces/plan-limits.service';
 import type { AttachmentRow } from './attachment-access';
 
 const present = (row: AttachmentRow): Attachment => ({

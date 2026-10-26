@@ -10,8 +10,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
-import { CurrentUser, type RequestUser } from '../auth';
-import { DocumentAccess } from '../permissions';
+import { CurrentUser } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
+import { DocumentAccess } from '../permissions/permissions.decorators';
 import {
   CreateVersionDto,
   CreatedVersionResponse,

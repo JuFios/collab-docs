@@ -11,7 +11,7 @@ import {
   getCorrelationId,
 } from '@collab-docs/shared/nest';
 import { AppModule } from '../app.module';
-import { Public } from '../auth';
+import { Public } from '../auth/auth.decorators';
 import { configureApp } from '../bootstrap';
 
 class CreateThingDto {

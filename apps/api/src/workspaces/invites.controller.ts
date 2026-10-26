@@ -9,8 +9,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
-import { CurrentUser, Public, type RequestUser } from '../auth';
-import { WorkspaceRole } from '../permissions';
+import { CurrentUser, Public } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
+import { WorkspaceRole } from '../permissions/permissions.decorators';
 import { InvitesService } from './invites.service';
 import {
   AcceptInviteResponse,

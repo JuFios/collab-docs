@@ -8,7 +8,7 @@ import type {
   DocumentVersionContent,
   RestoredVersion,
 } from '@collab-docs/shared';
-import { CollabInternalClient } from '../collab';
+import { CollabInternalClient } from '../collab/collab-internal.client';
 
 const SELECT = {
   id: true,

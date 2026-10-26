@@ -8,8 +8,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
-import { CurrentUser, type RequestUser } from '../auth';
-import { WorkspaceRole } from '../permissions';
+import { CurrentUser } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
+import { WorkspaceRole } from '../permissions/permissions.decorators';
 import { MembersService } from './members.service';
 import { MemberResponse, UpdateMemberDto } from './workspaces.dto';
 

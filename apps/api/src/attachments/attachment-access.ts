@@ -13,8 +13,12 @@ import { PrismaClient } from '@collab-docs/db';
 import type { Access } from '@collab-docs/shared';
 import { AppException, ParseUuidPipe } from '@collab-docs/shared/nest';
 import type { Request } from 'express';
-import type { RequestUser } from '../auth';
-import { type DocumentAccessResult, PermissionsService, notFound } from '../permissions';
+import type { RequestUser } from '../auth/auth.types';
+import {
+  type DocumentAccessResult,
+  PermissionsService,
+  notFound,
+} from '../permissions/permissions.service';
 
 const ATTACHMENT_ACCESS_KEY = 'attachments:access';
 

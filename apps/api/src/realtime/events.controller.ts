@@ -3,8 +3,9 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
-import { CurrentUser, type RequestUser } from '../auth';
-import { PermissionsService } from '../permissions';
+import { CurrentUser } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
+import { PermissionsService } from '../permissions/permissions.service';
 import { RealtimeEventsService } from './realtime-events.service';
 
 const HEARTBEAT_MS = 25_000;

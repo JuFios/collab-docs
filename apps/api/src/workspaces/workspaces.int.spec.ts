@@ -4,7 +4,8 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, type WorkspaceRole } from '@collab-docs/shared';
-import { MailQueueService, MailWorkerModule } from '../notifications';
+import { MailQueueService } from '../notifications/mail-queue.service';
+import { MailWorkerModule } from '../notifications/notifications.module';
 import { createTestApp } from '../test/test-app';
 
 const PASSWORD = 'correct-horse-battery';

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DocumentStateReader, DocumentVersions, PrismaClient } from '@collab-docs/db';
-import { CollabModule } from '../collab';
+import { CollabModule } from '../collab/collab.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { VersionPruneProcessor } from './version-prune.processor';
 import { VersionsController } from './versions.controller';
@@ -21,7 +22,7 @@ const storage = [
 ];
 
 @Module({
-  imports: [CollabModule],
+  imports: [CollabModule, PermissionsModule],
   controllers: [VersionsController],
   providers: [...storage, VersionsService],
   exports: [DocumentStateReader, DocumentVersions],
