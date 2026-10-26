@@ -1,6 +1,5 @@
 import {
   Global,
-  Inject,
   Injectable,
   Module,
   Optional,
@@ -14,9 +13,9 @@ import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/nest'
 @Injectable()
 class PrismaLifecycle implements OnModuleInit, OnModuleDestroy {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaClient,
     // the worker process has no health endpoint, hence no readiness registry
-    @Optional() @Inject(ReadinessService) private readonly readiness?: ReadinessService,
+    @Optional() private readonly readiness?: ReadinessService,
   ) {}
 
   onModuleInit(): void {

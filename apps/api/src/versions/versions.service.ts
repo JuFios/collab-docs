@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
 import { sanitizeContent, yDocToContentJson } from '@collab-docs/shared/content';
 import { AppException } from '@collab-docs/nest';
@@ -46,9 +46,9 @@ const notFound = () => new AppException('NOT_FOUND', 'Version not found');
 @Injectable()
 export class VersionsService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(DocumentVersions) private readonly versions: DocumentVersions,
-    @Inject(CollabInternalClient) private readonly collab: CollabInternalClient,
+    private readonly prisma: PrismaClient,
+    private readonly versions: DocumentVersions,
+    private readonly collab: CollabInternalClient,
   ) {}
 
   /** Newest first. The retention policy keeps this list to at most 100 entries. */

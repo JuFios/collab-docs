@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Query, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -17,8 +17,8 @@ const HEARTBEAT_MS = 25_000;
 @Controller('events')
 export class EventsController {
   constructor(
-    @Inject(RealtimeEventsService) private readonly realtime: RealtimeEventsService,
-    @Inject(PermissionsService) private readonly permissions: PermissionsService,
+    private readonly realtime: RealtimeEventsService,
+    private readonly permissions: PermissionsService,
   ) {}
 
   @Get('stream')

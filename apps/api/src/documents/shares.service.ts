@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { canManageDocument, type ShareRole } from '@collab-docs/shared';
 import { AppException } from '@collab-docs/nest';
@@ -12,9 +12,9 @@ import { TreeCacheService } from './tree-cache.service';
 @Injectable()
 export class SharesService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PermEventsService) private readonly permEvents: PermEventsService,
-    @Inject(TreeCacheService) private readonly treeCache: TreeCacheService,
+    private readonly prisma: PrismaClient,
+    private readonly permEvents: PermEventsService,
+    private readonly treeCache: TreeCacheService,
   ) {}
 
   private assertCanManage(userId: string, current: DocumentAccessResult): void {

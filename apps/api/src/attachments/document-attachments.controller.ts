@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -20,7 +20,7 @@ import { AttachmentsService } from './attachments.service';
 @ApiCookieAuth('access-cookie')
 @Controller('documents/:id/attachments')
 export class DocumentAttachmentsController {
-  constructor(@Inject(AttachmentsService) private readonly attachments: AttachmentsService) {}
+  constructor(private readonly attachments: AttachmentsService) {}
 
   @Post('presign')
   @DocumentAccess('EDIT', { param: 'id' })

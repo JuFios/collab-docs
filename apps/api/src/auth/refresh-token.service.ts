@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
 import { AppException, logEvent } from '@collab-docs/nest';
@@ -27,7 +27,7 @@ const rejected = () => new AppException('UNAUTHENTICATED', 'Invalid or expired s
 
 @Injectable()
 export class RefreshTokenService {
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   /** Starts a new token family (login / register). */
   async issue(userId: string, now = new Date()): Promise<string> {

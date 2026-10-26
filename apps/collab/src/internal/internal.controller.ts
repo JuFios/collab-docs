@@ -15,9 +15,9 @@ import { InternalTokenGuard } from './internal-token.guard';
 @UseGuards(InternalTokenGuard)
 export class InternalController {
   constructor(
-    @Inject(RoomManager) private readonly rooms: RoomManager,
+    private readonly rooms: RoomManager,
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
-    @Inject(VersionRestoreService) private readonly restoreService: VersionRestoreService,
+    private readonly restoreService: VersionRestoreService,
   ) {}
 
   @Get('status')

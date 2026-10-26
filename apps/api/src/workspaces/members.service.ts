@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import {
   type MemberRuleViolation,
@@ -28,9 +28,9 @@ function violation(rule: MemberRuleViolation): AppException {
 @Injectable()
 export class MembersService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PlanLimitsService) private readonly limits: PlanLimitsService,
-    @Inject(PermEventsService) private readonly events: PermEventsService,
+    private readonly prisma: PrismaClient,
+    private readonly limits: PlanLimitsService,
+    private readonly events: PermEventsService,
   ) {}
 
   async list(workspaceId: string): Promise<MemberResponse[]> {

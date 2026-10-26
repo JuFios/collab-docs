@@ -62,10 +62,7 @@ export class QueueService implements OnApplicationShutdown {
   private readonly processed: Counter<'queue' | 'result'>;
   readonly enqueueFailures: Counter<'queue'>;
 
-  constructor(
-    @Inject(APP_CONFIG) config: AppConfig,
-    @Inject(MetricsService) metrics: MetricsService,
-  ) {
+  constructor(@Inject(APP_CONFIG) config: AppConfig, metrics: MetricsService) {
     this.connection = createRedis(config.REDIS_URL, { forQueues: true });
     this.jobsGauge = new Gauge({
       name: 'queue_jobs',

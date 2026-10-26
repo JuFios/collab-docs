@@ -35,7 +35,7 @@ import { LoginThrottleGuard } from './login-throttle.guard';
 @Controller('auth')
 export class AuthController {
   constructor(
-    @Inject(AuthService) private readonly auth: AuthService,
+    private readonly auth: AuthService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 

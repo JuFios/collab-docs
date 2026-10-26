@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import {
   type LimitKind,
@@ -25,7 +25,7 @@ export interface Usage {
  */
 @Injectable()
 export class PlanLimitsService {
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   /** `SELECT ... FOR UPDATE` on the workspace row; blocks until concurrent holders commit. */
   async lockWorkspace(tx: Tx, workspaceId: string): Promise<void> {

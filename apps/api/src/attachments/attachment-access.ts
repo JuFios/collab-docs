@@ -1,7 +1,6 @@
 import {
   type CanActivate,
   type ExecutionContext,
-  Inject,
   Injectable,
   SetMetadata,
   UseGuards,
@@ -50,9 +49,9 @@ interface Requirement {
 @Injectable()
 export class AttachmentAccessGuard implements CanActivate {
   constructor(
-    @Inject(Reflector) private readonly reflector: Reflector,
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PermissionsService) private readonly permissions: PermissionsService,
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaClient,
+    private readonly permissions: PermissionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

@@ -53,6 +53,17 @@ export default tseslint.config(
     rules: { 'import/no-cycle': 'error' },
   },
   {
+    // constructor types are the DI tokens: a class used in a decorated signature must stay a value import,
+    // and the rule knows that when the parser is told the compiler options
+    files: ['apps/api/**/*.ts', 'apps/collab/**/*.ts', 'packages/nest/**/*.ts'],
+    languageOptions: {
+      parserOptions: { emitDecoratorMetadata: true, experimentalDecorators: true },
+    },
+    rules: {
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
+    },
+  },
+  {
     files: ['**/*.spec.ts', '**/*.test.ts'],
     languageOptions: { globals: { ...globals.node, ...globals.jest } },
   },

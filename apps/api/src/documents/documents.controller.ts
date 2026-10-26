@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Inject,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -48,7 +37,7 @@ import { DocumentsService } from './documents.service';
 @ApiCookieAuth('access-cookie')
 @Controller()
 export class DocumentsController {
-  constructor(@Inject(DocumentsService) private readonly documents: DocumentsService) {}
+  constructor(private readonly documents: DocumentsService) {}
 
   @Post('workspaces/:workspaceId/documents')
   @WorkspaceRole('EDITOR')

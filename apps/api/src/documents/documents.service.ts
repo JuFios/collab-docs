@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import {
   type Access,
@@ -82,12 +82,12 @@ function toChanged(rows: Array<{ id: string; revision: bigint }>): Changed[] {
 @Injectable()
 export class DocumentsService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PermissionsService) private readonly permissions: PermissionsService,
-    @Inject(PlanLimitsService) private readonly limits: PlanLimitsService,
-    @Inject(PermEventsService) private readonly permEvents: PermEventsService,
-    @Inject(TreeCacheService) private readonly treeCache: TreeCacheService,
-    @Inject(QueueService) private readonly queues: QueueService,
+    private readonly prisma: PrismaClient,
+    private readonly permissions: PermissionsService,
+    private readonly limits: PlanLimitsService,
+    private readonly permEvents: PermEventsService,
+    private readonly treeCache: TreeCacheService,
+    private readonly queues: QueueService,
   ) {}
 
   // --- create ---------------------------------------------------------------------------------------------

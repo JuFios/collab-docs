@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -19,7 +19,7 @@ import { MemberResponse, UpdateMemberDto } from './workspaces.dto';
 @ApiCookieAuth('access-cookie')
 @Controller('workspaces/:workspaceId/members')
 export class MembersController {
-  constructor(@Inject(MembersService) private readonly members: MembersService) {}
+  constructor(private readonly members: MembersService) {}
 
   @Get()
   @WorkspaceRole('VIEWER')

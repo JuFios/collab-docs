@@ -11,10 +11,10 @@ import { RoomManager } from '../rooms/room-manager';
 @Injectable()
 export class VersionRestoreService {
   constructor(
-    @Inject(RoomManager) private readonly rooms: RoomManager,
+    private readonly rooms: RoomManager,
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
-    @Inject(DocumentVersions) private readonly versions: DocumentVersions,
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly versions: DocumentVersions,
+    private readonly prisma: PrismaClient,
   ) {}
 
   /** Returns the document revision after the restore. */

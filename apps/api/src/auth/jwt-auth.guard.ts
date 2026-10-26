@@ -9,7 +9,7 @@ import { readBearer, readCookie } from './cookies';
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    @Inject(Reflector) private readonly reflector: Reflector,
+    private readonly reflector: Reflector,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -23,7 +23,7 @@ import {
 @ApiTags('invites')
 @Controller()
 export class InvitesController {
-  constructor(@Inject(InvitesService) private readonly invites: InvitesService) {}
+  constructor(private readonly invites: InvitesService) {}
 
   @Post('workspaces/:workspaceId/invites')
   @WorkspaceRole('ADMIN')

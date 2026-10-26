@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { AttachmentSweeper } from './attachment-sweeper';
 
@@ -9,8 +9,8 @@ const SCHEDULER_ID = 'attachment-cleanup-hourly';
 @Injectable()
 export class AttachmentCleanupProcessor implements OnModuleInit {
   constructor(
-    @Inject(QueueService) private readonly queues: QueueService,
-    @Inject(AttachmentSweeper) private readonly sweeper: AttachmentSweeper,
+    private readonly queues: QueueService,
+    private readonly sweeper: AttachmentSweeper,
   ) {}
 
   async onModuleInit(): Promise<void> {

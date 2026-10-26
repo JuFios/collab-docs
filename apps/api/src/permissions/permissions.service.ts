@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import {
   type Access,
@@ -48,7 +48,7 @@ function raise(decision: Decision, what: string): void {
  */
 @Injectable()
 export class PermissionsService {
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async getWorkspaceRole(userId: string, workspaceId: string): Promise<WorkspaceRole | null> {
     if (!UUID.test(workspaceId)) return null;

@@ -9,8 +9,8 @@ const BATCH = 200;
 @Injectable()
 export class AttachmentSweeper {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(S3Storage) private readonly s3: S3Storage,
+    private readonly prisma: PrismaClient,
+    private readonly s3: S3Storage,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 

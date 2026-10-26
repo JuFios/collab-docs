@@ -20,8 +20,8 @@ export class PersistenceHooksService implements PersistenceHooks {
   private readonly lastAuto = new Map<string, Promise<number>>();
 
   constructor(
-    @Inject(QueueService) private readonly queues: QueueService,
-    @Inject(DocumentVersions) private readonly versions: DocumentVersions,
+    private readonly queues: QueueService,
+    private readonly versions: DocumentVersions,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 

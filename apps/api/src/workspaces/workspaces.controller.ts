@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -25,7 +25,7 @@ import { WorkspacesService } from './workspaces.service';
 @ApiCookieAuth('access-cookie')
 @Controller('workspaces')
 export class WorkspacesController {
-  constructor(@Inject(WorkspacesService) private readonly workspaces: WorkspacesService) {}
+  constructor(private readonly workspaces: WorkspacesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a workspace; the caller becomes its owner on the FREE plan' })

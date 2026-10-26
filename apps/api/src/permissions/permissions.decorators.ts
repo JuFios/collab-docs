@@ -1,7 +1,6 @@
 import {
   type CanActivate,
   type ExecutionContext,
-  Inject,
   Injectable,
   SetMetadata,
   UseGuards,
@@ -45,8 +44,8 @@ function idOf(request: PermissionRequest, param: string): string {
 @Injectable()
 export class WorkspaceRoleGuard implements CanActivate {
   constructor(
-    @Inject(Reflector) private readonly reflector: Reflector,
-    @Inject(PermissionsService) private readonly permissions: PermissionsService,
+    private readonly reflector: Reflector,
+    private readonly permissions: PermissionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -68,8 +67,8 @@ export class WorkspaceRoleGuard implements CanActivate {
 @Injectable()
 export class DocumentAccessGuard implements CanActivate {
   constructor(
-    @Inject(Reflector) private readonly reflector: Reflector,
-    @Inject(PermissionsService) private readonly permissions: PermissionsService,
+    private readonly reflector: Reflector,
+    private readonly permissions: PermissionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
