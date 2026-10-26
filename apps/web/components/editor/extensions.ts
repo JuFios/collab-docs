@@ -17,7 +17,8 @@ import { SlashCommand } from './slash-command';
 export interface EditorExtensionOptions {
   ydoc: Y.Doc;
   provider: WebsocketProvider;
-  pickImage: () => void;
+  /** Omitted where images cannot be uploaded (guests): the slash menu then has no Image entry. */
+  pickImage?: () => void;
   /**
    * Whether this client may change the document. A reader must not let the editor write block ids into its
    * local copy: the server ignores a reader's updates, and the copy would stay "unsaved" for good.

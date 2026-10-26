@@ -2,7 +2,13 @@ import { COLLAB_CLOSE, COLLAB_FINAL_CLOSE_CODES } from '@collab-docs/shared';
 import { isApiError } from '@/lib/api/errors';
 
 /** Why a collaboration session ended for good; the editor shows a screen for each. */
-export type CollabErrorKind = 'forbidden' | 'not-found' | 'deleted' | 'unavailable';
+export type CollabErrorKind =
+  | 'forbidden'
+  | 'not-found'
+  | 'deleted'
+  /** An edit link that expired or was revoked (guests only). */
+  | 'link-expired'
+  | 'unavailable';
 
 export interface CollabError {
   kind: CollabErrorKind;
@@ -23,6 +29,7 @@ const STOPPED: Record<CollabErrorKind, CollabError> = {
   forbidden: { kind: 'forbidden', message: 'You no longer have access to this document.' },
   'not-found': { kind: 'not-found', message: 'This document does not exist.' },
   deleted: { kind: 'deleted', message: 'This document was deleted.' },
+  'link-expired': { kind: 'link-expired', message: 'This link has expired or was revoked.' },
   unavailable: {
     kind: 'unavailable',
     message: 'The real-time connection could not be established.',
@@ -55,6 +62,9 @@ export function decideOnClose(code: number): RecoveryDecision {
 export function decideOnTicketError(error: unknown): RecoveryDecision {
   if (isApiError(error)) {
     if (error.status === 403) return stopped('forbidden');
+    if (error.status === 410) {
+      return stopped(error.code === 'DOCUMENT_DELETED' ? 'deleted' : 'link-expired');
+    }
     if (error.status === 404) return stopped('not-found');
     if (error.status === 429 || error.status >= 500 || error.code === 'NETWORK_ERROR') {
       return { action: 'backoff' };

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { ShareDialog } from '@/components/sharing/share-dialog';
 import { useOptionalWorkspace } from '@/components/workspaces/workspace-provider';
 import { isApiError } from '@/lib/api/errors';
 import { useDocumentQuery, useTree } from '@/lib/documents/queries';
@@ -243,6 +244,16 @@ function Frame({
         {showStatus ? <SaveIndicator status={status} /> : null}
         <span className="ml-auto flex items-center gap-2">
           <PresenceAvatars users={presence} />
+          {member ? (
+            <ShareDialog
+              document={document}
+              sync={{
+                online,
+                synced: connection.synced,
+                hasUnsyncedChanges: connection.hasUnsyncedChanges,
+              }}
+            />
+          ) : null}
           <Button
             type="button"
             variant="ghost"

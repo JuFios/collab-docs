@@ -36,7 +36,8 @@ export function EditorToolbar({
   onPickImage,
 }: {
   editor: Editor;
-  onPickImage: () => void;
+  /** Omitted where images cannot be uploaded (guests). */
+  onPickImage?: () => void;
 }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const state = useEditorState({
@@ -126,7 +127,7 @@ export function EditorToolbar({
         active: state.codeBlock,
         run: () => chain().toggleCodeBlock().run(),
       },
-      { label: 'Image', icon: ImageIcon, run: onPickImage },
+      ...(onPickImage ? [{ label: 'Image', icon: ImageIcon, run: onPickImage }] : []),
     ],
   ];
 

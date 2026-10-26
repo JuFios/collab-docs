@@ -2,6 +2,7 @@
 
 import {
   type Access,
+  type CollabTicket,
   COLLAB_MESSAGE,
   accessAtLeast,
   base64ToBytes,
@@ -36,6 +37,8 @@ export interface DowngradeNotice {
 
 export interface CollabConnectionOptions {
   onDowngrade?: (notice: DowngradeNotice) => void;
+  /** Where a ticket comes from; the default is the signed-in user's `collab-ticket`. Guests pass their link's. */
+  fetchTicket?: (signal: AbortSignal) => Promise<CollabTicket>;
 }
 
 export interface CollabConnection {
@@ -100,6 +103,8 @@ export function useCollabConnection(
   const [session, setSession] = useState(0);
   const onDowngrade = useRef(options.onDowngrade);
   onDowngrade.current = options.onDowngrade;
+  const fetchTicket = useRef(options.fetchTicket);
+  fetchTicket.current = options.fetchTicket;
 
   useEffect(() => {
     const ydoc = new Y.Doc();
@@ -192,7 +197,9 @@ export function useCollabConnection(
 
     async function connect(): Promise<void> {
       try {
-        const { ticket, wsUrl } = await fetchCollabTicket(documentId, abort.signal);
+        const { ticket, wsUrl } = await (
+          fetchTicket.current ?? ((signal) => fetchCollabTicket(documentId, signal))
+        )(abort.signal);
         if (!alive) return;
         if (provider) {
           // y-websocket builds the URL from `params` on every attempt

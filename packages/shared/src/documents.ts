@@ -70,3 +70,15 @@ export type MovedDocument = z.infer<typeof movedDocumentSchema>;
 export type TrashItem = z.infer<typeof trashItemSchema>;
 export type CreateDocumentInput = z.infer<typeof createDocumentInputSchema>;
 export type MoveDocumentInput = z.infer<typeof moveDocumentInputSchema>;
+
+export const SHARE_ROLES = ['VIEWER', 'EDITOR'] as const;
+
+/** A person a document is shared with. Shares are per document and are not inherited by subpages. */
+export const shareSchema = z.object({
+  userId: z.string().uuid(),
+  email: z.string(),
+  name: z.string(),
+  role: z.enum(SHARE_ROLES),
+});
+export type Share = z.infer<typeof shareSchema>;
+export const shareListSchema = z.array(shareSchema);
