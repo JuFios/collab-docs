@@ -1,11 +1,18 @@
 import { Injectable } from '@nestjs/common';
+import { Counter } from 'prom-client';
 import { Prisma } from '@collab-docs/db';
 import {
   type MentionNotificationPayload,
   type NotificationPage,
   mentionNotificationPayloadSchema,
 } from '@collab-docs/shared';
-import { InjectPinoLogger, PinoLogger, QueueService, logEvent } from '@collab-docs/nest';
+import {
+  InjectPinoLogger,
+  MetricsService,
+  PinoLogger,
+  QueueService,
+  logEvent,
+} from '@collab-docs/nest';
 import { MailQueueService } from '../notifications/mail-queue.service';
 import { viewableDocumentSql } from '../permissions/document-access-sql';
 import { PrismaService } from '../prisma/prisma.service';
@@ -45,13 +52,23 @@ export const commentMentionKey = (commentId: string, userId: string) =>
  */
 @Injectable()
 export class InboxService {
+  private readonly createdTotal: Counter<'type'>;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeEventsService,
     private readonly mail: MailQueueService,
     private readonly queues: QueueService,
+    metrics: MetricsService,
     @InjectPinoLogger(InboxService.name) private readonly logger: PinoLogger,
-  ) {}
+  ) {
+    this.createdTotal = new Counter({
+      name: 'notifications_created_total',
+      help: 'In-app notifications created',
+      labelNames: ['type'],
+      registers: [metrics.registry],
+    });
+  }
 
   /**
    * Inside the caller's transaction: makes the mention notifications of a comment match its recipients. Users no
@@ -98,6 +115,7 @@ export class InboxService {
   async announce(created: CreatedNotification[]): Promise<void> {
     await Promise.all(
       created.map(async ({ id, userId }) => {
+        this.createdTotal.inc({ type: 'MENTION' });
         logEvent(this.logger, 'notification.created', {
           notificationId: id,
           userId,
