@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@collab-docs/db';
 import type { WorkspaceRole } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, logEvent } from '@collab-docs/nest';
+import { AppException, type AppConfig, logEvent } from '@collab-docs/nest';
 import { MailQueueService } from '../notifications/mail-queue.service';
 import { notFound } from '../permissions/permissions.service';
 import { INVITE_TOKEN_PATTERN, INVITE_TTL_MS, hashToken, newInviteToken } from './invite-token';
@@ -35,7 +36,7 @@ export class InvitesService {
     private readonly prisma: PrismaClient,
     private readonly limits: PlanLimitsService,
     private readonly mail: MailQueueService,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   /**
@@ -101,7 +102,7 @@ export class InvitesService {
       workspaceName: workspace.name,
       inviterName: inviter.name,
       role: input.role,
-      link: new URL(`/invite/${token}`, this.config.WEB_ORIGIN).toString(),
+      link: new URL(`/invite/${token}`, this.config.get('WEB_ORIGIN', { infer: true })).toString(),
       expiresAt: expiresAt.toISOString(),
     });
     logEvent('invite.sent', { workspaceId, inviteId: invite.id, inviterId, role: input.role });

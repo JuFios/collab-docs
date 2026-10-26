@@ -1,6 +1,7 @@
-import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type Transporter, createTransport } from 'nodemailer';
-import { APP_CONFIG, type AppConfig, logEvent } from '@collab-docs/nest';
+import { type AppConfig, logEvent } from '@collab-docs/nest';
 
 export interface MailMessage {
   to: string;
@@ -14,10 +15,13 @@ export interface MailMessage {
 export class MailerService implements OnApplicationShutdown {
   private transport?: Transporter;
 
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   async send(message: MailMessage): Promise<void> {
-    await this.getTransport().sendMail({ from: this.config.SMTP_FROM, ...message });
+    await this.getTransport().sendMail({
+      from: this.config.get('SMTP_FROM', { infer: true }),
+      ...message,
+    });
     logEvent('mail.sent', { subject: message.subject });
   }
 
@@ -27,11 +31,16 @@ export class MailerService implements OnApplicationShutdown {
 
   private getTransport(): Transporter {
     this.transport ??= createTransport({
-      host: this.config.SMTP_HOST,
-      port: this.config.SMTP_PORT,
+      host: this.config.get('SMTP_HOST', { infer: true }),
+      port: this.config.get('SMTP_PORT', { infer: true }),
       secure: false,
-      ...(this.config.SMTP_USER
-        ? { auth: { user: this.config.SMTP_USER, pass: this.config.SMTP_PASSWORD } }
+      ...(this.config.get('SMTP_USER', { infer: true })
+        ? {
+            auth: {
+              user: this.config.get('SMTP_USER', { infer: true }),
+              pass: this.config.get('SMTP_PASSWORD', { infer: true }),
+            },
+          }
         : {}),
     });
     return this.transport;

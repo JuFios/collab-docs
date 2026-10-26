@@ -1,4 +1,5 @@
-import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -9,7 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { APP_CONFIG, type AppConfig } from '@collab-docs/nest';
+import { type AppConfig } from '@collab-docs/nest';
 
 export interface ObjectInfo {
   size: number;
@@ -35,15 +36,21 @@ export class S3Storage implements OnModuleDestroy {
   private readonly signer: S3Client;
   private readonly bucket: string;
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+  constructor(config: ConfigService<AppConfig, true>) {
     const credentials = {
-      accessKeyId: config.S3_ACCESS_KEY,
-      secretAccessKey: config.S3_SECRET_KEY,
+      accessKeyId: config.get('S3_ACCESS_KEY', { infer: true }),
+      secretAccessKey: config.get('S3_SECRET_KEY', { infer: true }),
     };
     const common = { region: 'us-east-1', forcePathStyle: true, credentials } as const;
-    this.internal = new S3Client({ ...common, endpoint: config.S3_ENDPOINT });
-    this.signer = new S3Client({ ...common, endpoint: config.S3_PUBLIC_ENDPOINT });
-    this.bucket = config.S3_BUCKET;
+    this.internal = new S3Client({
+      ...common,
+      endpoint: config.get('S3_ENDPOINT', { infer: true }),
+    });
+    this.signer = new S3Client({
+      ...common,
+      endpoint: config.get('S3_PUBLIC_ENDPOINT', { infer: true }),
+    });
+    this.bucket = config.get('S3_BUCKET', { infer: true });
   }
 
   onModuleDestroy(): void {

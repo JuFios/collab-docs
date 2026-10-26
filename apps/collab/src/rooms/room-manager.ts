@@ -1,6 +1,7 @@
 import { Inject, Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { CollabRoomEvent } from '@collab-docs/shared';
-import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/nest';
+import { type AppConfig, getRootLogger } from '@collab-docs/nest';
 import type { Identity } from '../access/access.service';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DocRoom, type RoomConnection, type RoomLimits } from './doc-room';
@@ -33,17 +34,17 @@ export class RoomManager implements BeforeApplicationShutdown {
 
   constructor(
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
-    @Inject(APP_CONFIG) config: AppConfig,
+    config: ConfigService<AppConfig, true>,
     private readonly metrics: CollabMetrics,
   ) {
     this.limits = {
-      maxMessagesPer10s: config.COLLAB_MAX_MESSAGES_PER_10S,
-      maxUpdateBytes: config.COLLAB_MAX_UPDATE_BYTES,
-      maxDocumentBytes: config.COLLAB_MAX_DOCUMENT_BYTES,
-      maxConnections: config.COLLAB_MAX_CONNECTIONS_PER_DOCUMENT,
-      maxAwarenessBytes: config.COLLAB_MAX_AWARENESS_BYTES,
+      maxMessagesPer10s: config.get('COLLAB_MAX_MESSAGES_PER_10S', { infer: true }),
+      maxUpdateBytes: config.get('COLLAB_MAX_UPDATE_BYTES', { infer: true }),
+      maxDocumentBytes: config.get('COLLAB_MAX_DOCUMENT_BYTES', { infer: true }),
+      maxConnections: config.get('COLLAB_MAX_CONNECTIONS_PER_DOCUMENT', { infer: true }),
+      maxAwarenessBytes: config.get('COLLAB_MAX_AWARENESS_BYTES', { infer: true }),
     };
-    this.idleMs = config.COLLAB_ROOM_IDLE_MS;
+    this.idleMs = config.get('COLLAB_ROOM_IDLE_MS', { infer: true });
     metrics.bind(this);
   }
 

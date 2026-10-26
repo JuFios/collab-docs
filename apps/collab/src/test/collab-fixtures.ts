@@ -5,7 +5,7 @@ import { WebsocketProvider } from 'y-websocket';
 import WebSocket from 'ws';
 import type { PrismaClient } from '@collab-docs/db';
 import { COLLAB_MESSAGE, type CollabRoomEvent } from '@collab-docs/shared';
-import { currentConfig, signCollabTicket } from '@collab-docs/nest';
+import { parseConfig, signCollabTicket } from '@collab-docs/nest';
 
 export interface TestUser {
   id: string;
@@ -122,7 +122,7 @@ export async function makeTeam(prisma: PrismaClient) {
 }
 
 export async function ticketFor(user: TestUser, documentId: string): Promise<string> {
-  return signCollabTicket(currentConfig().COLLAB_TICKET_SECRET, {
+  return signCollabTicket(parseConfig(process.env).COLLAB_TICKET_SECRET, {
     docId: documentId,
     sub: user.id,
   });

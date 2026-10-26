@@ -10,6 +10,7 @@ export * from './metrics';
 export * from './queue';
 export * from './throttle';
 export * from './http';
+export * from './pipeline';
 export * from './platform';
 export * from './public';
 export * from './document-changed';

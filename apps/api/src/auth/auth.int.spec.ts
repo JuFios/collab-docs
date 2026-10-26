@@ -11,7 +11,7 @@ import {
   apiErrorSchema,
   signAccessToken,
 } from '@collab-docs/shared';
-import { currentConfig, getRootLogger } from '@collab-docs/nest';
+import { parseConfig, getRootLogger } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { CurrentUser, Public } from './auth.decorators';
 import type { RequestUser } from './auth.types';
@@ -211,9 +211,13 @@ describe('auth', () => {
       expect(garbage.body.code).toBe('UNAUTHENTICATED');
 
       const { body } = await register();
-      const { token } = await signAccessToken(currentConfig().JWT_ACCESS_SECRET, body.user.id, {
-        now: new Date(Date.now() - 3600_000),
-      });
+      const { token } = await signAccessToken(
+        parseConfig(process.env).JWT_ACCESS_SECRET,
+        body.user.id,
+        {
+          now: new Date(Date.now() - 3600_000),
+        },
+      );
       const expired = await http()
         .get('/api/auth/me')
         .set('Authorization', `Bearer ${token}`)

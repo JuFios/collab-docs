@@ -1,8 +1,9 @@
-import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import type { AuthenticatedRequest } from './auth.types';
 import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, IS_PUBLIC_KEY } from '@collab-docs/nest';
+import { AppException, type AppConfig, IS_PUBLIC_KEY } from '@collab-docs/nest';
 import { readBearer, readCookie } from './cookies';
 
 /** Global guard: verifies the access JWT locally (no database round trip) and exposes `req.user`. */
@@ -10,7 +11,7 @@ import { readBearer, readCookie } from './cookies';
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -27,7 +28,10 @@ export class JwtAuthGuard implements CanActivate {
     const token = readBearer(request) ?? readCookie(request, ACCESS_COOKIE);
     if (!token) throw new AppException('UNAUTHENTICATED', 'Authentication required');
     try {
-      const claims = await verifyAccessToken(token, this.config.JWT_ACCESS_SECRET);
+      const claims = await verifyAccessToken(
+        token,
+        this.config.get('JWT_ACCESS_SECRET', { infer: true }),
+      );
       request.user = { id: claims.sub, jti: claims.jti };
       return true;
     } catch (error) {

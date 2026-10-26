@@ -1,4 +1,5 @@
 import '../test/versions-env';
+import { ConfigService } from '@nestjs/config';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -6,7 +7,7 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import * as Y from 'yjs';
 import { DocumentStateWriter, DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
-import { QUEUE_NAMES, QueueService, currentConfig } from '@collab-docs/nest';
+import { QUEUE_NAMES, QueueService, parseConfig } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { VersionPruneProcessor } from './version-prune.processor';
 
@@ -114,7 +115,7 @@ describe('document versions', () => {
 
     app = await createTestApp();
     // the client reads the url from the shared config object on every call
-    currentConfig().COLLAB_INTERNAL_URL = collabUrl;
+    app.get(ConfigService).set('COLLAB_INTERNAL_URL', collabUrl);
     prisma = app.get(PrismaClient, { strict: false });
     versions = app.get(DocumentVersions, { strict: false });
     writer = new DocumentStateWriter(prisma);
@@ -124,7 +125,7 @@ describe('document versions', () => {
     calls.length = 0;
     collabStatus = 200;
     collabBody = {};
-    currentConfig().COLLAB_INTERNAL_URL = collabUrl;
+    app.get(ConfigService).set('COLLAB_INTERNAL_URL', collabUrl);
   });
 
   afterAll(async () => {
@@ -190,7 +191,7 @@ describe('document versions', () => {
       expect(calls).toEqual([
         {
           path: `/internal/documents/${documentId}/flush`,
-          authorization: `Bearer ${currentConfig().INTERNAL_API_TOKEN}`,
+          authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}`,
           body: {},
         },
       ]);
@@ -207,7 +208,7 @@ describe('document versions', () => {
     it('still saves, and says so, when collab cannot be reached', async () => {
       const { owner, documentId } = await setup();
       await writeContent(documentId, 'stored');
-      currentConfig().COLLAB_INTERNAL_URL = 'http://127.0.0.1:1';
+      app.get(ConfigService).set('COLLAB_INTERNAL_URL', 'http://127.0.0.1:1');
       const response = await as(owner)
         .post(`/documents/${documentId}/versions`)
         .send({})
@@ -330,7 +331,7 @@ describe('document versions', () => {
       expect(calls).toEqual([
         {
           path: `/internal/documents/${documentId}/restore`,
-          authorization: `Bearer ${currentConfig().INTERNAL_API_TOKEN}`,
+          authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}`,
           body: { versionId: created.body.id, userId: owner.id },
         },
       ]);
@@ -361,7 +362,7 @@ describe('document versions', () => {
       collabStatus = 500;
       expect((await as(owner).post(url).expect(503)).body.code).toBe('SERVICE_UNAVAILABLE');
       collabStatus = 200;
-      currentConfig().COLLAB_INTERNAL_URL = 'http://127.0.0.1:1';
+      app.get(ConfigService).set('COLLAB_INTERNAL_URL', 'http://127.0.0.1:1');
       expect((await as(owner).post(url).expect(503)).body.code).toBe('SERVICE_UNAVAILABLE');
     });
   });

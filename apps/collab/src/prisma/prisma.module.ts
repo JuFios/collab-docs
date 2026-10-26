@@ -5,8 +5,9 @@ import {
   type OnApplicationShutdown,
   type OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createPrismaClient, PrismaClient } from '@collab-docs/db';
-import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/nest';
+import { type AppConfig, ReadinessService } from '@collab-docs/nest';
 
 /** Registers the Postgres probe and closes the connection pool on shutdown. */
 @Injectable()
@@ -32,8 +33,9 @@ class PrismaLifecycle implements OnModuleInit, OnApplicationShutdown {
   providers: [
     {
       provide: PrismaClient,
-      inject: [APP_CONFIG],
-      useFactory: (config: AppConfig) => createPrismaClient(config.DATABASE_URL),
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfig, true>) =>
+        createPrismaClient(config.get('DATABASE_URL', { infer: true })),
     },
     PrismaLifecycle,
   ],

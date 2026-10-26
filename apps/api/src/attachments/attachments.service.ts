@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import {
   ATTACHMENT_READ_TTL_SECONDS,
@@ -15,7 +16,6 @@ import {
   sniffImageType,
 } from '@collab-docs/shared';
 import {
-  APP_CONFIG,
   AppException,
   type AppConfig,
   ValidationFailedException,
@@ -52,7 +52,7 @@ export class AttachmentsService {
     private readonly permissions: PermissionsService,
     private readonly limits: PlanLimitsService,
     private readonly s3: S3Storage,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   /** Needs EDIT on the document. Reserves `size` bytes of the workspace quota until the upload is completed or swept. */
@@ -72,7 +72,7 @@ export class AttachmentsService {
         { field: 'filename', messages: [`The file extension does not match ${input.mime}`] },
       ]);
     }
-    const maxBytes = this.config.ATTACHMENT_MAX_BYTES;
+    const maxBytes = this.config.get('ATTACHMENT_MAX_BYTES', { infer: true });
     if (input.size > maxBytes) {
       throw new AppException('PAYLOAD_TOO_LARGE', `Images can be at most ${maxBytes} bytes`, {
         details: { maxBytes },

@@ -11,14 +11,14 @@ import {
   type CollabRoomEvent,
   PERM_EVENT_CHANNELS,
 } from '@collab-docs/shared';
-import { REDIS_CLIENT, currentConfig, signCollabTicket } from '@collab-docs/nest';
+import { REDIS_CLIENT, parseConfig, signCollabTicket } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
 
-const SECRET = currentConfig().COLLAB_TICKET_SECRET;
-const IDLE_MS = currentConfig().COLLAB_ROOM_IDLE_MS;
-const RECHECK_MS = currentConfig().COLLAB_ACCESS_RECHECK_MS;
+const SECRET = parseConfig(process.env).COLLAB_TICKET_SECRET;
+const IDLE_MS = parseConfig(process.env).COLLAB_ROOM_IDLE_MS;
+const RECHECK_MS = parseConfig(process.env).COLLAB_ACCESS_RECHECK_MS;
 
 interface TestUser {
   id: string;
@@ -250,7 +250,7 @@ describe('collab gateway', () => {
       const socket = new WebSocket(`${collab.wsUrl}/${documentId}?ticket=${ticket}`);
       const closed = new Promise<number>((resolve) => socket.on('close', (code) => resolve(code)));
       await new Promise((resolve) => socket.on('open', resolve));
-      socket.send(Buffer.alloc(currentConfig().COLLAB_MAX_UPDATE_BYTES + 1024, 1));
+      socket.send(Buffer.alloc(parseConfig(process.env).COLLAB_MAX_UPDATE_BYTES + 1024, 1));
       await expect(closed).resolves.toBe(COLLAB_CLOSE.messageTooBig);
 
       healthy.paragraph().insert(0, 'still works');
@@ -262,7 +262,7 @@ describe('collab gateway', () => {
 
     it('refuses connections beyond the per-document limit with 4429', async () => {
       const { editor, documentId } = await setup();
-      const limit = currentConfig().COLLAB_MAX_CONNECTIONS_PER_DOCUMENT;
+      const limit = parseConfig(process.env).COLLAB_MAX_CONNECTIONS_PER_DOCUMENT;
       for (let i = 0; i < limit; i += 1) await connect(editor, documentId);
       await waitFor(() => clients.every((c) => c.synced), 'the allowed clients to sync');
       const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: editor.id });
@@ -538,7 +538,7 @@ describe('collab gateway', () => {
       const { editor, documentId } = await setup();
       const client = await connect(editor, documentId);
       await waitFor(() => client.synced, 'sync');
-      const limit = currentConfig().COLLAB_COMPACT_MAX_ROWS;
+      const limit = parseConfig(process.env).COLLAB_COMPACT_MAX_ROWS;
       let most = 0;
       for (let i = 0; i < 16; i += 1) {
         client.paragraph().insert(client.paragraph().length, `w${i} `);
@@ -626,11 +626,14 @@ describe('collab gateway', () => {
       expect((await fetch(url)).status).toBe(401);
       expect((await fetch(url, { headers: { authorization: 'Bearer wrong' } })).status).toBe(401);
       expect(
-        (await fetch(url, { headers: { 'x-internal-token': currentConfig().INTERNAL_API_TOKEN } }))
-          .status,
+        (
+          await fetch(url, {
+            headers: { 'x-internal-token': parseConfig(process.env).INTERNAL_API_TOKEN },
+          })
+        ).status,
       ).toBe(401);
       const ok = await fetch(url, {
-        headers: { authorization: `Bearer ${currentConfig().INTERNAL_API_TOKEN}` },
+        headers: { authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}` },
       });
       expect(ok.status).toBe(200);
       expect(await ok.json()).toEqual({
@@ -641,7 +644,7 @@ describe('collab gateway', () => {
 
     it('does not expose the internal API on the public port', async () => {
       const response = await fetch(`${collab.httpUrl}/internal/status`, {
-        headers: { authorization: `Bearer ${currentConfig().INTERNAL_API_TOKEN}` },
+        headers: { authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}` },
       });
       expect(response.status).toBe(404);
     });

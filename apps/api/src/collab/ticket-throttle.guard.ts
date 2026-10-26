@@ -1,13 +1,8 @@
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { Redis } from 'ioredis';
-import {
-  APP_CONFIG,
-  AppException,
-  type AppConfig,
-  REDIS_CLIENT,
-  getRootLogger,
-} from '@collab-docs/nest';
+import { AppException, type AppConfig, REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
 import type { RequestUser } from '../auth/auth.types';
 
 const WINDOW_SECONDS = 60;
@@ -20,7 +15,7 @@ const WINDOW_SECONDS = 60;
 export class TicketThrottleGuard implements CanActivate {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,7 +26,7 @@ export class TicketThrottleGuard implements CanActivate {
     try {
       const count = await this.redis.incr(key);
       if (count === 1) await this.redis.expire(key, WINDOW_SECONDS);
-      if (count <= this.config.RATE_TICKET_PER_MIN_USER) return true;
+      if (count <= this.config.get('RATE_TICKET_PER_MIN_USER', { infer: true })) return true;
       const ttl = await this.redis.ttl(key);
       throw new AppException('RATE_LIMITED', 'Too many connection attempts, try again shortly', {
         headers: { 'Retry-After': String(ttl > 0 ? ttl : WINDOW_SECONDS) },

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import {
-  AppConfigModule,
+  RequestPipelineModule,
+  appConfigModule,
   HealthModule,
   MetricsModule,
   PlatformLoggerModule,
@@ -12,7 +13,8 @@ import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
-    AppConfigModule.forRoot(),
+    appConfigModule(),
+    RequestPipelineModule,
     PlatformLoggerModule,
     RedisModule,
     MetricsModule,

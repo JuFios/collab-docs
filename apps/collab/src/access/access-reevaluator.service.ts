@@ -1,6 +1,7 @@
-import { Inject, Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { COLLAB_CLOSE } from '@collab-docs/shared';
-import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/nest';
+import { type AppConfig, getRootLogger } from '@collab-docs/nest';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { type Session, RoomManager } from '../rooms/room-manager';
 import { AccessService } from './access.service';
@@ -17,14 +18,17 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
   private timer: NodeJS.Timeout | null = null;
 
   constructor(
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
     private readonly access: AccessService,
     private readonly rooms: RoomManager,
     private readonly metrics: CollabMetrics,
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.reevaluate({}), this.config.COLLAB_ACCESS_RECHECK_MS);
+    this.timer = setInterval(
+      () => void this.reevaluate({}),
+      this.config.get('COLLAB_ACCESS_RECHECK_MS', { infer: true }),
+    );
     this.timer.unref();
   }
 

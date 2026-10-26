@@ -1,7 +1,7 @@
 import { type DynamicModule } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Logger as PinoAppLogger, LoggerModule } from 'nestjs-pino';
 import pino, { type DestinationStream, type Logger } from 'pino';
-import { APP_CONFIG } from './app-config';
 import type { AppConfig } from './config';
 import { getCorrelationId } from './correlation';
 
@@ -56,9 +56,9 @@ export function logEvent(name: string, fields: Record<string, unknown> = {}): vo
 const SILENT_PATHS = /^\/(health|ready|metrics)(\/|\?|$)/;
 
 export const PlatformLoggerModule: DynamicModule = LoggerModule.forRootAsync({
-  inject: [APP_CONFIG],
-  useFactory: (config: AppConfig) => {
-    const logger = createRootLogger(config.LOG_LEVEL);
+  inject: [ConfigService],
+  useFactory: (config: ConfigService<AppConfig, true>) => {
+    const logger = createRootLogger(config.get('LOG_LEVEL', { infer: true }));
     setRootLogger(logger);
     return {
       pinoHttp: {

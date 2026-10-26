@@ -1,7 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentVersions } from '@collab-docs/db';
 import {
-  APP_CONFIG,
   type AppConfig,
   QueueService,
   emitDocumentChanged,
@@ -22,7 +22,7 @@ export class PersistenceHooksService implements PersistenceHooks {
   constructor(
     private readonly queues: QueueService,
     private readonly versions: DocumentVersions,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   /** Work started by `contentPersisted`; shutdown waits for it so it does not run against closed connections. */
@@ -49,7 +49,7 @@ export class PersistenceHooksService implements PersistenceHooks {
   private async snapshotIfDue(documentId: string): Promise<void> {
     try {
       const last = await this.lastSnapshotAt(documentId);
-      if (Date.now() - last < this.config.AUTO_VERSION_INTERVAL_MS) return;
+      if (Date.now() - last < this.config.get('AUTO_VERSION_INTERVAL_MS', { infer: true })) return;
       // claim the slot first so a burst of flushes takes one snapshot
       this.lastAuto.set(documentId, Promise.resolve(Date.now()));
       await this.versions.create({ documentId, kind: 'AUTO' });

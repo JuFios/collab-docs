@@ -1,7 +1,8 @@
-import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig } from '@collab-docs/nest';
+import { AppException, type AppConfig } from '@collab-docs/nest';
 import { readBearer, readCookie } from './cookies';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -14,7 +15,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   canActivate(context: ExecutionContext): boolean {
     if (context.getType() !== 'http') return true;
@@ -22,7 +23,8 @@ export class CsrfGuard implements CanActivate {
     if (SAFE_METHODS.has(request.method)) return true;
     if (readBearer(request)) return true;
     if (!readCookie(request, ACCESS_COOKIE) && !readCookie(request, REFRESH_COOKIE)) return true;
-    if (request.headers.origin === new URL(this.config.WEB_ORIGIN).origin) return true;
+    if (request.headers.origin === new URL(this.config.get('WEB_ORIGIN', { infer: true })).origin)
+      return true;
     throw new AppException('CSRF_REJECTED', 'Cross-origin request rejected');
   }
 }
