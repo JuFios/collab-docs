@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Navbar } from '@/components/navbar';
+import { Providers } from '@/components/providers';
 import { isApiError } from '@/lib/api/errors';
 import { getCurrentUser, getWorkspaces } from '@/lib/workspaces/data';
 
@@ -16,9 +17,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     getWorkspaces().catch(() => null),
   ]);
   return (
-    <div className="min-h-screen">
-      <Navbar user={user} workspaces={workspaces} />
-      <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
-    </div>
+    <Providers>
+      <div className="min-h-screen">
+        <Navbar user={user} workspaces={workspaces} />
+        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+      </div>
+    </Providers>
   );
 }
