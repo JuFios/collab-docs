@@ -971,6 +971,9 @@ Server Component is the default: anything that reads data and needs no browser s
 | `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server                  |
 | `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                               |
 | `components/editor/*`, `lib/collab/use-collab-connection.ts`                                                | The block editor, the WebSocket, presence, save status and version history: Yjs, ProseMirror and `navigator.onLine` are browser-only |
+| `components/comments/*`, `lib/comments/*`                                                                   | Thread panel, composer with the `@` menu and optimistic writes (TanStack Query); it works on the live editor instance                |
+| `components/editor/block-comments.ts`                                                                       | ProseMirror plugin: the markers beside blocks, their highlight and the shortcut; browser-only like the rest of the editor            |
+| `components/notifications/*`, `lib/notifications/*`                                                         | The bell (Radix menu, unread badge), the `/notifications` list and the toast for a pushed notification                               |
 | `components/content/content-renderer.tsx` (not a client component)                                          | Stateless render of sanitised JSON; usable from a Server Component (the public page) and from the version preview                    |
 | `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                       |
 | `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                                   |
@@ -980,16 +983,17 @@ Server Component is the default: anything that reads data and needs no browser s
 
 Screens and where they render (everything not listed as a client island is a Server Component):
 
-| Screen                | Renders in                             | Why                                                                                                                                                                                                                                                           |
-| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/w`                  | RSC page + client create form          | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
-| `/w/[id]` (dashboard) | RSC, four async RSC blocks             | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
-| `/w/[id]/settings`    | RSC page + client forms/tables         | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
-| `/invite/[token]`     | RSC                                    | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
-| `/w/[id]/d/[docId]`   | RSC page + client shell and editor     | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
-| `/w/[id]/trash`       | RSC page + client list                 | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
-| `/shared`             | RSC                                    | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
-| Navbar                | RSC shell + switcher/user-menu islands | The workspace list is fetched in the layout and passed down as typed props                                                                                                                                                                                    |
+| Screen                | Renders in                                  | Why                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/w`                  | RSC page + client create form               | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
+| `/w/[id]` (dashboard) | RSC, four async RSC blocks                  | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
+| `/w/[id]/settings`    | RSC page + client forms/tables              | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
+| `/invite/[token]`     | RSC                                         | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
+| `/w/[id]/d/[docId]`   | RSC page + client shell and editor          | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
+| `/w/[id]/trash`       | RSC page + client list                      | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
+| `/notifications`      | RSC page + client list                      | The first page is read on the server and seeds the client query (`initialData`); from there the list is live (the stream, the bell and window focus refresh it) and pages in with a cursor                                                                    |
+| `/shared`             | RSC                                         | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
+| Navbar                | RSC shell + switcher/bell/user-menu islands | The workspace list and the unread count are fetched in the layout and passed down as typed props (the bell asks again itself if the count could not be loaded)                                                                                                |
 
 **Dashboard streaming.** `app/(app)/w/[id]/page.tsx` awaits nothing but the workspace the layout already loaded
 (deduplicated by `React.cache`). The blocks (`components/dashboard/blocks.tsx`: recent documents, members,
@@ -1119,6 +1123,62 @@ two-editor e2e spec seeds the block first for that reason.
 
 `ContentRenderer` has no `"use client"`: it renders sanitised JSON (and checks link protocols again), and takes a
 `resolveImageSrc(attachmentId)` callback so that the editor can use signed URLs and the public page `/media/:id`.
+
+### Comments and notifications in the UI
+
+**Where things live.** The comments panel and the bell are Client Components because they are made of browser
+state (a live editor instance, a caret, an `EventSource`); everything they show comes from the api through
+TanStack Query with the zod schemas of `@collab-docs/shared`. Comment text is only ever put on the page as React
+text nodes (there is no `dangerouslySetInnerHTML` anywhere near it), so `<img onerror=…>` typed into a comment
+is displayed literally; a unit test and an e2e test pin that down.
+
+- **Panel.** `CommentsPanel` sits beside the editor, in the place the version history uses (one side panel at a
+  time). Threads are grouped by the block they are about; the group title is the block's first words, taken from
+  the live editor document, and a click on it scrolls to the block and flashes it. Threads whose block is gone
+  (`orphaned`, from the api) have a section of their own, resolved threads are hidden until "Show resolved
+  threads" is on (a resolved thread that something links to is shown anyway), and a person without comment
+  access sees every thread and a one-line explanation instead of the composer, reply boxes and Resolve buttons.
+  The list is one query for the whole document (`status=all`), so the filter is instant and the block markers can
+  count open threads without a second request.
+- **Markers in the editor.** `BlockComments` (`components/editor/block-comments.ts`) is a ProseMirror plugin that
+  draws a widget decoration beside every text block and image that has an id (`UniqueID`): a count of the open
+  threads when there are some, otherwise an "add comment" button that appears on hover. The extension list of an
+  editor must not change while a document is open (a new list rebuilds the editor and loses the caret), so the
+  changing data (counts, may-comment, highlighted block) travels through a small controller object that the page
+  updates and the plugin subscribes to, not through options. Lists around items are skipped so that a list item is
+  not marked three times. `Ctrl/⌘+Alt+M` starts a thread on the block with the caret; markers without threads are
+  not tab stops (a stop per paragraph would make the page unusable by keyboard), which is what the shortcut is for.
+- **Composer.** A textarea (`role="combobox"` with the list-box pattern: `aria-controls`, `aria-activedescendant`,
+  `↑ ↓ Enter/Tab Esc`). Typing `@` and a few letters queries `GET /documents/:id/mentionable`; picking a person
+  inserts `@Name` into the text the user sees, and only names that were picked are turned into `@[<user id>]`
+  tokens when the comment is sent (`serializeBody`), so text that merely looks like a mention stays text and two
+  people with the same name are told apart by the order they were picked. Length is checked with the same zod
+  schema as the api. `Ctrl/⌘+Enter` sends.
+- **Optimistic writes.** New threads, replies and resolve/reopen follow the TanStack Query recipe: cancel the
+  in-flight fetch, put the change into the cache, keep the previous list for a rollback, refetch when settled. An
+  unconfirmed thread has an id starting with `pending:` and cannot be replied to. If the api refuses a comment the
+  cache is rolled back and the composer gets its text back, so nothing typed is lost. Mentions the api dropped
+  (the person cannot open the document) come back as `warnings` and are reported in a toast.
+- **Links.** `/w/:ws/d/:doc?thread=:id` (in notifications and emails) is read by the document page on the server
+  (validated as a uuid) and handed to the shell, which opens the panel, selects the thread and scrolls to its
+  block once the editor is ready. A thread written after the page loaded is looked for with one extra fetch before
+  the page says it is gone.
+- **Focus and ARIA.** Opening the panel moves focus to its heading (or to the composer when a thread is being
+  started), `Esc` closes it and hands the focus back to the "Comments" button, threads are `<li>`s in labelled
+  lists, a thread's comments are an ordered list with `<time>` elements, and the autocomplete announces how many
+  people it found.
+- **Bell and list.** The unread count is read in the app layout and passed to the bell as `initialData`, so the
+  badge is right in the first paint. A `notification.created` event arrives on the workspace stream that
+  `WorkspaceProvider` already owns (there is no second connection): the provider refreshes the badge and any list
+  on screen and shows a toast with the author, the document and an Open action. Outside a workspace (`/w`,
+  `/shared`, `/notifications`) no stream is open, because the api requires a workspace for it; there the badge is
+  refreshed when the window gets focus and by a 60-second poll, which also covers anything the stream missed. The
+  menu shows the newest eight; `/notifications` pages through all of them with the api's cursor. Using a
+  notification marks it read before navigation (optimistic, rolled back on failure), and so does "Mark all as read".
+
+Not done: editing and deleting your own comment from the UI (the api has both), mentions in the body of the
+document, live updates of other people's replies inside an open panel (they appear on the next refetch: window
+focus, reopening the panel, or any action of your own), and per-user notification settings.
 
 ### Server Actions vs REST vs WebSocket
 
