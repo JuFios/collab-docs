@@ -6,6 +6,7 @@ import {
   SetMetadata,
   UseGuards,
   applyDecorators,
+  createParamDecorator,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
@@ -49,9 +50,9 @@ export class WorkspaceRoleGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requirement = this.reflector.get<Requirement<Role> | undefined>(
+    const requirement = this.reflector.getAllAndOverride<Requirement<Role> | undefined>(
       WORKSPACE_ROLE_KEY,
-      context.getHandler(),
+      [context.getHandler(), context.getClass()],
     );
     if (!requirement) return true;
     const request = context.switchToHttp().getRequest<PermissionRequest>();
@@ -72,9 +73,9 @@ export class DocumentAccessGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requirement = this.reflector.get<Requirement<Access> | undefined>(
+    const requirement = this.reflector.getAllAndOverride<Requirement<Access> | undefined>(
       DOCUMENT_ACCESS_KEY,
-      context.getHandler(),
+      [context.getHandler(), context.getClass()],
     );
     if (!requirement) return true;
     const request = context.switchToHttp().getRequest<PermissionRequest>();
@@ -107,16 +108,20 @@ export const DocumentAccess = (min: Access, options: { param?: string } = {}) =>
     UseGuards(DocumentAccessGuard),
   );
 
-/** Role resolved by `@WorkspaceRole()`. */
-export function workspaceRoleOf(request: Request): Role {
-  const role = (request as PermissionRequest).workspaceRole;
-  if (!role) throw new AppException('INTERNAL_ERROR', 'WorkspaceRole guard missing');
-  return role;
-}
+/** The caller's role resolved by `@WorkspaceRole()`. */
+export const CurrentWorkspaceRole = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): Role => {
+    const role = context.switchToHttp().getRequest<PermissionRequest>().workspaceRole;
+    if (!role) throw new AppException('INTERNAL_ERROR', 'WorkspaceRole guard missing');
+    return role;
+  },
+);
 
-/** Access resolved by `@DocumentAccess()`. */
-export function documentAccessOf(request: Request): DocumentAccessResult {
-  const access = (request as PermissionRequest).documentAccess;
-  if (!access) throw new AppException('INTERNAL_ERROR', 'DocumentAccess guard missing');
-  return access;
-}
+/** The access resolved by `@DocumentAccess()`. */
+export const CurrentDocumentAccess = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): DocumentAccessResult => {
+    const access = context.switchToHttp().getRequest<PermissionRequest>().documentAccess;
+    if (!access) throw new AppException('INTERNAL_ERROR', 'DocumentAccess guard missing');
+    return access;
+  },
+);

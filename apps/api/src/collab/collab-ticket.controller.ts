@@ -10,7 +10,7 @@ import {
 import type { Request } from 'express';
 import { APP_CONFIG, type AppConfig, signCollabTicket } from '@collab-docs/shared/nest';
 import { CurrentUser, type RequestUser } from '../auth';
-import { DocumentAccess, documentAccessOf } from '../permissions';
+import { CurrentDocumentAccess, DocumentAccess, type DocumentAccessResult } from '../permissions';
 import { CollabTicketResponse } from './collab-ticket.dto';
 import { TicketThrottleGuard } from './ticket-throttle.guard';
 
@@ -36,9 +36,9 @@ export class CollabTicketController {
   @ApiTooManyRequestsResponse({ description: 'RATE_LIMITED' })
   async issue(
     @CurrentUser() user: RequestUser,
+    @CurrentDocumentAccess() { document }: DocumentAccessResult,
     @Req() req: Request,
   ): Promise<CollabTicketResponse> {
-    const { document } = documentAccessOf(req);
     const ticket = await signCollabTicket(this.config.COLLAB_TICKET_SECRET, {
       docId: document.id,
       sub: user.id,
