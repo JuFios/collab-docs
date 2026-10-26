@@ -1,7 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { apiErrorSchema, healthResponseSchema, readyResponseSchema } from '@collab-docs/shared';
+import { apiErrorSchema, healthCheckResultSchema } from '@collab-docs/shared';
+import { ReadinessService } from '@collab-docs/nest';
 import { createTestApp } from './test/test-app';
 
 describe('api platform', () => {
@@ -22,17 +23,44 @@ describe('api platform', () => {
   describe('probes and prefix', () => {
     it('serves /health, /ready and /metrics without the /api prefix', async () => {
       const health = await http().get('/health').expect(200);
-      expect(healthResponseSchema.parse(health.body)).toEqual({ status: 'ok' });
+      expect(healthCheckResultSchema.parse(health.body)).toEqual({
+        status: 'ok',
+        info: {},
+        error: {},
+        details: {},
+      });
 
       const ready = await http().get('/ready').expect(200);
-      expect(readyResponseSchema.parse(ready.body)).toEqual({
+      expect(healthCheckResultSchema.parse(ready.body)).toEqual({
         status: 'ok',
-        checks: { redis: 'up', postgres: 'up' },
+        info: { redis: { status: 'up' }, postgres: { status: 'up' } },
+        error: {},
+        details: { redis: { status: 'up' }, postgres: { status: 'up' } },
       });
 
       const metrics = await http().get('/metrics').expect(200);
       expect(metrics.headers['content-type']).toContain('text/plain');
       expect(metrics.text).toContain('process_cpu_user_seconds_total');
+    });
+
+    it('answers /ready with 503 and the same body shape when a dependency is down or too slow', async () => {
+      const readiness = app.get(ReadinessService);
+      readiness.register('broken', () => Promise.reject(new Error('connection refused')));
+      const down = await http().get('/ready').expect(503);
+      expect(healthCheckResultSchema.parse(down.body)).toMatchObject({
+        status: 'error',
+        error: { broken: { status: 'down' } },
+        details: { redis: { status: 'up' }, broken: { status: 'down' } },
+      });
+      // the failure reason stays in the logs, not in the response
+      expect(JSON.stringify(down.body)).not.toContain('connection refused');
+
+      readiness.register('broken', () => new Promise(() => undefined));
+      const slow = await http().get('/ready').expect(503);
+      expect(slow.body.error.broken).toEqual({ status: 'down', message: 'timeout' });
+
+      readiness.register('broken', () => Promise.resolve());
+      await http().get('/ready').expect(200);
     });
 
     it('prefixes application routes with /api', async () => {

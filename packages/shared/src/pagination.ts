@@ -25,11 +25,13 @@ export function pageSchema<T extends z.ZodType>(item: T) {
 
 export type Page<T> = { items: T[]; page: number; pageSize: number; total: number };
 
-export const healthResponseSchema = z.object({ status: z.literal('ok') });
-export type HealthResponse = z.infer<typeof healthResponseSchema>;
+const healthIndicatorSchema = z.object({ status: z.enum(['up', 'down']) }).catchall(z.unknown());
 
-export const readyResponseSchema = z.object({
-  status: z.enum(['ok', 'unavailable']),
-  checks: z.record(z.string(), z.enum(['up', 'down'])),
+/** Body of `/health` and `/ready`: the result object of `@nestjs/terminus`. */
+export const healthCheckResultSchema = z.object({
+  status: z.enum(['ok', 'error', 'shutting_down']),
+  info: z.record(z.string(), healthIndicatorSchema).optional(),
+  error: z.record(z.string(), healthIndicatorSchema).optional(),
+  details: z.record(z.string(), healthIndicatorSchema),
 });
-export type ReadyResponse = z.infer<typeof readyResponseSchema>;
+export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
