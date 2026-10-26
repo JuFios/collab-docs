@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@collab-docs/db';
-import { type AppConfig, logEvent } from '@collab-docs/nest';
+import { type AppConfig, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { S3Storage } from '../storage/s3.service';
 
 const BATCH = 200;
@@ -13,6 +13,7 @@ export class AttachmentSweeper {
     private readonly prisma: PrismaClient,
     private readonly s3: S3Storage,
     private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(AttachmentSweeper.name) private readonly logger: PinoLogger,
   ) {}
 
   /** Returns how many stale uploads were removed. */
@@ -33,13 +34,13 @@ export class AttachmentSweeper {
         try {
           await this.s3.delete(key);
         } catch (error) {
-          logEvent('attachment.sweep_object_failed', { key, error: String(error) });
+          logEvent(this.logger, 'attachment.sweep_object_failed', { key, error: String(error) });
         }
       }
       removed += claimed.length;
       if (claimed.length < BATCH) break;
     }
-    if (removed > 0) logEvent('attachment.swept', { removed });
+    if (removed > 0) logEvent(this.logger, 'attachment.swept', { removed });
     return removed;
   }
 }

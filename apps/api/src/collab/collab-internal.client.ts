@@ -5,7 +5,8 @@ import {
   type AppConfig,
   CORRELATION_HEADER,
   getCorrelationId,
-  getRootLogger,
+  InjectPinoLogger,
+  PinoLogger,
 } from '@collab-docs/nest';
 
 /** Spec §5: the api waits this long for a flush before it carries on with what is stored. */
@@ -15,7 +16,10 @@ const RESTORE_TIMEOUT_MS = 15_000;
 /** Calls the collab service's internal API (port 4002, inside the network only). */
 @Injectable()
 export class CollabInternalClient {
-  constructor(private readonly config: ConfigService<AppConfig, true>) {}
+  constructor(
+    private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(CollabInternalClient.name) private readonly logger: PinoLogger,
+  ) {}
 
   /**
    * Asks collab to write what it has buffered for the document. Never throws: when collab is down or slow the
@@ -25,12 +29,12 @@ export class CollabInternalClient {
     try {
       const response = await this.post(`documents/${documentId}/flush`, {}, FLUSH_TIMEOUT_MS);
       if (response.ok) return true;
-      getRootLogger().warn(
+      this.logger.warn(
         { documentId, status: response.status },
         'collab flush was refused, continuing with the stored state',
       );
     } catch (error) {
-      getRootLogger().warn(
+      this.logger.warn(
         { err: error, documentId },
         'collab flush failed, continuing with the stored state',
       );
@@ -52,12 +56,12 @@ export class CollabInternalClient {
         RESTORE_TIMEOUT_MS,
       );
     } catch (error) {
-      getRootLogger().error({ err: error, documentId }, 'collab restore request failed');
+      this.logger.error({ err: error, documentId }, 'collab restore request failed');
       throw new AppException('SERVICE_UNAVAILABLE', 'The collaboration service is not available');
     }
     if (response.status === 404) throw new AppException('NOT_FOUND', 'Version not found');
     if (!response.ok) {
-      getRootLogger().error({ documentId, status: response.status }, 'collab restore failed');
+      this.logger.error({ documentId, status: response.status }, 'collab restore failed');
       throw new AppException('SERVICE_UNAVAILABLE', 'The version could not be restored');
     }
     return (await response.json()) as { revision: number };

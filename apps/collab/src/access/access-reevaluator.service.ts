@@ -1,7 +1,7 @@
 import { Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { COLLAB_CLOSE } from '@collab-docs/shared';
-import { type AppConfig, getRootLogger } from '@collab-docs/nest';
+import { type AppConfig, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { type Session, RoomManager } from '../rooms/room-manager';
 import { AccessService } from './access.service';
@@ -22,6 +22,7 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
     private readonly access: AccessService,
     private readonly rooms: RoomManager,
     private readonly metrics: CollabMetrics,
+    @InjectPinoLogger(AccessReevaluator.name) private readonly logger: PinoLogger,
   ) {}
 
   onModuleInit(): void {
@@ -82,7 +83,7 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
     } catch (error) {
       // a database blip must not disconnect everyone; the next tick tries again
       this.metrics.accessChanged('error');
-      getRootLogger().warn(
+      this.logger.warn(
         { err: error, documentId: session.documentId, connectionId: conn.id },
         'collab access re-evaluation failed',
       );

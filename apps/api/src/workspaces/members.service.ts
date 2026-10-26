@@ -6,7 +6,7 @@ import {
   checkMemberRemoval,
   checkRoleChange,
 } from '@collab-docs/shared';
-import { AppException, logEvent } from '@collab-docs/nest';
+import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { PermEventsService } from '../permissions/perm-events.service';
 import { notFound } from '../permissions/permissions.service';
 import { PlanLimitsService, type Tx } from './plan-limits.service';
@@ -31,6 +31,7 @@ export class MembersService {
     private readonly prisma: PrismaClient,
     private readonly limits: PlanLimitsService,
     private readonly events: PermEventsService,
+    @InjectPinoLogger(MembersService.name) private readonly logger: PinoLogger,
   ) {}
 
   async list(workspaceId: string): Promise<MemberResponse[]> {
@@ -90,7 +91,7 @@ export class MembersService {
       };
     });
     if (updated.previousRole !== newRole) {
-      logEvent('member.role_changed', {
+      logEvent(this.logger, 'member.role_changed', {
         workspaceId,
         actorId: actor.id,
         userId: targetUserId,
@@ -130,7 +131,11 @@ export class MembersService {
         where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
       });
     });
-    logEvent('member.removed', { workspaceId, actorId: actor.id, userId: targetUserId });
+    logEvent(this.logger, 'member.removed', {
+      workspaceId,
+      actorId: actor.id,
+      userId: targetUserId,
+    });
     await this.events.permChanged({ workspaceId, userId: targetUserId, reason: 'member_removed' });
   }
 }

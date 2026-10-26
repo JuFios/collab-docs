@@ -11,7 +11,7 @@ import {
   apiErrorSchema,
   signAccessToken,
 } from '@collab-docs/shared';
-import { parseConfig, getRootLogger } from '@collab-docs/nest';
+import { PinoLogger, parseConfig } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { CurrentUser, Public } from './auth.decorators';
 import type { RequestUser } from './auth.types';
@@ -383,8 +383,11 @@ describe('auth', () => {
   describe('logs', () => {
     it('never contain passwords, access tokens or refresh tokens', async () => {
       const lines: string[] = [];
-      // tee the shared pino logger (pino-http, Nest, logEvent) into memory
-      const logger = getRootLogger() as unknown as Record<symbol, { write(chunk: string): void }>;
+      // tee the shared pino logger (pino-http, Nest, logEvent) into memory; derived loggers inherit its stream
+      let logger = PinoLogger.root as unknown as Record<symbol, { write(chunk: string): void }>;
+      const hasStream = (candidate: object) =>
+        Object.getOwnPropertySymbols(candidate).some((s) => s.description === 'pino.stream');
+      while (!hasStream(logger)) logger = Object.getPrototypeOf(logger);
       const streamSym = Object.getOwnPropertySymbols(logger).find(
         (s) => s.description === 'pino.stream',
       )!;
@@ -423,6 +426,15 @@ describe('auth', () => {
       const output = lines.join('');
       expect(output).toContain('auth.refresh_reuse_detected'); // logging was captured at all
       expect(output).toContain('"url":"/api/auth/login"');
+      // business events keep their name and the request's correlation id, and say which class logged them
+      const loggedIn = lines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .find((entry) => entry.event === 'auth.logged_in');
+      expect(loggedIn).toMatchObject({
+        context: 'AuthService',
+        correlationId: expect.any(String),
+        msg: 'auth.logged_in',
+      });
       const secrets = [
         secretPassword,
         refreshToken,

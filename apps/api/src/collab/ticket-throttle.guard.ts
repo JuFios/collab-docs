@@ -2,7 +2,13 @@ import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@ne
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { Redis } from 'ioredis';
-import { AppException, type AppConfig, REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
+import {
+  AppException,
+  type AppConfig,
+  REDIS_CLIENT,
+  InjectPinoLogger,
+  PinoLogger,
+} from '@collab-docs/nest';
 import type { RequestUser } from '../auth/auth.types';
 
 const WINDOW_SECONDS = 60;
@@ -16,6 +22,7 @@ export class TicketThrottleGuard implements CanActivate {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(TicketThrottleGuard.name) private readonly logger: PinoLogger,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,7 +40,7 @@ export class TicketThrottleGuard implements CanActivate {
       });
     } catch (error) {
       if (error instanceof AppException) throw error;
-      getRootLogger().error({ err: error }, 'ticket rate limiter unavailable, allowing request');
+      this.logger.error({ err: error }, 'ticket rate limiter unavailable, allowing request');
       return true;
     }
   }

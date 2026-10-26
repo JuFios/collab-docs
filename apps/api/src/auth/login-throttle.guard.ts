@@ -3,7 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import type { Redis } from 'ioredis';
-import { AppException, type AppConfig, REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
+import {
+  AppException,
+  type AppConfig,
+  REDIS_CLIENT,
+  InjectPinoLogger,
+  PinoLogger,
+} from '@collab-docs/nest';
 
 const WINDOW_SECONDS = 60;
 
@@ -16,6 +22,7 @@ export class LoginThrottleGuard implements CanActivate {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(LoginThrottleGuard.name) private readonly logger: PinoLogger,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -35,7 +42,7 @@ export class LoginThrottleGuard implements CanActivate {
       });
     } catch (error) {
       if (error instanceof AppException) throw error;
-      getRootLogger().error({ err: error }, 'login rate limiter unavailable, allowing request');
+      this.logger.error({ err: error }, 'login rate limiter unavailable, allowing request');
       return true;
     }
   }

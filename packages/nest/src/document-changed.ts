@@ -1,5 +1,4 @@
 import type { DocumentChangedEvent } from '@collab-docs/shared';
-import { logEvent } from './logger';
 import { QUEUE_NAMES, type QueueService, enqueueDebounced } from './queue';
 
 /** Debounce windows (spec §7a): page revalidation 3 s, search indexing 5 s. */
@@ -25,9 +24,7 @@ export async function emitDocumentChanged(
           reason: event.reason,
         });
       } catch (error) {
-        queues.enqueueFailures.inc({ queue });
-        logEvent('document.changed_enqueue_failed', {
-          queue,
+        queues.recordEnqueueFailure(queue, 'document.changed_enqueue_failed', {
           documentId: event.documentId,
           error: error instanceof Error ? error.message : String(error),
         });

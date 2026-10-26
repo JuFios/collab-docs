@@ -1,7 +1,7 @@
 import { Inject, Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CollabRoomEvent } from '@collab-docs/shared';
-import { type AppConfig, getRootLogger } from '@collab-docs/nest';
+import { type AppConfig, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import type { Identity } from '../access/access.service';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DocRoom, type RoomConnection, type RoomLimits } from './doc-room';
@@ -36,6 +36,7 @@ export class RoomManager implements BeforeApplicationShutdown {
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
     config: ConfigService<AppConfig, true>,
     private readonly metrics: CollabMetrics,
+    @InjectPinoLogger(RoomManager.name) private readonly logger: PinoLogger,
   ) {
     this.limits = {
       maxMessagesPer10s: config.get('COLLAB_MAX_MESSAGES_PER_10S', { infer: true }),
@@ -92,7 +93,7 @@ export class RoomManager implements BeforeApplicationShutdown {
       this.store,
       this.limits,
       this.metrics,
-      getRootLogger(),
+      this.logger.logger,
     );
     room.onEmpty = () => this.scheduleUnload(documentId);
     return room;
@@ -147,7 +148,7 @@ export class RoomManager implements BeforeApplicationShutdown {
     if (!room) return false;
     await this.store.flush(documentId).catch((error: unknown) => {
       // the updates stay buffered and keep being retried; closing the sockets does not depend on them
-      getRootLogger().error({ err: error, documentId }, 'flush before closing a room failed');
+      this.logger.error({ err: error, documentId }, 'flush before closing a room failed');
     });
     room.closeAll(code, reason, event);
     await this.unload(documentId);
@@ -186,7 +187,7 @@ export class RoomManager implements BeforeApplicationShutdown {
         await this.store.release(documentId);
       } catch (error) {
         // keep the room (and the store's buffer) and try again later: dropping it would lose the updates
-        getRootLogger().error({ err: error, documentId }, 'releasing a room failed, will retry');
+        this.logger.error({ err: error, documentId }, 'releasing a room failed, will retry');
         entry.closing = null;
         if (!this.shuttingDown) this.scheduleUnload(documentId);
         return;

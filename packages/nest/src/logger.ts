@@ -1,12 +1,12 @@
 import { type DynamicModule } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Logger as PinoAppLogger, LoggerModule } from 'nestjs-pino';
+import { InjectPinoLogger, Logger as PinoAppLogger, LoggerModule, PinoLogger } from 'nestjs-pino';
 import pino, { type DestinationStream, type Logger } from 'pino';
 import type { AppConfig } from './config';
 import { getCorrelationId } from './correlation';
 
-/** Nest's `app.useLogger()` target; re-exported so apps need no direct nestjs-pino dependency. */
-export { PinoAppLogger };
+/** Re-exported so apps need no direct nestjs-pino dependency: `PinoAppLogger` is `app.useLogger()`'s target. */
+export { InjectPinoLogger, PinoAppLogger, PinoLogger };
 
 export const REDACT_PATHS = [
   'req.headers.authorization',
@@ -38,35 +38,34 @@ export function createRootLogger(level: string, destination?: DestinationStream)
   );
 }
 
-let root: Logger = createRootLogger(process.env.LOG_LEVEL ?? 'info');
-
-export function getRootLogger(): Logger {
-  return root;
-}
-
-export function setRootLogger(logger: Logger): void {
-  root = logger;
-}
-
 /** Structured business event (`document.published`, `plan.changed`, ...); carries the ambient correlation id. */
-export function logEvent(name: string, fields: Record<string, unknown> = {}): void {
-  root.info({ ...fields, event: name }, name);
+export function logEvent(
+  logger: PinoLogger,
+  name: string,
+  fields: Record<string, unknown> = {},
+): void {
+  logger.info({ ...fields, event: name }, name);
 }
 
 const SILENT_PATHS = /^\/(health|ready|metrics)(\/|\?|$)/;
 
-export const PlatformLoggerModule: DynamicModule = LoggerModule.forRootAsync({
-  inject: [ConfigService],
-  useFactory: (config: ConfigService<AppConfig, true>) => {
-    const logger = createRootLogger(config.get('LOG_LEVEL', { infer: true }));
-    setRootLogger(logger);
-    return {
-      pinoHttp: {
-        logger,
-        genReqId: (req) => req.correlationId ?? getCorrelationId() ?? '',
-        customProps: (req) => ({ correlationId: req.id }),
-        autoLogging: { ignore: (req) => SILENT_PATHS.test(req.url ?? '') },
-      },
-    };
-  },
-});
+/**
+ * Call it where the application module is declared, after the imports of the feature modules: `forRootAsync`
+ * registers one provider per `@InjectPinoLogger(context)` seen so far, so classes loaded later would not resolve.
+ */
+export const platformLoggerModule = (): DynamicModule =>
+  LoggerModule.forRootAsync({
+    inject: [ConfigService],
+    useFactory: (config: ConfigService<AppConfig, true>) => {
+      return {
+        pinoHttp: {
+          logger: createRootLogger(config.get('LOG_LEVEL', { infer: true })),
+          // lines logged inside a request carry only its id, not the whole serialised request
+          quietReqLogger: true,
+          genReqId: (req) => req.correlationId ?? getCorrelationId() ?? '',
+          customProps: (req) => ({ correlationId: req.id }),
+          autoLogging: { ignore: (req) => SILENT_PATHS.test(req.url ?? '') },
+        },
+      };
+    },
+  });

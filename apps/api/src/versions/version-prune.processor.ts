@@ -24,6 +24,6 @@ export class VersionPruneProcessor extends QueueProcessor implements OnModuleIni
 
   protected async handle(): Promise<void> {
     const deleted = await this.versions.prune();
-    logEvent('versions.pruned', { deleted });
+    logEvent(this.logger, 'versions.pruned', { deleted });
   }
 }

@@ -5,9 +5,10 @@ import type { RawData, WebSocket } from 'ws';
 import { COLLAB_CLOSE } from '@collab-docs/shared';
 import {
   type AppConfig,
-  getRootLogger,
   resolveCorrelationId,
   verifyCollabTicket,
+  InjectPinoLogger,
+  PinoLogger,
 } from '@collab-docs/nest';
 import { AccessService, type Identity } from '../access/access.service';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
@@ -43,6 +44,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     private readonly access: AccessService,
     private readonly rooms: RoomManager,
     private readonly metrics: CollabMetrics,
+    @InjectPinoLogger(ConnectionService.name) private readonly logger: PinoLogger,
   ) {}
 
   onModuleInit(): void {
@@ -69,7 +71,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     this.sockets.add(socket);
     this.alive.add(socket);
     socket.on('pong', () => this.alive.add(socket));
-    socket.on('error', (error) => getRootLogger().warn({ err: error }, 'collab socket error'));
+    socket.on('error', (error) => this.logger.warn({ err: error }, 'collab socket error'));
 
     const state: { conn: WsConnection | null; documentId: string; closed: boolean } = {
       conn: null,
@@ -108,7 +110,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     const url = new URL(request.url ?? '/', 'http://collab');
     const documentId = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() ?? '');
     const correlationId = resolveCorrelationId(request.headers['x-correlation-id']);
-    const log = getRootLogger().child({ correlationId, documentId });
+    const log = this.logger.logger.child({ correlationId, documentId });
     const fail = (code: number, reason: string) => {
       log.info({ event: 'collab.connection_refused', code, reason }, 'collab connection refused');
       socket.close(code, reason);

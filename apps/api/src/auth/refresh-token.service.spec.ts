@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@collab-docs/db';
+import type { PinoLogger } from '@collab-docs/nest';
 import { REFRESH_GRACE_MS, RefreshTokenService, hashToken } from './refresh-token.service';
 
 interface Row {
@@ -59,7 +60,12 @@ const DAY = 24 * 3600 * 1000;
 describe('RefreshTokenService', () => {
   const setup = () => {
     const { prisma, rows } = fakePrisma();
-    return { service: new RefreshTokenService(prisma), rows };
+    const logger = { info: jest.fn() };
+    return {
+      service: new RefreshTokenService(prisma, logger as unknown as PinoLogger),
+      rows,
+      logger,
+    };
   };
 
   it('issues an opaque token and stores only its hash with a 30 day expiry', async () => {
@@ -101,13 +107,17 @@ describe('RefreshTokenService', () => {
   });
 
   it('revokes the whole family on a replay after the grace window', async () => {
-    const { service, rows } = setup();
+    const { service, rows, logger } = setup();
     const now = new Date();
     const first = await service.issue(USER, now);
     const second = await service.rotate(first, now);
     const late = new Date(now.getTime() + REFRESH_GRACE_MS + 1);
     await expect(service.rotate(first, late)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
     expect(rows.every((r) => r.revokedAt !== null)).toBe(true);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'auth.refresh_reuse_detected', userId: USER }),
+      'auth.refresh_reuse_detected',
+    );
     if (second.kind === 'rotated') {
       await expect(service.rotate(second.token, late)).rejects.toMatchObject({
         code: 'UNAUTHENTICATED',
@@ -138,7 +148,7 @@ describe('RefreshTokenService', () => {
 
   it('treats a lost rotation race as a grace replay', async () => {
     const { prisma, rows } = fakePrisma();
-    const service = new RefreshTokenService(prisma);
+    const service = new RefreshTokenService(prisma, { info: jest.fn() } as unknown as PinoLogger);
     const now = new Date();
     const token = await service.issue(USER, now);
     // a parallel request claims the token between our read and our conditional update

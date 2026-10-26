@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import type { AuthSession, AuthUser } from '@collab-docs/shared';
-import { AppException, logEvent } from '@collab-docs/nest';
+import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { AccessTokenService } from './access-token.service';
 import type { LoginDto, RegisterDto } from './auth.dto';
 import { PasswordService } from './password.service';
@@ -29,6 +29,7 @@ export class AuthService {
     private readonly accessTokens: AccessTokenService,
     private readonly passwords: PasswordService,
     private readonly refreshTokens: RefreshTokenService,
+    @InjectPinoLogger(AuthService.name) private readonly logger: PinoLogger,
   ) {}
 
   async register(dto: RegisterDto): Promise<IssuedSession> {
@@ -37,7 +38,7 @@ export class AuthService {
       const user = await this.prisma.user.create({
         data: { email: dto.email, name: dto.name, passwordHash },
       });
-      logEvent('auth.registered', { userId: user.id });
+      logEvent(this.logger, 'auth.registered', { userId: user.id });
       return this.start(user);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -54,10 +55,10 @@ export class AuthService {
       ? await this.passwords.verify(user.passwordHash, dto.password)
       : await this.passwords.verifyAgainstDummy(dto.password);
     if (!user || !valid) {
-      logEvent('auth.login_failed');
+      logEvent(this.logger, 'auth.login_failed');
       throw new AppException('UNAUTHENTICATED', INVALID_CREDENTIALS);
     }
-    logEvent('auth.logged_in', { userId: user.id });
+    logEvent(this.logger, 'auth.logged_in', { userId: user.id });
     return this.start(user);
   }
 
@@ -72,7 +73,7 @@ export class AuthService {
   async logout(presented: string | undefined): Promise<void> {
     if (!presented) return;
     await this.refreshTokens.revokeFamilyOf(presented);
-    logEvent('auth.logged_out');
+    logEvent(this.logger, 'auth.logged_out');
   }
 
   async me(userId: string): Promise<AuthUser> {

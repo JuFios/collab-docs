@@ -226,8 +226,9 @@ short, log-safe token, otherwise a new UUID. It is stored in `AsyncLocalStorage`
 returned in the `x-correlation-id` response header and in every error body. When code enqueues a job the id
 is written into the job data, and the worker restores it before running the processor, so one id follows a
 change from the browser through the API into background work (and later the collab server). Secrets are
-redacted from logs (`authorization`, `cookie`, `set-cookie`, passwords, tokens); business events are logged
-with `logEvent('document.published', { … })`.
+redacted from logs (`authorization`, `cookie`, `set-cookie`, passwords, tokens). Classes get their logger by
+injection (`@InjectPinoLogger(MyService.name)`), which adds a `context` field; business events are logged with
+`logEvent(this.logger, 'document.published', { … })` (an `event` field plus the same name as the message).
 
 ### Observability
 

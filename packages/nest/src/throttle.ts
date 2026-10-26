@@ -15,7 +15,7 @@ import {
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from './config';
-import { getRootLogger } from './logger';
+import { InjectPinoLogger, PinoLogger } from './logger';
 
 export function throttlerOptions(
   config: ConfigService<AppConfig, true>,
@@ -38,6 +38,7 @@ export function throttlerOptions(
 export class ClientIpThrottlerGuard extends ThrottlerGuard {
   // property injection: the base class constructor takes the throttler options, storage and reflector
   @Inject() private readonly config!: ConfigService<AppConfig, true>;
+  @InjectPinoLogger(ClientIpThrottlerGuard.name) private readonly pino!: PinoLogger;
 
   protected override handleRequest(request: ThrottlerRequest): Promise<boolean> {
     const preset = this.reflector.getAllAndOverride<RatePreset | undefined>(RATE_LIMIT_PRESET, [
@@ -64,7 +65,7 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
       return await super.canActivate(context);
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      getRootLogger().error({ err: error }, 'rate limiter unavailable, allowing request');
+      this.pino.error({ err: error }, 'rate limiter unavailable, allowing request');
       return true;
     }
   }
