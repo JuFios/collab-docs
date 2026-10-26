@@ -2,13 +2,13 @@ import { ParseUUIDPipe, ValidationPipe, type ValidationError } from '@nestjs/com
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import type { ValidationIssue } from '../errors';
+import type { ValidationIssue } from '@collab-docs/shared';
 import {
   DEFAULT_PAGE_SIZE,
   type IdParam,
   MAX_PAGE_SIZE,
   type PaginationQuery,
-} from '../pagination';
+} from '@collab-docs/shared';
 import { ValidationFailedException } from './exceptions';
 
 function flatten(errors: ValidationError[], prefix = ''): ValidationIssue[] {

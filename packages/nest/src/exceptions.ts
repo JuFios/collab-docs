@@ -6,7 +6,12 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { type ApiErrorBody, ERROR_STATUS, type ErrorCode, type ValidationIssue } from '../errors';
+import {
+  type ApiErrorBody,
+  ERROR_STATUS,
+  type ErrorCode,
+  type ValidationIssue,
+} from '@collab-docs/shared';
 import { getCorrelationId } from './correlation';
 import { getRootLogger } from './logger';
 

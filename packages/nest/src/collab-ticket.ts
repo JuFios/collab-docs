@@ -3,7 +3,7 @@ import {
   COLLAB_TICKET_AUDIENCE,
   COLLAB_TICKET_TTL_SECONDS,
   type CollabTicketClaims,
-} from '../collab';
+} from '@collab-docs/shared';
 
 const ISSUER = 'collab-docs-api';
 
