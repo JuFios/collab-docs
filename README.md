@@ -82,15 +82,15 @@ from source and reuses the layer cache of the image build job), Docker image bui
 
 ## Development
 
-| Command                   | What it does                                                                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm lint`               | ESLint (flat config) for the whole repo                                                                                                       |
-| `pnpm typecheck`          | `tsc --noEmit` in every package                                                                                                               |
-| `pnpm test`               | Jest (api, collab) and Vitest (web, shared)                                                                                                   |
-| `pnpm test:integration`   | Integration tests (needs Postgres and Redis; set `MAILPIT_URL=http://localhost:8025` with Mailpit running to include the email delivery test) |
-| `pnpm build`              | Builds shared libraries, then every app                                                                                                       |
-| `pnpm format`             | Prettier                                                                                                                                      |
-| `pnpm --filter api start` | Runs the built API                                                                                                                            |
+| Command                   | What it does                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm lint`               | ESLint (flat config) for the whole repo                                                                                                                                                                      |
+| `pnpm typecheck`          | `tsc --noEmit` in every package                                                                                                                                                                              |
+| `pnpm test`               | Jest (api, collab) and Vitest (web, shared)                                                                                                                                                                  |
+| `pnpm test:integration`   | Integration tests (needs Postgres, Redis and MinIO: `docker compose up -d postgres redis minio minio-init`; set `MAILPIT_URL=http://localhost:8025` with Mailpit running to include the email delivery test) |
+| `pnpm build`              | Builds shared libraries, then every app                                                                                                                                                                      |
+| `pnpm format`             | Prettier                                                                                                                                                                                                     |
+| `pnpm --filter api start` | Runs the built API                                                                                                                                                                                           |
 
 Libraries in `packages/*` are built before type checking and testing (`pnpm build:libs`, run
 automatically by `typecheck` and `test`).
