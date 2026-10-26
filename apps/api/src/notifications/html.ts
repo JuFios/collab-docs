@@ -10,3 +10,6 @@ const ESCAPES: Record<string, string> = {
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ESCAPES[char]!);
 }
+
+/** Subjects are plain text but still must not carry line breaks (header injection). */
+export const oneLine = (value: string): string => value.replace(/[\r\n]+/g, ' ').trim();

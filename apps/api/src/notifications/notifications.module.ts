@@ -2,11 +2,14 @@ import { Module } from '@nestjs/common';
 import { MailProcessor } from './mail.processor';
 import { MailQueueService } from './mail-queue.service';
 import { MailerService } from './mailer.service';
+import { MentionMailService } from './mention-mail.service';
+import { PrismaModule } from '../prisma/prisma.module';
 
-/** Enqueues emails (used by the api process). */
+/** Enqueues emails (used by the api process) and renders the ones that depend on stored data. */
 @Module({
-  providers: [MailerService, MailQueueService],
-  exports: [MailerService, MailQueueService],
+  imports: [PrismaModule],
+  providers: [MailerService, MailQueueService, MentionMailService],
+  exports: [MailerService, MailQueueService, MentionMailService],
 })
 export class NotificationsModule {}
 

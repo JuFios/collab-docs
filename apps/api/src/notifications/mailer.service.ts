@@ -21,10 +21,19 @@ export class MailerService implements OnApplicationShutdown {
   ) {}
 
   async send(message: MailMessage): Promise<void> {
-    await this.getTransport().sendMail({
-      from: this.config.get('SMTP_FROM', { infer: true }),
-      ...message,
-    });
+    try {
+      await this.getTransport().sendMail({
+        from: this.config.get('SMTP_FROM', { infer: true }),
+        ...message,
+      });
+    } catch (error) {
+      // the job fails and BullMQ retries it; the log line is what tells a delivery problem from a slow queue
+      logEvent(this.logger, 'mail.failed', {
+        subject: message.subject,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
     logEvent(this.logger, 'mail.sent', { subject: message.subject });
   }
 
