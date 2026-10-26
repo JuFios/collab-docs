@@ -11,6 +11,10 @@ describe('generateSlug', () => {
     expect(generateSlug(name)).toMatch(pattern);
   });
 
+  it('uses the fallback for names without latin letters', () => {
+    expect(generateSlug('Плани на квартал', 'page')).toMatch(/^page-[0-9a-f]{6}$/);
+  });
+
   it('is random per call', () => {
     expect(generateSlug('Same')).not.toBe(generateSlug('Same'));
   });

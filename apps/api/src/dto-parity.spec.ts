@@ -8,6 +8,7 @@ import {
   VERSION_LABEL_MAX_LENGTH,
   WORKSPACE_NAME_MAX_LENGTH,
   createDocumentInputSchema,
+  createPublicLinkInputSchema,
   createVersionInputSchema,
   createWorkspaceInputSchema,
   inviteInputSchema,
@@ -16,10 +17,12 @@ import {
   presignAttachmentInputSchema,
   registerInputSchema,
   renameWorkspaceInputSchema,
+  updatePublicLinkInputSchema,
 } from '@collab-docs/shared';
 import { LoginDto, RegisterDto } from './auth/auth.dto';
 import { PresignAttachmentDto } from './attachments/attachments.dto';
 import { CreateDocumentDto, MoveDocumentDto } from './documents/documents.dto';
+import { CreatePublicLinkDto, UpdatePublicLinkDto } from './publishing/public-links.dto';
 import { CreateVersionDto } from './versions/versions.dto';
 import {
   CreateInviteDto,
@@ -209,6 +212,40 @@ const pairs: Pair[] = [
       ['a negative size', { size: -5 }],
       ['a fractional size', { size: 1.5 }],
       ['a size as text', { size: '1024' }],
+    ],
+  },
+  {
+    name: 'create public link',
+    dto: CreatePublicLinkDto,
+    schema: createPublicLinkInputSchema,
+    base: { mode: 'VIEW' },
+    cases: [
+      ['a view link without expiry', {}],
+      ['an edit link', { mode: 'EDIT' }],
+      ['an unknown mode', { mode: 'COMMENT' }],
+      ['a lower-case mode', { mode: 'view' }],
+      ['no mode', { mode: undefined }],
+      ['an expiry in UTC', { expiresAt: '2030-01-31T12:00:00Z' }],
+      ['an expiry with milliseconds', { expiresAt: '2030-01-31T12:00:00.250Z' }],
+      ['an expiry with an offset', { expiresAt: '2030-01-31T12:00:00+02:00' }],
+      ['a null expiry', { expiresAt: null }],
+      ['a date without a time', { expiresAt: '2030-01-31' }],
+      ['an expiry without a zone', { expiresAt: '2030-01-31T12:00:00' }],
+      ['an expiry that is not text', { expiresAt: 1893499200000 }],
+      ['free text as expiry', { expiresAt: 'next week' }],
+    ],
+  },
+  {
+    name: 'update public link',
+    dto: UpdatePublicLinkDto,
+    schema: updatePublicLinkInputSchema,
+    base: { expiresAt: '2030-01-31T12:00:00Z' },
+    cases: [
+      ['a new expiry', {}],
+      ['no expiry any more', { expiresAt: null }],
+      ['a missing expiry', { expiresAt: undefined }],
+      ['a date without a time', { expiresAt: '2030-01-31' }],
+      ['an expiry that is not text', { expiresAt: 5 }],
     ],
   },
 ];

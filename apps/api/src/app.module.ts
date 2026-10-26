@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { CollabModule } from './collab/collab.module';
 import { DocumentsModule } from './documents/documents.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PublishingModule } from './publishing/publishing.module';
 import { RealtimeEventsModule } from './realtime/realtime.module';
 import { VersionsModule } from './versions/versions.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
@@ -20,6 +21,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     CollabModule,
     VersionsModule,
     AttachmentsModule,
+    PublishingModule,
   ],
 })
 export class AppModule {}

@@ -1842,6 +1842,316 @@
           "attachments"
         ]
       }
+    },
+    "/api/documents/{id}/public-links": {
+      "get": {
+        "description": "At most one VIEW link (the published page) and one EDIT link. The EDIT secret is not listed: it is shown once, when the link is created.",
+        "operationId": "PublicLinksController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicLinkResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Public links of a document (MANAGE, or EDIT as the author)",
+        "tags": [
+          "publishing"
+        ]
+      },
+      "post": {
+        "description": "MANAGE, or EDIT as the author; 10 per hour per user. VIEW: collab is asked to write its buffer first (2 s; `flushed` is false when it could not), the slug is created once and returned again when the page is published again. EDIT: every call issues a new secret and invalidates the previous URL, closing its open guest sessions.",
+        "operationId": "PublicLinksController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePublicLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedPublicLinkResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish the page (VIEW) or enable editing by link (EDIT)",
+        "tags": [
+          "publishing"
+        ]
+      }
+    },
+    "/api/documents/{id}/public-links/{linkId}": {
+      "patch": {
+        "operationId": "PublicLinksController_update",
+        "parameters": [
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePublicLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLinkResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The link was revoked"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change or remove the expiry of a link",
+        "tags": [
+          "publishing"
+        ]
+      },
+      "delete": {
+        "description": "Unpublishes the page (the slug stays reserved for it) or ends editing by link. Revoking an already revoked link does nothing.",
+        "operationId": "PublicLinksController_revoke",
+        "parameters": [
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a link",
+        "tags": [
+          "publishing"
+        ]
+      }
+    },
+    "/api/public/documents/{slug}": {
+      "get": {
+        "description": "Title, description for the meta tags and content as sanitised ProseMirror JSON. One 404 for a page that was never published, was unpublished, has expired or whose document is deleted.",
+        "operationId": "PublicController_document",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDocumentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The page is not available"
+          }
+        },
+        "summary": "Sanitised content of a published page",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/public/media/{attachmentId}": {
+      "get": {
+        "description": "Redirects (302) to a presigned URL valid for 5 minutes. The image has to belong to the document the slug publishes.",
+        "operationId": "PublicController_media",
+        "parameters": [
+          {
+            "name": "attachmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": true,
+            "in": "query",
+            "description": "Slug of the published page that embeds the image",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the image"
+          },
+          "404": {
+            "description": "The page or the image is not available"
+          }
+        },
+        "summary": "Image of a published page",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/public/links/{token}": {
+      "get": {
+        "description": "For `/e/<token>`. 404 for an unknown or replaced secret, 410 `LINK_EXPIRED` for an expired or revoked link and 410 `DOCUMENT_DELETED` for a deleted document.",
+        "operationId": "PublicController_editLink",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditLinkStateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown link"
+          },
+          "410": {
+            "description": "LINK_EXPIRED or DOCUMENT_DELETED"
+          }
+        },
+        "summary": "State of an edit link",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/public/links/{token}/ticket": {
+      "post": {
+        "description": "Same shape as the ticket of a signed-in user. Collab checks the link again whenever the socket is evaluated, so revoking or expiring it closes the session. Rate limited per IP.",
+        "operationId": "PublicController_guestTicket",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollabTicketResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown link"
+          },
+          "410": {
+            "description": "LINK_EXPIRED or DOCUMENT_DELETED"
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "summary": "Collab ticket for a guest with an edit link",
+        "tags": [
+          "public"
+        ]
+      }
     }
   },
   "info": {
@@ -2962,6 +3272,206 @@
         },
         "required": [
           "url",
+          "expiresAt"
+        ]
+      },
+      "PublicLinkResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "VIEW",
+              "EDIT"
+            ]
+          },
+          "slug": {
+            "type": "object",
+            "nullable": true,
+            "description": "VIEW links: the stable address /p/<slug>"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "revoked"
+            ]
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "mode",
+          "slug",
+          "status",
+          "expiresAt",
+          "revokedAt",
+          "createdAt"
+        ]
+      },
+      "CreatePublicLinkDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "VIEW",
+              "EDIT"
+            ],
+            "description": "VIEW publishes the page at /p/<slug>; EDIT lets anyone with the secret URL edit the document as a guest"
+          },
+          "expiresAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the link stops working; must lie in the future. Omitted or null: never."
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "CreatedPublicLinkResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "VIEW",
+              "EDIT"
+            ]
+          },
+          "slug": {
+            "type": "object",
+            "nullable": true,
+            "description": "VIEW links: the stable address /p/<slug>"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "revoked"
+            ]
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "token": {
+            "type": "object",
+            "nullable": true,
+            "description": "EDIT links: the secret that goes into /e/<token>. Shown once, only its hash is stored."
+          },
+          "flushed": {
+            "type": "object",
+            "nullable": true,
+            "description": "VIEW links: false when the collaboration service could not write its buffer first, so the page may miss the last few seconds of editing"
+          }
+        },
+        "required": [
+          "id",
+          "mode",
+          "slug",
+          "status",
+          "expiresAt",
+          "revokedAt",
+          "createdAt",
+          "token",
+          "flushed"
+        ]
+      },
+      "UpdatePublicLinkDto": {
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true,
+            "description": "The new expiry; null removes it"
+          }
+        },
+        "required": [
+          "expiresAt"
+        ]
+      },
+      "PublicDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "First 160 characters of the text, for the meta description"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Sanitised ProseMirror JSON ({ type: \"doc\", content: [...] })"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "content",
+          "updatedAt"
+        ]
+      },
+      "EditLinkStateResponse": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "EDIT"
+            ]
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "mode",
+          "documentId",
+          "title",
           "expiresAt"
         ]
       }
