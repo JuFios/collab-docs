@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import type { WorkspaceRole } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, logEvent } from '@collab-docs/shared/nest';
+import { APP_CONFIG, AppException, type AppConfig, logEvent } from '@collab-docs/nest';
 import { MailQueueService } from '../notifications/mail-queue.service';
 import { notFound } from '../permissions/permissions.service';
 import { INVITE_TOKEN_PATTERN, INVITE_TTL_MS, hashToken, newInviteToken } from './invite-token';

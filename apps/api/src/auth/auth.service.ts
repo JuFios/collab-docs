@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import { type AuthSession, type AuthUser, signAccessToken } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, logEvent } from '@collab-docs/shared/nest';
+import { APP_CONFIG, AppException, type AppConfig, logEvent } from '@collab-docs/nest';
 import type { LoginDto, RegisterDto } from './auth.dto';
 import { PasswordService } from './password.service';
 import { RefreshTokenService } from './refresh-token.service';

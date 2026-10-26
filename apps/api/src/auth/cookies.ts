@@ -6,7 +6,7 @@ import {
   REFRESH_COOKIE_PATH,
   REFRESH_TOKEN_TTL_SECONDS,
 } from '@collab-docs/shared';
-import type { AppConfig } from '@collab-docs/shared/nest';
+import type { AppConfig } from '@collab-docs/nest';
 
 /** Secure cookies everywhere except local development and tests (plain http). */
 export function cookieOptions(

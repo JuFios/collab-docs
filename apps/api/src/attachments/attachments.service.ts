@@ -20,7 +20,7 @@ import {
   type AppConfig,
   ValidationFailedException,
   logEvent,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import { PermissionsService, notFound } from '../permissions/permissions.service';
 import { S3Storage } from '../storage/s3.service';
 import { PlanLimitsService } from '../workspaces/plan-limits.service';

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Counter, Gauge, Histogram } from 'prom-client';
-import { MetricsService } from '@collab-docs/shared/nest';
+import { MetricsService } from '@collab-docs/nest';
 import type { RejectReason, RoomObserver } from '../rooms/doc-room';
 import type { PersistenceObserver } from '../rooms/postgres-document-store';
 

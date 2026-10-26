@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
-import { currentConfig, verifyCollabTicket } from '@collab-docs/shared/nest';
+import { currentConfig, verifyCollabTicket } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 
 const PASSWORD = 'correct-horse-battery';

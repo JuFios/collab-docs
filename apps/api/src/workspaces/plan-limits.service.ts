@@ -7,7 +7,7 @@ import {
   limitFor,
   storageFits,
 } from '@collab-docs/shared';
-import { AppException } from '@collab-docs/shared/nest';
+import { AppException } from '@collab-docs/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
 
 export type Tx = Prisma.TransactionClient;

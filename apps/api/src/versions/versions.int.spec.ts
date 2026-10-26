@@ -6,7 +6,7 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import * as Y from 'yjs';
 import { DocumentStateWriter, DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
-import { QUEUE_NAMES, QueueService, currentConfig } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService, currentConfig } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { VersionPruneProcessor } from './version-prune.processor';
 

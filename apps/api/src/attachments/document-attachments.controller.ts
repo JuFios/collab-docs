@@ -8,7 +8,7 @@ import {
   ApiPayloadTooLargeResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { ParseUuidPipe } from '@collab-docs/shared/nest';
+import { ParseUuidPipe } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { DocumentAccess } from '../permissions/permissions.decorators';

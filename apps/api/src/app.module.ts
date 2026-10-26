@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PlatformModule } from '@collab-docs/shared/nest';
+import { PlatformModule } from '@collab-docs/nest';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { CollabModule } from './collab/collab.module';

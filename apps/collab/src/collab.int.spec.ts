@@ -11,7 +11,7 @@ import {
   type CollabRoomEvent,
   PERM_EVENT_CHANNELS,
 } from '@collab-docs/shared';
-import { REDIS_CLIENT, currentConfig, signCollabTicket } from '@collab-docs/shared/nest';
+import { REDIS_CLIENT, currentConfig, signCollabTicket } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';

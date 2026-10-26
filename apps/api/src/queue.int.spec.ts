@@ -6,7 +6,7 @@ import {
   enqueueDebounced,
   getCorrelationId,
   runWithCorrelationId,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

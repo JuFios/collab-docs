@@ -6,7 +6,7 @@ import {
   CORRELATION_HEADER,
   getCorrelationId,
   getRootLogger,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 
 /** Spec §5: the api waits this long for a flush before it carries on with what is stored. */
 const FLUSH_TIMEOUT_MS = 2000;

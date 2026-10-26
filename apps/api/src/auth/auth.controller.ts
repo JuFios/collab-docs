@@ -23,7 +23,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { type AuthSession, REFRESH_COOKIE, sanitizeNextPath } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, RateLimit } from '@collab-docs/shared/nest';
+import { APP_CONFIG, AppException, type AppConfig, RateLimit } from '@collab-docs/nest';
 import { CurrentUser, Public } from './auth.decorators';
 import { AuthSessionResponse, AuthUserResponse, LoginDto, RegisterDto } from './auth.dto';
 import { type IssuedSession, AuthService } from './auth.service';

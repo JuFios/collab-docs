@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { QUEUE_NAMES, QueueService } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { AttachmentSweeper } from './attachment-sweeper';
 
 const SWEEP_EVERY_MS = 60 * 60 * 1000;

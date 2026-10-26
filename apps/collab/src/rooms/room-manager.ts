@@ -1,6 +1,6 @@
 import { Inject, Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
 import type { CollabRoomEvent } from '@collab-docs/shared';
-import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/nest';
 import type { Identity } from '../access/access.service';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DocRoom, type RoomConnection, type RoomLimits } from './doc-room';

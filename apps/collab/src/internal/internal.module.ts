@@ -1,5 +1,5 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig } from '@collab-docs/nest';
 import { VersionRestoreService } from '../persistence/version-restore.service';
 import { DOCUMENT_STORE, type DocumentStore } from '../rooms/document-store';
 import { RoomManager } from '../rooms/room-manager';

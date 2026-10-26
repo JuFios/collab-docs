@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { canManageDocument, type ShareRole } from '@collab-docs/shared';
-import { AppException } from '@collab-docs/shared/nest';
+import { AppException } from '@collab-docs/nest';
 import { type DocumentAccessResult, notFound } from '../permissions/permissions.service';
 import { PermEventsService } from '../permissions/perm-events.service';
 import { LIVE_DOCUMENT } from '../prisma/live-document';

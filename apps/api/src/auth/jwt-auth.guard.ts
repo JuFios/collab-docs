@@ -2,7 +2,7 @@ import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@ne
 import { Reflector } from '@nestjs/core';
 import type { AuthenticatedRequest } from './auth.types';
 import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, IS_PUBLIC_KEY } from '@collab-docs/shared/nest';
+import { APP_CONFIG, AppException, type AppConfig, IS_PUBLIC_KEY } from '@collab-docs/nest';
 import { readBearer, readCookie } from './cookies';
 
 /** Global guard: verifies the access JWT locally (no database round trip) and exposes `req.user`. */

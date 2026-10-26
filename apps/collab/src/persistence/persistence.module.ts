@@ -5,7 +5,7 @@ import {
   DocumentVersions,
   PrismaClient,
 } from '@collab-docs/db';
-import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/nest';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DOCUMENT_STORE } from '../rooms/document-store';
 import { type DocumentStorage, PostgresDocumentStore } from '../rooms/postgres-document-store';

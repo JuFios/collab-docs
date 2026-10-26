@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
-import { AppException, logEvent } from '@collab-docs/shared/nest';
+import { AppException, logEvent } from '@collab-docs/nest';
 
 /** A just-rotated token may be presented again for this long (parallel requests, several tabs). */
 export const REFRESH_GRACE_MS = 30_000;

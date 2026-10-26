@@ -6,7 +6,7 @@ import {
   configureHttpApp,
   correlationMiddleware,
   createValidationPipe,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import { InternalModule } from './internal/internal.module';
 import { VersionRestoreService } from './persistence/version-restore.service';
 import { DOCUMENT_STORE } from './rooms/document-store';

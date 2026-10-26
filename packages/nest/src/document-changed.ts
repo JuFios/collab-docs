@@ -1,4 +1,4 @@
-import type { DocumentChangedEvent } from '../realtime-events';
+import type { DocumentChangedEvent } from '@collab-docs/shared';
 import { logEvent } from './logger';
 import { QUEUE_NAMES, type QueueService, enqueueDebounced } from './queue';
 

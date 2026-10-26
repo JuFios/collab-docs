@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import { Counter } from 'prom-client';
 import { PrismaClient } from '@collab-docs/db';
-import { MetricsService, REDIS_CLIENT, getRootLogger } from '@collab-docs/shared/nest';
+import { MetricsService, REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
 import type { TreeRow } from './tree';

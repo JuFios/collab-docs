@@ -7,7 +7,7 @@ import {
   type AppConfig,
   REDIS_CLIENT,
   getRootLogger,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import type { RequestUser } from '../auth/auth.types';
 
 const WINDOW_SECONDS = 60;

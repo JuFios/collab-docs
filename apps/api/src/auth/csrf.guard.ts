@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig } from '@collab-docs/shared/nest';
+import { APP_CONFIG, AppException, type AppConfig } from '@collab-docs/nest';
 import { readBearer, readCookie } from './cookies';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

@@ -7,7 +7,7 @@ import {
   type TreeChangedEvent,
   type UserRealtimeEvent,
 } from '@collab-docs/shared';
-import { REDIS_CLIENT, getRootLogger } from '@collab-docs/shared/nest';
+import { REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
 
 /**
  * Redis pub/sub bridge for server-sent events. Publishers (any api instance) write to one channel; every

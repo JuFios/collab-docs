@@ -11,7 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import type { Access, WorkspaceRole as Role } from '@collab-docs/shared';
-import { AppException } from '@collab-docs/shared/nest';
+import { AppException } from '@collab-docs/nest';
 import type { RequestUser } from '../auth/auth.types';
 import { type DocumentAccessResult, PermissionsService } from './permissions.service';
 

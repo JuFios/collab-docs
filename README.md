@@ -14,10 +14,11 @@ pnpm monorepo:
 | `apps/web`        | Next.js 15 (App Router, Tailwind). Route groups `(public)` and `(app)`. |
 | `apps/api`        | NestJS REST API (`GET /health`).                                        |
 | `apps/collab`     | NestJS WebSocket server for document co-editing (Yjs), `GET /health`.   |
-| `packages/shared` | Shared code with entry points `.`, `./content` and `./nest`.            |
+| `packages/shared` | Framework-free shared code with entry points `.` and `./content`.       |
+| `packages/nest`   | Server-only NestJS building blocks shared by `api` and `collab`.        |
 | `packages/db`     | Prisma schema, migrations, seed and integration-test harness.           |
 
-`@collab-docs/shared/nest` is server-only; ESLint forbids importing it (and `@collab-docs/db`) in
+`@collab-docs/nest` is server-only; ESLint forbids importing it (and `@collab-docs/db`) in
 `apps/web`.
 
 ## Run
@@ -86,7 +87,7 @@ from source and reuses the layer cache of the image build job), Docker image bui
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm lint`               | ESLint (flat config) for the whole repo                                                                                                       |
 | `pnpm typecheck`          | `tsc --noEmit` in every package                                                                                                               |
-| `pnpm test`               | Jest (api, collab) and Vitest (web, shared)                                                                                                   |
+| `pnpm test`               | Jest (api, collab) and Vitest (web, shared, nest)                                                                                             |
 | `pnpm test:integration`   | Integration tests (needs Postgres and Redis; set `MAILPIT_URL=http://localhost:8025` with Mailpit running to include the email delivery test) |
 | `pnpm build`              | Builds shared libraries, then every app                                                                                                       |
 | `pnpm format`             | Prettier                                                                                                                                      |
@@ -100,7 +101,9 @@ automatically by `typecheck` and `test`).
 `jose` is ESM-only, so the choice below was verified with smoke tests in every runtime:
 
 - `packages/shared` is a dual package (`"type": "module"`, built with tsup to ESM `.js` and CJS
-  `.cjs`, with matching type declarations) exposed through conditional `exports`.
+  `.cjs`, with matching type declarations) exposed through conditional `exports`. It has no NestJS code.
+- `packages/nest` is CommonJS and built with `tsc`, because decorator metadata is only emitted by `tsc`
+  (and by swc), not by esbuild; it requires ESM-only `jose` the same way the apps do.
 - `apps/api` and `apps/collab` stay CommonJS (NestJS). At runtime Node loads ESM-only `jose`
   through `require(esm)`, which is why Node >= 22.12 is required.
 - Jest runs through `@swc/jest`; `transformIgnorePatterns` lets `jose` be transformed to CommonJS.
@@ -165,7 +168,7 @@ applies the migrations and truncates tables between tests.
 
 ## API platform
 
-Shared by `api`, its queue worker and (later) `collab`: it lives in `@collab-docs/shared/nest`, and each
+Shared by `api`, its queue worker and (later) `collab`: it lives in `@collab-docs/nest`, and each
 app only plugs the modules in (`PlatformModule` for HTTP services, `WorkerPlatformModule` for the worker).
 
 - **Prefix**: routes live under `/api`; `/health`, `/ready`, `/metrics` and `/docs` are served without it.

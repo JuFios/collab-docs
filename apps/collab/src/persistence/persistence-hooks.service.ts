@@ -6,7 +6,7 @@ import {
   QueueService,
   emitDocumentChanged,
   getRootLogger,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import type { PersistenceHooks } from '../rooms/postgres-document-store';
 
 /**

@@ -69,7 +69,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['@collab-docs/shared/nest', '@collab-docs/db', '@collab-docs/db/*'],
+              group: ['@collab-docs/nest', '@collab-docs/db', '@collab-docs/db/*'],
               message: 'Server-only packages must not be imported into the web app.',
             },
           ],

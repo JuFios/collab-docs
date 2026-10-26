@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import { describe, expect, it } from 'vitest';
-import { apiErrorSchema } from '../errors';
+import { apiErrorSchema } from '@collab-docs/shared';
 import { AppException, ValidationFailedException, toErrorResponse } from './exceptions';
 
 const map = (error: unknown) => apiErrorSchema.parse(toErrorResponse(error, 'corr-12345678'));

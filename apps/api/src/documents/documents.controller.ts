@@ -20,7 +20,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { WorkspaceRole as Role } from '@collab-docs/shared';
-import { ParseUuidPipe } from '@collab-docs/shared/nest';
+import { ParseUuidPipe } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import {

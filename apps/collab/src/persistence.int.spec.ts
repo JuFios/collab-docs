@@ -14,7 +14,7 @@ import {
   stateVectorCovers,
   base64ToBytes,
 } from '@collab-docs/shared';
-import { QUEUE_NAMES, QueueService, REDIS_CLIENT, currentConfig } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService, REDIS_CLIENT, currentConfig } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { DOCUMENT_STORE, type DocumentStore } from './rooms/document-store';
 import { RoomManager } from './rooms/room-manager';

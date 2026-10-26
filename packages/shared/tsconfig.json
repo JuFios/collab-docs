@@ -3,8 +3,7 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "noEmit": true,
-    "experimentalDecorators": true
+    "noEmit": true
   },
   "include": ["src", "tsup.config.ts"]
 }

@@ -11,7 +11,7 @@ import {
   apiErrorSchema,
   signAccessToken,
 } from '@collab-docs/shared';
-import { currentConfig, getRootLogger } from '@collab-docs/shared/nest';
+import { currentConfig, getRootLogger } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { CurrentUser, Public } from './auth.decorators';
 import type { RequestUser } from './auth.types';

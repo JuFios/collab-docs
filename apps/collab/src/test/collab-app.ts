@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import { currentConfig } from '@collab-docs/shared/nest';
+import { currentConfig } from '@collab-docs/nest';
 import { AppModule } from '../app.module';
 import { configureApp, createInternalApp } from '../bootstrap';
 

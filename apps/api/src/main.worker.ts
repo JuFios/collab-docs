@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { PinoAppLogger, loadConfigOrExit, setCurrentConfig } from '@collab-docs/shared/nest';
+import { PinoAppLogger, loadConfigOrExit, setCurrentConfig } from '@collab-docs/nest';
 import { WorkerModule } from './worker.module';
 
 // Queue processors (search-sync, mail, ...) are registered by their stage modules in WorkerModule.

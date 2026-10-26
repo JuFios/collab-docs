@@ -9,7 +9,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from './public';
 import type { Response } from 'express';
 import type { Redis } from 'ioredis';
-import { type HealthResponse, type ReadyResponse } from '../pagination';
+import { type HealthResponse, type ReadyResponse } from '@collab-docs/shared';
 import { REDIS_CLIENT } from './redis';
 
 const CHECK_TIMEOUT_MS = 2000;

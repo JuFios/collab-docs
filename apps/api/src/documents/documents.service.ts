@@ -15,7 +15,7 @@ import {
   decideDocumentAccess,
   resolveDocumentAccess,
 } from '@collab-docs/shared';
-import { AppException, QueueService, emitDocumentChanged } from '@collab-docs/shared/nest';
+import { AppException, QueueService, emitDocumentChanged } from '@collab-docs/nest';
 import {
   type DocumentAccessResult,
   PermissionsService,

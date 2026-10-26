@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, UseGuards } from '@nestjs/common';
 import { COLLAB_CLOSE } from '@collab-docs/shared';
-import { ParseUuidPipe } from '@collab-docs/shared/nest';
+import { ParseUuidPipe } from '@collab-docs/nest';
 import { VersionRestoreService } from '../persistence/version-restore.service';
 import { DOCUMENT_STORE, type DocumentStore } from '../rooms/document-store';
 import { RoomManager } from '../rooms/room-manager';
