@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Inject,
-  Param,
-  Patch,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -36,7 +26,7 @@ import { SharesService } from './shares.service';
 @ApiCookieAuth('access-cookie')
 @Controller()
 export class SharesController {
-  constructor(@Inject(SharesService) private readonly shares: SharesService) {}
+  constructor(private readonly shares: SharesService) {}
 
   @Get('me/shared-documents')
   @ApiOperation({ summary: 'Documents shared with the caller' })

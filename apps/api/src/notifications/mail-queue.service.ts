@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import type { InviteEmailData } from './invite-email';
 
@@ -11,7 +11,7 @@ export interface InviteMailJob extends InviteEmailData {
 /** Producer side of the `mail` queue (retries and backoff come from the queue defaults). */
 @Injectable()
 export class MailQueueService {
-  constructor(@Inject(QueueService) private readonly queues: QueueService) {}
+  constructor(private readonly queues: QueueService) {}
 
   async sendInvite(job: InviteMailJob): Promise<void> {
     await this.queues.add(QUEUE_NAMES.mail, MAIL_JOBS.invite, job);

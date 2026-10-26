@@ -20,10 +20,10 @@ export class TreeCacheService {
   private readonly lookups: Counter<'result'>;
 
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaClient,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    @Inject(RealtimeEventsService) private readonly realtime: RealtimeEventsService,
-    @Inject(MetricsService) metrics: MetricsService,
+    private readonly realtime: RealtimeEventsService,
+    metrics: MetricsService,
   ) {
     this.lookups = new Counter({
       name: 'tree_cache_lookups_total',

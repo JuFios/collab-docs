@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Counter, Gauge, Histogram } from 'prom-client';
 import { MetricsService } from '@collab-docs/nest';
 import type { RejectReason, RoomObserver } from '../rooms/doc-room';
@@ -23,7 +23,7 @@ export class CollabMetrics implements RoomObserver, PersistenceObserver {
   private readonly badRows: Counter;
   private source: { connectionCount(): number; roomCount(): number } | null = null;
 
-  constructor(@Inject(MetricsService) metrics: MetricsService) {
+  constructor(metrics: MetricsService) {
     const registers = [metrics.registry];
     this.applied = new Counter({
       name: 'collab_updates_applied_total',

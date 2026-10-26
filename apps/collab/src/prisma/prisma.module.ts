@@ -1,6 +1,5 @@
 import {
   Global,
-  Inject,
   Injectable,
   Module,
   type OnApplicationShutdown,
@@ -13,8 +12,8 @@ import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/nest'
 @Injectable()
 class PrismaLifecycle implements OnModuleInit, OnApplicationShutdown {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(ReadinessService) private readonly readiness: ReadinessService,
+    private readonly prisma: PrismaClient,
+    private readonly readiness: ReadinessService,
   ) {}
 
   onModuleInit(): void {

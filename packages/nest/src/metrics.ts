@@ -1,4 +1,4 @@
-import { Controller, Get, Global, Inject, Injectable, Module, Res } from '@nestjs/common';
+import { Controller, Get, Global, Injectable, Module, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from './public';
@@ -41,7 +41,7 @@ export class MetricsService {
 @SkipThrottle()
 @Controller()
 export class MetricsController {
-  constructor(@Inject(MetricsService) private readonly metrics: MetricsService) {}
+  constructor(private readonly metrics: MetricsService) {}
 
   @Get('metrics')
   async scrape(@Res() res: Response): Promise<void> {

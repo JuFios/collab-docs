@@ -32,9 +32,9 @@ function toResponse(invite: {
 @Injectable()
 export class InvitesService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PlanLimitsService) private readonly limits: PlanLimitsService,
-    @Inject(MailQueueService) private readonly mail: MailQueueService,
+    private readonly prisma: PrismaClient,
+    private readonly limits: PlanLimitsService,
+    private readonly mail: MailQueueService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 

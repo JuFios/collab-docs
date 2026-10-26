@@ -28,8 +28,8 @@ export class PermissionEventsService implements OnModuleInit, OnApplicationShutd
 
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    @Inject(AccessReevaluator) private readonly reevaluator: AccessReevaluator,
-    @Inject(RoomManager) private readonly rooms: RoomManager,
+    private readonly reevaluator: AccessReevaluator,
+    private readonly rooms: RoomManager,
   ) {}
 
   async onModuleInit(): Promise<void> {

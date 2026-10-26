@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { type Access, resolveDocumentAccess, resolveLinkAccess } from '@collab-docs/shared';
 
@@ -22,7 +22,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 @Injectable()
 export class AccessService {
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async resolve(identity: Identity, documentId: string): Promise<AccessOutcome> {
     if (!UUID.test(documentId)) return { status: 'not_found' };

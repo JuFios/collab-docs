@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { DocumentVersions } from '@collab-docs/db';
 import { QUEUE_NAMES, QueueService, logEvent } from '@collab-docs/nest';
 
@@ -9,8 +9,8 @@ const SCHEDULER_ID = 'version-prune-hourly';
 @Injectable()
 export class VersionPruneProcessor implements OnModuleInit {
   constructor(
-    @Inject(QueueService) private readonly queues: QueueService,
-    @Inject(DocumentVersions) private readonly versions: DocumentVersions,
+    private readonly queues: QueueService,
+    private readonly versions: DocumentVersions,
   ) {}
 
   async onModuleInit(): Promise<void> {

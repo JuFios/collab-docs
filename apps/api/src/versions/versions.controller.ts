@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -27,7 +27,7 @@ import { VersionsService } from './versions.service';
 @ApiCookieAuth('access-cookie')
 @Controller('documents/:id/versions')
 export class VersionsController {
-  constructor(@Inject(VersionsService) private readonly versions: VersionsService) {}
+  constructor(private readonly versions: VersionsService) {}
 
   @Get()
   @DocumentAccess('VIEW', { param: 'id' })

@@ -18,9 +18,9 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
-    @Inject(AccessService) private readonly access: AccessService,
-    @Inject(RoomManager) private readonly rooms: RoomManager,
-    @Inject(CollabMetrics) private readonly metrics: CollabMetrics,
+    private readonly access: AccessService,
+    private readonly rooms: RoomManager,
+    private readonly metrics: CollabMetrics,
   ) {}
 
   onModuleInit(): void {

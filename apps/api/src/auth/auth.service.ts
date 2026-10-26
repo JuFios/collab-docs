@@ -24,10 +24,10 @@ const INVALID_CREDENTIALS = 'Invalid email or password';
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaClient,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
-    @Inject(PasswordService) private readonly passwords: PasswordService,
-    @Inject(RefreshTokenService) private readonly refreshTokens: RefreshTokenService,
+    private readonly passwords: PasswordService,
+    private readonly refreshTokens: RefreshTokenService,
   ) {}
 
   async register(dto: RegisterDto): Promise<IssuedSession> {

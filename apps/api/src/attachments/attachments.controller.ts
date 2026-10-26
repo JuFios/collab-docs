@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, Inject, Post } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -18,7 +18,7 @@ import { AttachmentsService } from './attachments.service';
 @ApiParam({ name: 'id', type: String })
 @Controller('attachments')
 export class AttachmentsController {
-  constructor(@Inject(AttachmentsService) private readonly attachments: AttachmentsService) {}
+  constructor(private readonly attachments: AttachmentsService) {}
 
   @Post(':id/complete')
   @HttpCode(200)

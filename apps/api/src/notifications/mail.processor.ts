@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { renderInviteEmail } from './invite-email';
 import { MAIL_JOBS, type InviteMailJob } from './mail-queue.service';
@@ -8,8 +8,8 @@ import { MailerService } from './mailer.service';
 @Injectable()
 export class MailProcessor implements OnModuleInit {
   constructor(
-    @Inject(QueueService) private readonly queues: QueueService,
-    @Inject(MailerService) private readonly mailer: MailerService,
+    private readonly queues: QueueService,
+    private readonly mailer: MailerService,
   ) {}
 
   onModuleInit(): void {

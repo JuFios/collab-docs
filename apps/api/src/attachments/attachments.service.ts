@@ -48,10 +48,10 @@ export const attachmentKey = (workspaceId: string, documentId: string): string =
 @Injectable()
 export class AttachmentsService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PermissionsService) private readonly permissions: PermissionsService,
-    @Inject(PlanLimitsService) private readonly limits: PlanLimitsService,
-    @Inject(S3Storage) private readonly s3: S3Storage,
+    private readonly prisma: PrismaClient,
+    private readonly permissions: PermissionsService,
+    private readonly limits: PlanLimitsService,
+    private readonly s3: S3Storage,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 

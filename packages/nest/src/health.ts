@@ -75,7 +75,7 @@ export class ReadyResponseDto implements ReadyResponse {
 @SkipThrottle()
 @Controller()
 export class HealthController {
-  constructor(@Inject(ReadinessService) private readonly readiness: ReadinessService) {}
+  constructor(private readonly readiness: ReadinessService) {}
 
   @Get('health')
   @ApiOkResponse({ type: HealthResponseDto })

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import type { PlanTier, WorkspaceRole } from '@collab-docs/shared';
 import { AppException, logEvent } from '@collab-docs/nest';
@@ -25,8 +25,8 @@ const SLUG_ATTEMPTS = 3;
 @Injectable()
 export class WorkspacesService {
   constructor(
-    @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PlanLimitsService) private readonly limits: PlanLimitsService,
+    private readonly prisma: PrismaClient,
+    private readonly limits: PlanLimitsService,
   ) {}
 
   /** The creator becomes OWNER and the workspace starts on the FREE plan. */

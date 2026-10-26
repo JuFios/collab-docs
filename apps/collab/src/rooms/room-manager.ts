@@ -34,7 +34,7 @@ export class RoomManager implements BeforeApplicationShutdown {
   constructor(
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
     @Inject(APP_CONFIG) config: AppConfig,
-    @Inject(CollabMetrics) private readonly metrics: CollabMetrics,
+    private readonly metrics: CollabMetrics,
   ) {
     this.limits = {
       maxMessagesPer10s: config.COLLAB_MAX_MESSAGES_PER_10S,
