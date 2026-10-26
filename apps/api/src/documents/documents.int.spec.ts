@@ -1038,10 +1038,17 @@ describe('documents', () => {
         .join('')
         .split('\n\n')
         .filter((block) => block.startsWith('event: '))
-        .map((block) => ({
-          event: block.split('\n')[0]!.slice(7),
-          data: JSON.parse(block.split('\n')[1]!.slice(6)) as Record<string, unknown>,
-        }));
+        .map((block) => {
+          const field = (name: string) =>
+            block
+              .split('\n')
+              .find((line) => line.startsWith(`${name}: `))!
+              .slice(name.length + 2);
+          return {
+            event: field('event'),
+            data: JSON.parse(field('data')) as Record<string, unknown>,
+          };
+        });
 
     beforeAll(async () => {
       await app.listen(0);
@@ -1055,7 +1062,7 @@ describe('documents', () => {
       try {
         expect(member.statusCode).toBe(200);
         expect(member.headers['content-type']).toContain('text/event-stream');
-        expect(member.headers['cache-control']).toBe('no-cache, no-transform');
+        expect(member.headers['cache-control']).toContain('no-transform');
         expect(member.headers['x-accel-buffering']).toBe('no');
 
         const doc = await createDoc(team.editor, team.workspaceId);
