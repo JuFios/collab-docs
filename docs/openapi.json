@@ -1577,7 +1577,7 @@
     "/api/documents/{id}/attachments/presign": {
       "post": {
         "description": "Needs EDIT. Only png, jpeg, webp and gif up to the configured size are accepted. The size is reserved against the workspace quota; the returned policy pins the key, the content type and the exact length. POST `fields` followed by the file to `url`, then call `complete`.",
-        "operationId": "AttachmentsController_presign",
+        "operationId": "DocumentAttachmentsController_presign",
         "parameters": [
           {
             "name": "id",
