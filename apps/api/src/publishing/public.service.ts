@@ -3,9 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentStateReader } from '@collab-docs/db';
 import {
   ATTACHMENT_READ_TTL_SECONDS,
-  EDIT_TOKEN_PATTERN,
-  PUBLIC_SLUG_MAX_LENGTH,
-  PUBLIC_SLUG_PATTERN,
   type CollabTicket,
   type EditLinkState,
   type PublicDocument,
@@ -19,10 +16,8 @@ import {
 } from '@collab-docs/nest';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Storage } from '../storage/s3.service';
+import { statusOf } from './link-status';
 import { hashToken } from './link-token';
-import { statusOf } from './public-links.service';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One answer for every reason a page is not available, so the endpoint does not tell what exists. */
 const pageNotFound = () => new AppException('NOT_FOUND', 'Page not found');
@@ -66,7 +61,6 @@ export class PublicService {
   /** The image must belong to the document that the slug publishes; the browser is sent to a short-lived URL. */
   async mediaUrl(attachmentId: string, slug: string): Promise<string> {
     const link = await this.liveViewLink(slug);
-    if (!UUID.test(attachmentId)) throw pageNotFound();
     const attachment = await this.prisma.attachment.findFirst({
       where: { id: attachmentId, documentId: link.document.id, status: 'READY' },
       select: { key: true, mime: true },
@@ -113,9 +107,6 @@ export class PublicService {
   // --- helpers ----------------------------------------------------------------------------------------------
 
   private async liveViewLink(slug: string) {
-    if (slug.length > PUBLIC_SLUG_MAX_LENGTH || !PUBLIC_SLUG_PATTERN.test(slug)) {
-      throw pageNotFound();
-    }
     const link = await this.prisma.publicLink.findUnique({
       where: { slug },
       include: {
@@ -137,7 +128,6 @@ export class PublicService {
   }
 
   private async liveEditLink(token: string) {
-    if (!EDIT_TOKEN_PATTERN.test(token)) throw linkNotFound();
     const link = await this.prisma.publicLink.findUnique({
       where: { tokenHash: hashToken(token) },
       include: { document: { select: { id: true, title: true, deletedAt: true } } },

@@ -1,4 +1,14 @@
-import { Controller, Get, HttpCode, Param, Post, Query, Redirect } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Redirect,
+} from '@nestjs/common';
 import {
   ApiFoundResponse,
   ApiGoneResponse,
@@ -16,6 +26,7 @@ import {
   PublicDocumentResponse,
   PublicMediaQueryDto,
 } from './public-links.dto';
+import { EditTokenPipe, PublicSlugPipe } from './public-params.pipe';
 import { PublicService } from './public.service';
 
 /** Anonymous endpoints behind `/p/<slug>` and `/e/<token>`. No cookies, no user: nothing here depends on who asks. */
@@ -35,7 +46,7 @@ export class PublicController {
   @ApiParam({ name: 'slug', type: String })
   @ApiOkResponse({ type: PublicDocumentResponse })
   @ApiNotFoundResponse({ description: 'The page is not available' })
-  document(@Param('slug') slug: string) {
+  document(@Param('slug', PublicSlugPipe) slug: string) {
     return this.publicApi.document(slug);
   }
 
@@ -50,7 +61,11 @@ export class PublicController {
   @ApiParam({ name: 'attachmentId', type: String })
   @ApiFoundResponse({ description: 'Redirect to the image' })
   @ApiNotFoundResponse({ description: 'The page or the image is not available' })
-  async media(@Param('attachmentId') attachmentId: string, @Query() query: PublicMediaQueryDto) {
+  async media(
+    @Param('attachmentId', new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND }))
+    attachmentId: string,
+    @Query() query: PublicMediaQueryDto,
+  ) {
     return { url: await this.publicApi.mediaUrl(attachmentId, query.slug), statusCode: 302 };
   }
 
@@ -65,7 +80,7 @@ export class PublicController {
   @ApiOkResponse({ type: EditLinkStateResponse })
   @ApiNotFoundResponse({ description: 'Unknown link' })
   @ApiGoneResponse({ description: 'LINK_EXPIRED or DOCUMENT_DELETED' })
-  editLink(@Param('token') token: string) {
+  editLink(@Param('token', EditTokenPipe) token: string) {
     return this.publicApi.editLink(token);
   }
 
@@ -83,7 +98,7 @@ export class PublicController {
   @ApiNotFoundResponse({ description: 'Unknown link' })
   @ApiGoneResponse({ description: 'LINK_EXPIRED or DOCUMENT_DELETED' })
   @ApiTooManyRequestsResponse({ description: 'RATE_LIMITED' })
-  guestTicket(@Param('token') token: string) {
+  guestTicket(@Param('token', EditTokenPipe) token: string) {
     return this.publicApi.guestTicket(token);
   }
 }

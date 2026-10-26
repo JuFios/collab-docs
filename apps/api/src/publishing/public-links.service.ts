@@ -5,7 +5,6 @@ import {
   type CreatedPublicLink,
   PUBLIC_LINK_MAX_TTL_DAYS,
   type PublicLink,
-  type PublicLinkStatus,
   canManageDocument,
 } from '@collab-docs/shared';
 import {
@@ -22,21 +21,13 @@ import { LIVE_DOCUMENT } from '../prisma/live-document';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateSlug } from '../workspaces/slug';
 import { LinkExpiryService } from './link-expiry.service';
+import { statusOf } from './link-status';
 import { newLinkToken } from './link-token';
 import { RevalidationService } from './revalidation.service';
 
 const DAY_MS = 24 * 3600 * 1000;
 /** A slug collision (6 random hex digits next to the title) or a concurrent publish; both resolve on retry. */
 const MAX_ATTEMPTS = 5;
-
-export function statusOf(
-  link: Pick<PublicLinkRow, 'revokedAt' | 'expiresAt'>,
-  now = new Date(),
-): PublicLinkStatus {
-  if (link.revokedAt) return 'revoked';
-  if (link.expiresAt && link.expiresAt.getTime() <= now.getTime()) return 'expired';
-  return 'active';
-}
 
 const present = (link: PublicLinkRow): PublicLink => ({
   id: link.id,

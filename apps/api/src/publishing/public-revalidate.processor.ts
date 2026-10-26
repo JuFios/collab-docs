@@ -1,6 +1,8 @@
+import { HttpService } from '@nestjs/axios';
 import { Processor } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Job } from 'bullmq';
+import { firstValueFrom } from 'rxjs';
 import { publicPageTag } from '@collab-docs/shared';
 import { type AppConfig, QUEUE_NAMES, QueueProcessor, logEvent } from '@collab-docs/nest';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,6 +29,7 @@ export class PublicRevalidateProcessor extends QueueProcessor<RevalidateJob> {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly http: HttpService,
   ) {
     super();
   }
@@ -41,19 +44,19 @@ export class PublicRevalidateProcessor extends QueueProcessor<RevalidateJob> {
 
     const startedAt = Date.now();
     try {
-      const response = await fetch(
-        new URL('/internal/revalidate', this.config.get('WEB_INTERNAL_URL', { infer: true })),
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-revalidate-secret': this.config.get('REVALIDATE_SECRET', { infer: true }),
+      await firstValueFrom(
+        this.http.post(
+          new URL('/internal/revalidate', this.config.get('WEB_INTERNAL_URL', { infer: true }))
+            .href,
+          { tags: [publicPageTag(link.slug)] },
+          {
+            headers: {
+              'x-revalidate-secret': this.config.get('REVALIDATE_SECRET', { infer: true }),
+            },
+            timeout: REQUEST_TIMEOUT_MS,
           },
-          body: JSON.stringify({ tags: [publicPageTag(link.slug)] }),
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        },
+        ),
       );
-      if (!response.ok) throw new Error(`the web app answered ${response.status}`);
       logEvent(this.logger, 'revalidate.sent', {
         documentId,
         slug: link.slug,
