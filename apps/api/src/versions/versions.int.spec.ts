@@ -10,6 +10,7 @@ import { DocumentStateWriter, DocumentVersions, MAX_VERSIONS, PrismaClient } fro
 import { QUEUE_NAMES, QueueService, parseConfig } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { VersionPruneProcessor } from './version-prune.processor';
+import { VersionsWorkerModule } from './versions.module';
 
 const PASSWORD = 'correct-horse-battery';
 const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
@@ -113,7 +114,7 @@ describe('document versions', () => {
     await new Promise<void>((resolve) => collab.listen(0, '127.0.0.1', resolve));
     collabUrl = `http://127.0.0.1:${(collab.address() as AddressInfo).port}`;
 
-    app = await createTestApp();
+    app = await createTestApp([], [VersionsWorkerModule]);
     // the client reads the url from the shared config object on every call
     app.get(ConfigService).set('COLLAB_INTERNAL_URL', collabUrl);
     prisma = app.get(PrismaClient, { strict: false });
@@ -373,9 +374,10 @@ describe('document versions', () => {
       const queues = app.get(QueueService, { strict: false });
       for (let i = 0; i < 55; i += 1) await versions.create({ documentId, kind: 'AUTO' });
 
-      const processor = new VersionPruneProcessor(queues, versions);
+      // the worker module already registered the schedule on start; starting again must not stack another
+      const processor = app.get(VersionPruneProcessor, { strict: false });
       await processor.onModuleInit();
-      await new VersionPruneProcessor(queues, versions).onModuleInit();
+      await processor.onModuleInit();
       const schedulers = await queues.getQueue(QUEUE_NAMES.versionPrune).getJobSchedulers();
       expect(schedulers.filter((s) => s.key === 'version-prune-hourly')).toHaveLength(1);
 

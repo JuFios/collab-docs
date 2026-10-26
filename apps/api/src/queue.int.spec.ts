@@ -1,6 +1,10 @@
+import { Processor } from '@nestjs/bullmq';
 import { Test } from '@nestjs/testing';
 import { Redis } from 'ioredis';
+import type { Job } from 'bullmq';
 import {
+  type JobEnvelope,
+  QueueProcessor,
   QueueService,
   WorkerPlatformModule,
   enqueueDebounced,
@@ -18,6 +22,23 @@ async function until(condition: () => boolean, timeoutMs = 10_000): Promise<void
   }
 }
 
+// the handlers are swapped per test; the processors are real @Processor classes started by the Nest module
+const handlers: Record<string, (job: Job<JobEnvelope>) => Promise<void>> = {};
+
+@Processor('mail', { concurrency: 5 })
+class MailProbe extends QueueProcessor {
+  protected handle(job: Job<JobEnvelope>): Promise<void> {
+    return handlers.mail?.(job) ?? Promise.resolve();
+  }
+}
+
+@Processor('search-sync', { concurrency: 5 })
+class SearchProbe extends QueueProcessor {
+  protected handle(job: Job<JobEnvelope>): Promise<void> {
+    return handlers['search-sync']?.(job) ?? Promise.resolve();
+  }
+}
+
 describe('queues', () => {
   let queues: QueueService;
   let close: () => Promise<void>;
@@ -32,6 +53,7 @@ describe('queues', () => {
     redis.disconnect();
     const moduleRef = await Test.createTestingModule({
       imports: [WorkerPlatformModule.forRoot()],
+      providers: [MailProbe, SearchProbe],
     }).compile();
     const app = moduleRef.createNestApplication();
     await app.init();
@@ -46,10 +68,10 @@ describe('queues', () => {
   it('carries the correlation id into the job and restores it in the processor', async () => {
     const seen: Array<string | undefined> = [];
     const payloads: unknown[] = [];
-    queues.process('mail', async (job) => {
+    handlers.mail = async (job) => {
       seen.push(getCorrelationId());
       payloads.push(job.data);
-    });
+    };
 
     await runWithCorrelationId('corr-from-request-1', () =>
       queues.add('mail', 'send', { to: 'a@example.test' }),
@@ -83,11 +105,11 @@ describe('queues', () => {
         release = resolve;
       });
       let active = false;
-      queues.process('search-sync', async () => {
+      handlers['search-sync'] = async () => {
         active = true;
         runs.push(Date.now());
         await gate;
-      });
+      };
 
       const first = await enqueueDebounced(queue, documentId, 300);
       const second = await enqueueDebounced(queue, documentId, 300);
