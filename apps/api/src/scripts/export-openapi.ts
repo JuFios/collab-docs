@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { parseConfig } from '@collab-docs/shared/nest';
+import { parseConfig } from '@collab-docs/nest';
 import { AppModule } from '../app.module';
 import { configureApp } from '../bootstrap';
 

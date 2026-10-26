@@ -2,7 +2,7 @@ import { Inject, Injectable, type OnApplicationShutdown, type OnModuleInit } fro
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
 import { COLLAB_CLOSE, PERM_EVENT_CHANNELS } from '@collab-docs/shared';
-import { REDIS_CLIENT, getRootLogger, runWithCorrelationId } from '@collab-docs/shared/nest';
+import { REDIS_CLIENT, getRootLogger, runWithCorrelationId } from '@collab-docs/nest';
 import { AccessReevaluator } from '../access/access-reevaluator.service';
 import { RoomManager } from '../rooms/room-manager';
 

@@ -1,6 +1,6 @@
 import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { type Transporter, createTransport } from 'nodemailer';
-import { APP_CONFIG, type AppConfig, logEvent } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig, logEvent } from '@collab-docs/nest';
 
 export interface MailMessage {
   to: string;

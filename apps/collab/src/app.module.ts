@@ -6,7 +6,7 @@ import {
   PlatformLoggerModule,
   QueueModule,
   RedisModule,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import { CollabModule } from './collab.module';
 import { PrismaModule } from './prisma/prisma.module';
 

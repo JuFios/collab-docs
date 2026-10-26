@@ -8,7 +8,7 @@ import {
   getRootLogger,
   resolveCorrelationId,
   verifyCollabTicket,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import { AccessService, type Identity } from '../access/access.service';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import type { DocRoom } from '../rooms/doc-room';

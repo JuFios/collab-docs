@@ -1,6 +1,6 @@
 import { Inject, Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { COLLAB_CLOSE } from '@collab-docs/shared';
-import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/nest';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { type Session, RoomManager } from '../rooms/room-manager';
 import { AccessService } from './access.service';

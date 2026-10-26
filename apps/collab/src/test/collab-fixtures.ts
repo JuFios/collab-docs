@@ -5,7 +5,7 @@ import { WebsocketProvider } from 'y-websocket';
 import WebSocket from 'ws';
 import type { PrismaClient } from '@collab-docs/db';
 import { COLLAB_MESSAGE, type CollabRoomEvent } from '@collab-docs/shared';
-import { currentConfig, signCollabTicket } from '@collab-docs/shared/nest';
+import { currentConfig, signCollabTicket } from '@collab-docs/nest';
 
 export interface TestUser {
   id: string;

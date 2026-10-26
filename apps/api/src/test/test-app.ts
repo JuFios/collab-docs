@@ -9,7 +9,7 @@ import {
   RateLimit,
   currentConfig,
   getCorrelationId,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 import { AppModule } from '../app.module';
 import { Public } from '../auth/auth.decorators';
 import { configureApp } from '../bootstrap';

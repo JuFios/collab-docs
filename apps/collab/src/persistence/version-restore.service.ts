@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DocumentVersions, PrismaClient } from '@collab-docs/db';
-import { AppException } from '@collab-docs/shared/nest';
+import { AppException } from '@collab-docs/nest';
 import { DOCUMENT_STORE, type DocumentStore } from '../rooms/document-store';
 import { RoomManager } from '../rooms/room-manager';
 

@@ -6,7 +6,7 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, REALTIME_CHANNEL, type WorkspaceRole } from '@collab-docs/shared';
-import { QUEUE_NAMES, QueueService } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 
 const PASSWORD = 'correct-horse-battery';

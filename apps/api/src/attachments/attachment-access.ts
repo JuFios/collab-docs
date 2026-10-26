@@ -11,7 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaClient } from '@collab-docs/db';
 import type { Access } from '@collab-docs/shared';
-import { AppException, ParseUuidPipe } from '@collab-docs/shared/nest';
+import { AppException, ParseUuidPipe } from '@collab-docs/nest';
 import type { Request } from 'express';
 import type { RequestUser } from '../auth/auth.types';
 import {

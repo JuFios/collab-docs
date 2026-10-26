@@ -8,7 +8,7 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { APP_CONFIG, type AppConfig, signCollabTicket } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig, signCollabTicket } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { CurrentDocumentAccess, DocumentAccess } from '../permissions/permissions.decorators';

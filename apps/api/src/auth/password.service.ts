@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { hash, verify } from '@node-rs/argon2';
-import { APP_CONFIG, type AppConfig } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig } from '@collab-docs/nest';
 
 /** argon2id hashing; the algorithm is the library default and every parameter is encoded in the hash itself. */
 @Injectable()

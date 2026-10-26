@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import type { PlanTier, WorkspaceRole } from '@collab-docs/shared';
-import { AppException, logEvent } from '@collab-docs/shared/nest';
+import { AppException, logEvent } from '@collab-docs/nest';
 import { notFound } from '../permissions/permissions.service';
 import { type Usage, PlanLimitsService } from './plan-limits.service';
 import { generateSlug } from './slug';

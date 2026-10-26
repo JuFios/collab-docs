@@ -2,7 +2,7 @@ import { Controller, Get, Inject, Query, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import { ParseUuidPipe } from '@collab-docs/shared/nest';
+import { ParseUuidPipe } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { PermissionsService } from '../permissions/permissions.service';

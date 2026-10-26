@@ -10,7 +10,7 @@ import {
   resolveDocumentAccess,
   resolveWorkspaceRole,
 } from '@collab-docs/shared';
-import { AppException } from '@collab-docs/shared/nest';
+import { AppException } from '@collab-docs/nest';
 
 export interface DocumentAccessResult {
   access: Access;

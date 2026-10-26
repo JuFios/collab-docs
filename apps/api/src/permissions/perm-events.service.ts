@@ -5,7 +5,7 @@ import {
   PERM_EVENT_CHANNELS,
   type PermChangedEvent,
 } from '@collab-docs/shared';
-import { REDIS_CLIENT, getCorrelationId, getRootLogger } from '@collab-docs/shared/nest';
+import { REDIS_CLIENT, getCorrelationId, getRootLogger } from '@collab-docs/nest';
 
 /**
  * Publishes permission events to Redis. Call it only after the database transaction has committed:

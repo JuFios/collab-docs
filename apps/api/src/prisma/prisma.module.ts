@@ -8,7 +8,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { createPrismaClient, PrismaClient } from '@collab-docs/db';
-import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/shared/nest';
+import { APP_CONFIG, type AppConfig, ReadinessService } from '@collab-docs/nest';
 
 /** Registers the Postgres probe and closes the connection pool on shutdown. */
 @Injectable()

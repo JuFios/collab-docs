@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
 import { sanitizeContent, yDocToContentJson } from '@collab-docs/shared/content';
-import { AppException } from '@collab-docs/shared/nest';
+import { AppException } from '@collab-docs/nest';
 import type {
   CreatedVersion,
   DocumentVersion,

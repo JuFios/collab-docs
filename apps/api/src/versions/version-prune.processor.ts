@@ -1,6 +1,6 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { DocumentVersions } from '@collab-docs/db';
-import { QUEUE_NAMES, QueueService, logEvent } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService, logEvent } from '@collab-docs/nest';
 
 const PRUNE_EVERY_MS = 60 * 60 * 1000;
 const SCHEDULER_ID = 'version-prune-hourly';

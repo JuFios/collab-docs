@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { QUEUE_NAMES, QueueService } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import type { InviteEmailData } from './invite-email';
 
 export const MAIL_JOBS = { invite: 'invite' } as const;

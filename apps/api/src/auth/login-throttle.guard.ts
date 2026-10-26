@@ -8,7 +8,7 @@ import {
   type AppConfig,
   REDIS_CLIENT,
   getRootLogger,
-} from '@collab-docs/shared/nest';
+} from '@collab-docs/nest';
 
 const WINDOW_SECONDS = 60;
 

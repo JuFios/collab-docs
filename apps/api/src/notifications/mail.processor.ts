@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { QUEUE_NAMES, QueueService } from '@collab-docs/shared/nest';
+import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { renderInviteEmail } from './invite-email';
 import { MAIL_JOBS, type InviteMailJob } from './mail-queue.service';
 import { MailerService } from './mailer.service';

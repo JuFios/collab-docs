@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { currentConfig, loadConfigOrExit, setCurrentConfig } from '@collab-docs/shared/nest';
+import { currentConfig, loadConfigOrExit, setCurrentConfig } from '@collab-docs/nest';
 import { AppModule } from './app.module';
 import { configureApp, createInternalApp } from './bootstrap';
 
