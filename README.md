@@ -240,9 +240,12 @@ with `logEvent('document.published', { … })`.
 ### Queues
 
 BullMQ queues (`search-sync`, `public-revalidate`, `mail`, `billing-webhook`, `link-expiry`, `version-prune`, `attachment-cleanup`)
-are created through `QueueService`, with default retries (5 attempts, exponential backoff) and bounded
-history. The worker runs from the same image as the API (`node dist/main.worker.js`) and shuts down
-gracefully, finishing active jobs. `enqueueDebounced(queue, documentId, delayMs)` coalesces bursts of
+are registered once with `@nestjs/bullmq` (`BullModule.registerQueue`), with default retries (5 attempts,
+exponential backoff) and bounded history. Producers inject a queue (`@InjectQueue(name)`) or use `QueueService`;
+either way `addJob` stamps the ambient correlation id into the job. Consumers are `@Processor(name)` classes that
+extend `QueueProcessor`: it restores the correlation context, counts results and logs failed jobs, and the class
+only implements `handle(job)`. The worker runs from the same image as the API (`node dist/main.worker.js`) and
+shuts down gracefully, finishing active jobs. `enqueueDebounced(queue, documentId, delayMs)` coalesces bursts of
 changes into one delayed job using BullMQ deduplication; the job reads the latest state when it runs, and a
 change made while it is processing schedules a new job. A fixed `jobId` per document is deliberately not
 used, because BullMQ remembers finished ids and would drop later changes.
