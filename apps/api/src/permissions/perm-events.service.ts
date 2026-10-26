@@ -5,7 +5,7 @@ import {
   PERM_EVENT_CHANNELS,
   type PermChangedEvent,
 } from '@collab-docs/shared';
-import { REDIS_CLIENT, getCorrelationId, getRootLogger } from '@collab-docs/nest';
+import { REDIS_CLIENT, getCorrelationId, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 
 /**
  * Publishes permission events to Redis. Call it only after the database transaction has committed:
@@ -14,7 +14,10 @@ import { REDIS_CLIENT, getCorrelationId, getRootLogger } from '@collab-docs/nest
  */
 @Injectable()
 export class PermEventsService {
-  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
+  constructor(
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @InjectPinoLogger(PermEventsService.name) private readonly logger: PinoLogger,
+  ) {}
 
   async permChanged(event: PermChangedEvent): Promise<void> {
     try {
@@ -23,7 +26,7 @@ export class PermEventsService {
         JSON.stringify({ ...event, correlationId: getCorrelationId() }),
       );
     } catch (error) {
-      getRootLogger().warn({ err: error, event }, 'perm.changed publish failed');
+      this.logger.warn({ err: error, event }, 'perm.changed publish failed');
     }
   }
 
@@ -42,7 +45,7 @@ export class PermEventsService {
         JSON.stringify({ ...event, correlationId: getCorrelationId() }),
       );
     } catch (error) {
-      getRootLogger().warn(
+      this.logger.warn(
         { err: error, channel, workspaceId: event.workspaceId },
         `${channel} publish failed`,
       );

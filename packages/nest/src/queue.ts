@@ -6,7 +6,7 @@ import type { ConnectionOptions, Job, JobsOptions, Queue } from 'bullmq';
 import { Counter, Gauge } from 'prom-client';
 import type { AppConfig } from './config';
 import { getCorrelationId, runWithCorrelationId } from './correlation';
-import { getRootLogger, logEvent } from './logger';
+import { InjectPinoLogger, PinoLogger, logEvent } from './logger';
 import { MetricsService } from './metrics';
 
 export const QUEUE_NAMES = {
@@ -87,11 +87,12 @@ export function addJob<T extends object>(
 @Injectable()
 export class QueueService {
   private readonly jobsGauge: Gauge<'queue' | 'state'>;
-  readonly enqueueFailures: Counter<'queue'>;
+  private readonly enqueueFailures: Counter<'queue'>;
 
   constructor(
     private readonly moduleRef: ModuleRef,
     metrics: MetricsService,
+    @InjectPinoLogger(QueueService.name) private readonly logger: PinoLogger,
   ) {
     this.jobsGauge = new Gauge({
       name: 'queue_jobs',
@@ -115,6 +116,12 @@ export class QueueService {
       labelNames: ['queue'],
       registers: [metrics.registry],
     });
+  }
+
+  /** Counts a job that could not be enqueued and logs it as `event`; the triggering request still succeeds. */
+  recordEnqueueFailure(queue: string, event: string, fields: Record<string, unknown>): void {
+    this.enqueueFailures.inc({ queue });
+    logEvent(this.logger, event, { queue, ...fields });
   }
 
   getQueue(name: QueueName | (string & {})): Queue {
@@ -155,6 +162,7 @@ export class QueueMetrics {
 export abstract class QueueProcessor<T extends object = Record<string, never>> extends WorkerHost {
   // property injection: subclasses declare their own constructors
   @Inject() private readonly queueMetrics!: QueueMetrics;
+  @InjectPinoLogger(QueueProcessor.name) protected readonly logger!: PinoLogger;
 
   protected abstract handle(job: Job<T & JobEnvelope>): Promise<void>;
 
@@ -171,7 +179,7 @@ export abstract class QueueProcessor<T extends object = Record<string, never>> e
   protected onFailed(job: Job<T & JobEnvelope> | undefined, error: Error): void {
     this.queueMetrics.processed.inc({ queue: this.worker.name, result: 'failed' });
     runWithCorrelationId(job?.data?.correlationId ?? 'unknown', () =>
-      logEvent('queue.job_failed', {
+      logEvent(this.logger, 'queue.job_failed', {
         queue: this.worker.name,
         jobId: job?.id,
         attemptsMade: job?.attemptsMade,
@@ -182,7 +190,7 @@ export abstract class QueueProcessor<T extends object = Record<string, never>> e
 
   @OnWorkerEvent('error')
   protected onError(error: Error): void {
-    getRootLogger().error({ err: error, queue: this.worker.name }, 'worker error');
+    this.logger.error({ err: error, queue: this.worker.name }, 'worker error');
   }
 }
 

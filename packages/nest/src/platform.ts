@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { appConfigModule } from './app-config';
 import type { AppConfig } from './config';
 import { HealthModule } from './health';
-import { PlatformLoggerModule } from './logger';
+import { platformLoggerModule } from './logger';
 import { MetricsModule } from './metrics';
 import { QueueModule } from './queue';
 import { RequestPipelineModule } from './pipeline';
@@ -21,7 +21,7 @@ export class PlatformModule {
       module: PlatformModule,
       imports: [
         appConfigModule(),
-        PlatformLoggerModule,
+        platformLoggerModule(),
         RequestPipelineModule,
         RedisModule,
         MetricsModule,
@@ -44,7 +44,7 @@ export class WorkerPlatformModule {
   static forRoot(): DynamicModule {
     return {
       module: WorkerPlatformModule,
-      imports: [appConfigModule(), PlatformLoggerModule, RedisModule, MetricsModule, QueueModule],
+      imports: [appConfigModule(), platformLoggerModule(), RedisModule, MetricsModule, QueueModule],
     };
   }
 }

@@ -20,6 +20,8 @@ import {
   type AppConfig,
   ValidationFailedException,
   logEvent,
+  InjectPinoLogger,
+  PinoLogger,
 } from '@collab-docs/nest';
 import { PermissionsService, notFound } from '../permissions/permissions.service';
 import { S3Storage } from '../storage/s3.service';
@@ -53,6 +55,7 @@ export class AttachmentsService {
     private readonly limits: PlanLimitsService,
     private readonly s3: S3Storage,
     private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(AttachmentsService.name) private readonly logger: PinoLogger,
   ) {}
 
   /** Needs EDIT on the document. Reserves `size` bytes of the workspace quota until the upload is completed or swept. */
@@ -149,7 +152,7 @@ export class AttachmentsService {
       data: { status: 'READY' },
     });
     if (count === 0) throw notFound('Attachment');
-    logEvent('attachment.completed', { attachmentId: row.id, size: row.size });
+    logEvent(this.logger, 'attachment.completed', { attachmentId: row.id, size: row.size });
     return present({ ...row, status: 'READY' });
   }
 
@@ -170,7 +173,7 @@ export class AttachmentsService {
   private async reject(row: AttachmentRow, reason: string, message: string): Promise<never> {
     await this.s3.delete(row.key);
     await this.prisma.attachment.deleteMany({ where: { id: row.id, status: 'PENDING' } });
-    logEvent('attachment.rejected', { attachmentId: row.id, reason });
+    logEvent(this.logger, 'attachment.rejected', { attachmentId: row.id, reason });
     throw unprocessable(reason, message);
   }
 }

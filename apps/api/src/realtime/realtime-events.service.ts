@@ -7,7 +7,7 @@ import {
   type TreeChangedEvent,
   type UserRealtimeEvent,
 } from '@collab-docs/shared';
-import { REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
+import { REDIS_CLIENT, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 
 /**
  * Redis pub/sub bridge for server-sent events. Publishers (any api instance) write to one channel; every
@@ -19,14 +19,17 @@ export class RealtimeEventsService implements OnApplicationShutdown {
   private subscriber: Redis | null = null;
   private subscribing: Promise<void> | null = null;
 
-  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
+  constructor(
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @InjectPinoLogger(RealtimeEventsService.name) private readonly logger: PinoLogger,
+  ) {}
 
   /** Publishes after commit; losing a message only delays a refetch, so failures are logged. */
   async publish(envelope: RealtimeEnvelope): Promise<void> {
     try {
       await this.redis.publish(REALTIME_CHANNEL, JSON.stringify(envelope));
     } catch (error) {
-      getRootLogger().warn({ err: error }, 'realtime publish failed');
+      this.logger.warn({ err: error }, 'realtime publish failed');
     }
   }
 
@@ -66,11 +69,11 @@ export class RealtimeEventsService implements OnApplicationShutdown {
       try {
         this.messages.next(JSON.parse(raw) as RealtimeEnvelope);
       } catch (error) {
-        getRootLogger().warn({ err: error }, 'malformed realtime message dropped');
+        this.logger.warn({ err: error }, 'malformed realtime message dropped');
       }
     });
     subscriber.on('error', (error) =>
-      getRootLogger().warn({ err: error }, 'realtime subscriber error'),
+      this.logger.warn({ err: error }, 'realtime subscriber error'),
     );
     this.subscriber = subscriber;
     await subscriber.subscribe(REALTIME_CHANNEL);

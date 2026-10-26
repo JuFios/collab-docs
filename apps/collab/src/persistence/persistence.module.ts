@@ -6,7 +6,7 @@ import {
   DocumentVersions,
   PrismaClient,
 } from '@collab-docs/db';
-import { type AppConfig, getRootLogger } from '@collab-docs/nest';
+import { type AppConfig, PinoLogger } from '@collab-docs/nest';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DOCUMENT_STORE } from '../rooms/document-store';
 import { type DocumentStorage, PostgresDocumentStore } from '../rooms/postgres-document-store';
@@ -35,6 +35,7 @@ import { PersistenceHooksService } from './persistence-hooks.service';
         ConfigService,
         CollabMetrics,
         PersistenceHooksService,
+        PinoLogger,
       ],
       useFactory: (
         prisma: PrismaClient,
@@ -42,6 +43,7 @@ import { PersistenceHooksService } from './persistence-hooks.service';
         config: ConfigService<AppConfig, true>,
         metrics: CollabMetrics,
         hooks: PersistenceHooksService,
+        logger: PinoLogger,
       ) => {
         const writer = new DocumentStateWriter(prisma);
         const storage: DocumentStorage = {
@@ -59,7 +61,7 @@ import { PersistenceHooksService } from './persistence-hooks.service';
           },
           metrics,
           hooks,
-          getRootLogger(),
+          logger.logger,
         );
       },
     },

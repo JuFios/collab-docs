@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
-import { AppException, logEvent } from '@collab-docs/nest';
+import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 
 /** A just-rotated token may be presented again for this long (parallel requests, several tabs). */
 export const REFRESH_GRACE_MS = 30_000;
@@ -27,7 +27,10 @@ const rejected = () => new AppException('UNAUTHENTICATED', 'Invalid or expired s
 
 @Injectable()
 export class RefreshTokenService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    @InjectPinoLogger(RefreshTokenService.name) private readonly logger: PinoLogger,
+  ) {}
 
   /** Starts a new token family (login / register). */
   async issue(userId: string, now = new Date()): Promise<string> {
@@ -91,7 +94,10 @@ export class RefreshTokenService {
       return { kind: 'grace', userId: row.userId };
     }
     await this.revokeFamily(row.familyId, now);
-    logEvent('auth.refresh_reuse_detected', { userId: row.userId, familyId: row.familyId });
+    logEvent(this.logger, 'auth.refresh_reuse_detected', {
+      userId: row.userId,
+      familyId: row.familyId,
+    });
     throw rejected();
   }
 

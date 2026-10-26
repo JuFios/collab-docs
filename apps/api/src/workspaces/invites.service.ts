@@ -2,7 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@collab-docs/db';
 import type { WorkspaceRole } from '@collab-docs/shared';
-import { AppException, type AppConfig, logEvent } from '@collab-docs/nest';
+import {
+  AppException,
+  type AppConfig,
+  logEvent,
+  InjectPinoLogger,
+  PinoLogger,
+} from '@collab-docs/nest';
 import { MailQueueService } from '../notifications/mail-queue.service';
 import { notFound } from '../permissions/permissions.service';
 import { INVITE_TOKEN_PATTERN, INVITE_TTL_MS, hashToken, newInviteToken } from './invite-token';
@@ -37,6 +43,7 @@ export class InvitesService {
     private readonly limits: PlanLimitsService,
     private readonly mail: MailQueueService,
     private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(InvitesService.name) private readonly logger: PinoLogger,
   ) {}
 
   /**
@@ -105,7 +112,12 @@ export class InvitesService {
       link: new URL(`/invite/${token}`, this.config.get('WEB_ORIGIN', { infer: true })).toString(),
       expiresAt: expiresAt.toISOString(),
     });
-    logEvent('invite.sent', { workspaceId, inviteId: invite.id, inviterId, role: input.role });
+    logEvent(this.logger, 'invite.sent', {
+      workspaceId,
+      inviteId: invite.id,
+      inviterId,
+      role: input.role,
+    });
     return toResponse(invite);
   }
 
@@ -128,7 +140,7 @@ export class InvitesService {
       data: { revokedAt: new Date() },
     });
     if (result.count === 0) throw notFound('Invite');
-    logEvent('invite.revoked', { workspaceId, inviteId });
+    logEvent(this.logger, 'invite.revoked', { workspaceId, inviteId });
   }
 
   /** Public: shows what the token is for, so the web app can route the visitor through login/register. */
@@ -177,7 +189,11 @@ export class InvitesService {
         data: { workspaceId: invite.workspaceId, userId, role: invite.role },
       });
     });
-    logEvent('invite.accepted', { workspaceId: invite.workspaceId, inviteId: invite.id, userId });
+    logEvent(this.logger, 'invite.accepted', {
+      workspaceId: invite.workspaceId,
+      inviteId: invite.id,
+      userId,
+    });
     return { workspaceId: invite.workspaceId, role: invite.role };
   }
 

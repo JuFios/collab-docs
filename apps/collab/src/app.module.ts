@@ -4,7 +4,7 @@ import {
   appConfigModule,
   HealthModule,
   MetricsModule,
-  PlatformLoggerModule,
+  platformLoggerModule,
   QueueModule,
   RedisModule,
 } from '@collab-docs/nest';
@@ -15,7 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     appConfigModule(),
     RequestPipelineModule,
-    PlatformLoggerModule,
+    platformLoggerModule(),
     RedisModule,
     MetricsModule,
     QueueModule,

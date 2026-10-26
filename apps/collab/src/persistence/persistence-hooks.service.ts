@@ -5,7 +5,8 @@ import {
   type AppConfig,
   QueueService,
   emitDocumentChanged,
-  getRootLogger,
+  InjectPinoLogger,
+  PinoLogger,
 } from '@collab-docs/nest';
 import type { PersistenceHooks } from '../rooms/postgres-document-store';
 
@@ -23,6 +24,7 @@ export class PersistenceHooksService implements PersistenceHooks {
     private readonly queues: QueueService,
     private readonly versions: DocumentVersions,
     private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(PersistenceHooksService.name) private readonly logger: PinoLogger,
   ) {}
 
   /** Work started by `contentPersisted`; shutdown waits for it so it does not run against closed connections. */
@@ -55,7 +57,7 @@ export class PersistenceHooksService implements PersistenceHooks {
       await this.versions.create({ documentId, kind: 'AUTO' });
     } catch (error) {
       this.lastAuto.delete(documentId);
-      getRootLogger().warn({ err: error, documentId }, 'automatic version failed');
+      this.logger.warn({ err: error, documentId }, 'automatic version failed');
     }
   }
 

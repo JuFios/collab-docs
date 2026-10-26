@@ -13,7 +13,7 @@ import {
   type ValidationIssue,
 } from '@collab-docs/shared';
 import { getCorrelationId } from './correlation';
-import { getRootLogger } from './logger';
+import { InjectPinoLogger, PinoLogger } from './logger';
 
 /** Throw this from application code to return a specific catalog code. */
 export class AppException extends HttpException {
@@ -158,6 +158,8 @@ export function toErrorResponse(exception: unknown, correlationId: string): ApiE
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  constructor(@InjectPinoLogger(AllExceptionsFilter.name) private readonly logger: PinoLogger) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     if (host.getType() !== 'http') throw exception;
     const response = host.switchToHttp().getResponse<Response>();
@@ -165,7 +167,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const body = toErrorResponse(exception, correlationId);
 
     if (body.statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      getRootLogger().error(
+      this.logger.error(
         { err: exception, statusCode: body.statusCode, code: body.code },
         'request failed',
       );

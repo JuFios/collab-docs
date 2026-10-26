@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import { Counter } from 'prom-client';
 import { PrismaClient } from '@collab-docs/db';
-import { MetricsService, REDIS_CLIENT, getRootLogger } from '@collab-docs/nest';
+import { MetricsService, REDIS_CLIENT, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
 import type { TreeRow } from './tree';
@@ -24,6 +24,7 @@ export class TreeCacheService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly realtime: RealtimeEventsService,
     metrics: MetricsService,
+    @InjectPinoLogger(TreeCacheService.name) private readonly logger: PinoLogger,
   ) {
     this.lookups = new Counter({
       name: 'tree_cache_lookups_total',
@@ -43,7 +44,7 @@ export class TreeCacheService {
         return JSON.parse(cached) as TreeRow[];
       }
     } catch (error) {
-      getRootLogger().warn({ err: error }, 'tree cache read failed');
+      this.logger.warn({ err: error }, 'tree cache read failed');
       this.lookups.inc({ result: 'error' });
       return this.load(workspaceId);
     }
@@ -53,7 +54,7 @@ export class TreeCacheService {
     // never read again
     await this.redis
       .set(this.entryKey(workspaceId, version), JSON.stringify(rows), 'EX', ENTRY_TTL_SECONDS)
-      .catch((error) => getRootLogger().warn({ err: error }, 'tree cache write failed'));
+      .catch((error) => this.logger.warn({ err: error }, 'tree cache write failed'));
     return rows;
   }
 
@@ -63,7 +64,7 @@ export class TreeCacheService {
       const version = await this.redis.incr(this.versionKey(workspaceId));
       await this.realtime.publishTreeChanged({ workspaceId, version });
     } catch (error) {
-      getRootLogger().warn({ err: error, workspaceId }, 'tree cache invalidation failed');
+      this.logger.warn({ err: error, workspaceId }, 'tree cache invalidation failed');
     }
   }
 

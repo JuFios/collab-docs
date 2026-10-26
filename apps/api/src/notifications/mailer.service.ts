@@ -1,7 +1,7 @@
 import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Transporter, createTransport } from 'nodemailer';
-import { type AppConfig, logEvent } from '@collab-docs/nest';
+import { type AppConfig, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 
 export interface MailMessage {
   to: string;
@@ -15,14 +15,17 @@ export interface MailMessage {
 export class MailerService implements OnApplicationShutdown {
   private transport?: Transporter;
 
-  constructor(private readonly config: ConfigService<AppConfig, true>) {}
+  constructor(
+    private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(MailerService.name) private readonly logger: PinoLogger,
+  ) {}
 
   async send(message: MailMessage): Promise<void> {
     await this.getTransport().sendMail({
       from: this.config.get('SMTP_FROM', { infer: true }),
       ...message,
     });
-    logEvent('mail.sent', { subject: message.subject });
+    logEvent(this.logger, 'mail.sent', { subject: message.subject });
   }
 
   onApplicationShutdown(): void {

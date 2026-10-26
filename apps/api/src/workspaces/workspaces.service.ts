@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@collab-docs/db';
 import type { PlanTier, WorkspaceRole } from '@collab-docs/shared';
-import { AppException, logEvent } from '@collab-docs/nest';
+import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { notFound } from '../permissions/permissions.service';
 import { type Usage, PlanLimitsService } from './plan-limits.service';
 import { generateSlug } from './slug';
@@ -27,6 +27,7 @@ export class WorkspacesService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly limits: PlanLimitsService,
+    @InjectPinoLogger(WorkspacesService.name) private readonly logger: PinoLogger,
   ) {}
 
   /** The creator becomes OWNER and the workspace starts on the FREE plan. */
@@ -46,7 +47,7 @@ export class WorkspacesService {
           });
           return created;
         });
-        logEvent('workspace.created', { workspaceId: workspace.id, userId });
+        logEvent(this.logger, 'workspace.created', { workspaceId: workspace.id, userId });
         return toResponse(workspace, 'OWNER');
       } catch (error) {
         const slugClash =

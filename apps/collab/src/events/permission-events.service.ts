@@ -2,7 +2,12 @@ import { Inject, Injectable, type OnApplicationShutdown, type OnModuleInit } fro
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
 import { COLLAB_CLOSE, PERM_EVENT_CHANNELS } from '@collab-docs/shared';
-import { REDIS_CLIENT, getRootLogger, runWithCorrelationId } from '@collab-docs/nest';
+import {
+  REDIS_CLIENT,
+  runWithCorrelationId,
+  InjectPinoLogger,
+  PinoLogger,
+} from '@collab-docs/nest';
 import { AccessReevaluator } from '../access/access-reevaluator.service';
 import { RoomManager } from '../rooms/room-manager';
 
@@ -30,13 +35,14 @@ export class PermissionEventsService implements OnModuleInit, OnApplicationShutd
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly reevaluator: AccessReevaluator,
     private readonly rooms: RoomManager,
+    @InjectPinoLogger(PermissionEventsService.name) private readonly logger: PinoLogger,
   ) {}
 
   async onModuleInit(): Promise<void> {
     const subscriber = this.redis.duplicate();
     this.subscriber = subscriber;
     subscriber.on('error', (error) =>
-      getRootLogger().warn({ err: error }, 'permission event subscriber error'),
+      this.logger.warn({ err: error }, 'permission event subscriber error'),
     );
     subscriber.on('message', (channel, raw) => void this.handle(channel, raw));
     await subscriber.subscribe(...Object.values(PERM_EVENT_CHANNELS));
@@ -51,7 +57,7 @@ export class PermissionEventsService implements OnModuleInit, OnApplicationShutd
 
   /** Public for tests: processes one message as if it had arrived from Redis. */
   async handle(channel: string, raw: string): Promise<void> {
-    const log = getRootLogger();
+    const log = this.logger;
     try {
       const payload: unknown = JSON.parse(raw);
       const correlationId =
