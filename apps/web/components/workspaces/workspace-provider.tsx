@@ -14,6 +14,8 @@ import {
 import { DOCUMENTS_KEY, trashKey, treeKey } from '@/lib/documents/keys';
 import type { StreamStatus } from '@/lib/realtime/event-stream';
 import type { WorkspaceEvent } from '@/lib/realtime/events';
+import { useNotificationEvents } from '@/lib/notifications/live';
+import { NOTIFICATIONS_KEY } from '@/lib/notifications/queries';
 import { useWorkspaceEvents } from '@/lib/realtime/use-workspace-events';
 
 type Listener = (event: WorkspaceEvent) => void;
@@ -63,12 +65,20 @@ export function WorkspaceProvider({
     void queryClient.invalidateQueries({ queryKey: DOCUMENTS_KEY });
   }, [queryClient, workspaceId]);
 
+  const onNotification = useNotificationEvents();
+
   const connection = useWorkspaceEvents(workspaceId, {
     onEvent: (event) => {
       if (event.type === 'tree.changed' && event.workspaceId === workspaceId) refetchTree();
+      // the stream carries this user's notifications from every workspace, not only this one's
+      onNotification(event);
       for (const listener of listeners.current) listener(event);
     },
-    onResync: refetchTree,
+    onResync: () => {
+      refetchTree();
+      // a notification may have arrived while the stream was down
+      void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+    },
   });
 
   const subscribe = useCallback((listener: Listener) => {

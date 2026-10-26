@@ -3,11 +3,13 @@ import {
   documentSchema,
   inviteListSchema,
   memberListSchema,
+  notificationPageSchema,
   recentDocumentListSchema,
   searchPageSchema,
   sharedDocumentListSchema,
   trashItemListSchema,
   treeNodeListSchema,
+  unreadCountSchema,
   usageSchema,
   workspaceListSchema,
   workspaceSchema,
@@ -44,6 +46,13 @@ export const getRecentDocuments = cache((id: string, limit: number) =>
 );
 export const getSharedDocuments = cache(() =>
   apiServer('/me/shared-documents', { schema: sharedDocumentListSchema }),
+);
+
+export const getNotifications = cache(() =>
+  apiServer('/notifications?limit=20', { schema: notificationPageSchema }),
+);
+export const getUnreadCount = cache(() =>
+  apiServer('/notifications/unread-count', { schema: unreadCountSchema }),
 );
 
 /** Page-level guard: a non-member (a guest with a share, or a stranger) gets the same 404 as an unknown id. */
