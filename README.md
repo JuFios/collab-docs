@@ -1068,6 +1068,53 @@ Streaming leaves a hidden copy of a boundary's content in the DOM until React re
 retrying. Specs therefore use role-based locators (hidden elements are excluded) for pages that sit behind
 `loading.tsx`, and `persisted(page, …)` in `documents.spec.ts` waits for the api call before a reload.
 
+### Public pages: why ISR + on-demand revalidation
+
+`/p/<slug>` is a page that many people may open and that changes rarely, so it is rendered once and served from
+Next's cache (incremental static regeneration) instead of on every visit. Three alternatives were weighed:
+
+| Option                             | Why not                                                                                                                                 |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Render on every request (SSR)      | Every reader hits the api and the database; a popular page costs as much as a busy editor.                                              |
+| Static export at publish time      | Needs a rebuild or a deploy per edit, which is what "the page follows the document" must avoid.                                         |
+| Time-based ISR only (`revalidate`) | A change shows up after up to an hour, and an unpublished page keeps being served until then.                                           |
+| **ISR + on-demand revalidation**   | The page is cached for an hour as a fallback; the api worker drops it within seconds of a change, a publish, an unpublish or an expiry. |
+
+How it fits together:
+
+- **Route.** `app/(public)/p/[slug]/page.tsx` is made of Server Components only and reads no `cookies()` or
+  `headers()`; either would turn the route dynamic and the cache would be gone. `revalidate = 3600` and an empty
+  `generateStaticParams` make every slug render on first visit and then be cached. The data comes from
+  `GET /public/documents/:slug` through the anonymous client `lib/api/public.ts`, with the cache tag `pub:<slug>`
+  (the slug is all the page knows before it has the document).
+- **Invalidation.** The api worker (`public-revalidate` queue, debounced for content and title, immediate for
+  publish, unpublish, expiry) calls `POST /internal/revalidate` with `x-revalidate-secret` and `{tags: ["pub:<slug>"]}`.
+  The handler compares the secret in constant time, validates the body with the schema from `@collab-docs/shared`
+  and calls `revalidateTag`. The reverse proxy does not forward `/internal/*`, so only the worker (which reaches the
+  web container directly) can call it. If a call fails the queue retries with backoff; after that the hour-long
+  fallback applies.
+- **A cached 404 does not stick.** Next caches `notFound()` too. The page asks for its data under the same tag
+  even when the answer is 404, so publishing a slug (or republishing an unpublished one) invalidates the cached
+  "not found" the same way.
+- **Safety.** The content that reaches the page is sanitised on the server, and the renderer builds React
+  elements from it: there is no `dangerouslySetInnerHTML`, unknown nodes are skipped, every link is checked again
+  and gets the forced `rel`. Images go through `/media/<id>?slug=`, which asks the api for a 5-minute signed URL and
+  redirects, so a visitor never needs an account or a storage address.
+- **Cost for the reader.** Client providers (TanStack Query, the toaster) live in the layouts of the route groups
+  that need them, not in the root layout, so the published page downloads React and Next and nothing else.
+  `pnpm --filter @collab-docs/web check:bundle` (a CI job) reads the build output and fails if `/p/[slug]` stops
+  being ISR-capable or if the editor, Yjs or the query client appear in its JavaScript.
+- **Edit links** (`/e/<token>`) are the opposite case: personal, never cached, not indexed, `Referrer-Policy:
+no-referrer`. The server shell checks the link and shows the expired, replaced or deleted state; the editor is the
+  one from the app, with a ticket issued for the link, and without images (the attachments api needs a signed-in
+  user).
+- **Publishing waits for the editor.** The Share dialog enables "Publish to web" only when the editor is online,
+  synced and has no change the server has not acknowledged (`persisted`); otherwise it says why. This is the
+  "publish with unsaved changes" edge case.
+
+`ISR_REVALIDATE_SECONDS` was removed: a route segment's `revalidate` has to be a literal, so the window cannot come
+from the environment. A unit test keeps the page and the data fetch on the same value.
+
 ## Decisions
 
 The server side follows the NestJS documentation wherever it fits, and the places where it does not are

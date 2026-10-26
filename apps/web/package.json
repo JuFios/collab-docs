@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "check:bundle": "node scripts/check-public-bundle.mjs",
     "start": "node .next/standalone/apps/web/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

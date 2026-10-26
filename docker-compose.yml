@@ -191,6 +191,8 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
       # verifies the access cookie in the edge middleware (read at request time, not baked into the build)
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-jwt-access-secret-change-me}
+      # authorises the worker's POST /internal/revalidate (read at request time)
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-dev-only-revalidate-secret-change-me}
       # test hook: delays every dashboard block so the streaming test can see skeletons first (0 = off, ignored in staging)
       DASHBOARD_BLOCK_DELAY_MS: ${DASHBOARD_BLOCK_DELAY_MS:-0}
     # not published: browsers reach it through `proxy`, which owns X-Forwarded-For

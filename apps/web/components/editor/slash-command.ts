@@ -6,7 +6,7 @@ import { SlashMenu, type SlashMenuHandle, type SlashMenuProps } from './slash-me
 import { type SlashItem, filterSlashItems } from './slash-items';
 
 export interface SlashCommandOptions {
-  pickImage: () => void;
+  pickImage?: () => void;
 }
 
 const slashKey = new PluginKey('slashCommand');
@@ -25,7 +25,7 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
   name: 'slashCommand',
 
   addOptions() {
-    return { pickImage: () => undefined };
+    return { pickImage: undefined };
   },
 
   addProseMirrorPlugins() {
@@ -35,8 +35,9 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
         editor: this.editor,
         pluginKey: slashKey,
         char: '/',
-        items: ({ query }) => filterSlashItems(query),
-        command: ({ editor, range, props }) => props.run({ editor, range, pickImage }),
+        items: ({ query }) => filterSlashItems(query, { images: pickImage !== undefined }),
+        command: ({ editor, range, props }) =>
+          props.run({ editor, range, pickImage: pickImage ?? (() => undefined) }),
         render: () => {
           let renderer: ReactRenderer<SlashMenuHandle, SlashMenuProps> | null = null;
           return {

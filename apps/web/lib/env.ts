@@ -13,3 +13,10 @@ export function jwtAccessSecret(): string {
   if (!secret) throw new Error('JWT_ACCESS_SECRET is not set');
   return secret;
 }
+
+/** Shared with the api worker, which sends it in `x-revalidate-secret` when it asks for a page to be rebuilt. */
+export function revalidateSecret(): string {
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!secret) throw new Error('REVALIDATE_SECRET is not set');
+  return secret;
+}

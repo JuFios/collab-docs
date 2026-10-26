@@ -72,10 +72,11 @@ export const SLASH_ITEMS: readonly SlashItem[] = [
   },
 ];
 
-export function filterSlashItems(query: string): SlashItem[] {
+export function filterSlashItems(query: string, { images = true } = {}): SlashItem[] {
   const needle = query.trim().toLowerCase();
-  if (!needle) return [...SLASH_ITEMS];
-  return SLASH_ITEMS.filter(
+  const available = images ? SLASH_ITEMS : SLASH_ITEMS.filter((item) => item.id !== 'image');
+  if (!needle) return [...available];
+  return available.filter(
     (item) =>
       item.title.toLowerCase().includes(needle) ||
       item.keywords.some((keyword) => keyword.includes(needle)),

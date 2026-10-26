@@ -25,15 +25,19 @@ export function DocumentEditor({
   provider,
   synced,
   editable,
+  images = true,
 }: {
   documentId: string;
   ydoc: Y.Doc;
   provider: WebsocketProvider;
   synced: boolean;
   editable: boolean;
+  /** False for guests with an edit link: the attachments api needs a signed-in user. */
+  images?: boolean;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const pickImage = useCallback(() => fileInput.current?.click(), []);
+  const pickImageClick = useCallback(() => fileInput.current?.click(), []);
+  const pickImage = images ? pickImageClick : undefined;
   const uploadRef = useRef<(files: readonly File[], position?: number) => void>(() => undefined);
   // the content is shown from the first sync on; a later disconnect keeps the editor (and the caret) in place
   const [ready, setReady] = useState(false);
@@ -61,7 +65,7 @@ export function DocumentEditor({
         },
         handleDrop: (view, event) => {
           const files = imageFiles(event.dataTransfer);
-          if (files.length === 0 || !view.editable) return false;
+          if (files.length === 0 || !view.editable || !images) return false;
           event.preventDefault();
           const target = view.posAtCoords({ left: event.clientX, top: event.clientY });
           uploadRef.current(files, target?.pos);
@@ -70,7 +74,12 @@ export function DocumentEditor({
         handlePaste: (view, event) => {
           const files = imageFiles(event.clipboardData);
           // a copied table or page also carries a picture; only a bare image is an upload
-          if (files.length === 0 || !view.editable || event.clipboardData?.getData('text/plain')) {
+          if (
+            files.length === 0 ||
+            !view.editable ||
+            !images ||
+            event.clipboardData?.getData('text/plain')
+          ) {
             return false;
           }
           event.preventDefault();
@@ -107,18 +116,20 @@ export function DocumentEditor({
         </div>
       )}
       <EditorContent editor={editor} className={ready ? undefined : 'hidden'} />
-      <input
-        ref={fileInput}
-        type="file"
-        hidden
-        multiple
-        accept={ATTACHMENT_MIME_TYPES.join(',')}
-        aria-label="Upload an image"
-        onChange={(event) => {
-          upload([...(event.target.files ?? [])]);
-          event.target.value = '';
-        }}
-      />
+      {images ? (
+        <input
+          ref={fileInput}
+          type="file"
+          hidden
+          multiple
+          accept={ATTACHMENT_MIME_TYPES.join(',')}
+          aria-label="Upload an image"
+          onChange={(event) => {
+            upload([...(event.target.files ?? [])]);
+            event.target.value = '';
+          }}
+        />
+      ) : null}
     </div>
   );
 }
