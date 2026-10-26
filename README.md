@@ -497,9 +497,10 @@ exchange Yjs updates with the room over a WebSocket, and nothing else writes con
 close codes and the `persisted` / `access` / `deleted` room events are specified in
 [docs/collab-protocol.md](docs/collab-protocol.md).
 
-- **Transport.** A custom adapter (`ws/collab-ws.adapter.ts`) lets the Nest gateway take binary frames on
-  `/ws/<documentId>`; Nest's stock `WsAdapter` matches exact paths and expects JSON messages, neither of which
-  fits the `y-websocket` protocol. The server is a plain `ws` + `y-protocols` implementation, the client is
+- **Transport.** `ws/collab-ws.adapter.ts` extends Nest's stock `WsAdapter` (`@nestjs/platform-ws`) in two
+  places so the gateway can take binary frames on `/ws/<documentId>`: upgrades are routed by path prefix
+  (the stock adapter matches the exact path) and message handlers are not bound (the stock adapter expects JSON
+  messages, the `y-websocket` protocol is binary). The server is `ws` + `y-protocols`, the client is
   `y-websocket`.
 - **Authentication and permissions.** The api issues a 60 s ticket (`POST /documents/:id/collab-ticket`, at
   least `VIEW`, limited per user); collab verifies it and reads the document permissions **from the database**
