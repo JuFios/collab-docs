@@ -4,6 +4,7 @@ import {
   inviteListSchema,
   memberListSchema,
   recentDocumentListSchema,
+  searchPageSchema,
   sharedDocumentListSchema,
   trashItemListSchema,
   treeNodeListSchema,
@@ -64,3 +65,11 @@ export const getTrash = cache((id: string) =>
 export const getDocument = cache((id: string) =>
   apiServer(`/documents/${segment(id)}`, { schema: documentSchema }),
 );
+
+export const searchDocuments = cache((id: string, q: string, cursor?: string) => {
+  const params = new URLSearchParams({ q });
+  if (cursor) params.set('cursor', cursor);
+  return apiServer(`/workspaces/${segment(id)}/search?${params.toString()}`, {
+    schema: searchPageSchema,
+  });
+});
