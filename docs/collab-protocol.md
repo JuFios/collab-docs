@@ -87,8 +87,11 @@ database call on this path. A connection sending more than `COLLAB_MAX_MESSAGES_
 | 4410 | The document was deleted                                           | `provider.disconnect()`; offer restore  |
 | 4429 | Too many messages, or the document is at its connection limit      | Back off before reconnecting            |
 
-`y-websocket` reconnects forever on any close, so the client must call `provider.disconnect()` on 4403, 4404 and
-4410 (`COLLAB_FINAL_CLOSE_CODES` in `@collab-docs/shared`).
+`y-websocket` 3.x treats close codes 4400-4499 as final: it stops reconnecting and emits `closed`, and a later
+`provider.connect()` resumes. Older versions reconnect forever on any close. The client therefore calls
+`provider.disconnect()` on 4403, 4404 and 4410 (`COLLAB_FINAL_CLOSE_CODES` in `@collab-docs/shared`), which is
+correct for either behaviour, and calls `connect()` itself after 4401 (with a new ticket) and 4429 (after a
+pause). Every other code, 1006 included, is retried by the provider with its own backoff.
 
 ## Permission changes while connected
 
