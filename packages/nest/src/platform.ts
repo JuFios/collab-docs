@@ -27,11 +27,16 @@ export class PlatformModule {
         MetricsModule,
         QueueModule,
         HealthModule,
-        ThrottlerModule.forRootAsync({
-          inject: [ConfigService, REDIS_CLIENT],
-          useFactory: (config: ConfigService<AppConfig, true>, redis: Redis) =>
-            throttlerOptions(config, redis),
-        }),
+        // global: the route-level `UserThrottlerGuard` of `@RateLimit.user(...)` needs the options and storage
+        // in whichever module hosts the controller
+        {
+          ...ThrottlerModule.forRootAsync({
+            inject: [ConfigService, REDIS_CLIENT],
+            useFactory: (config: ConfigService<AppConfig, true>, redis: Redis) =>
+              throttlerOptions(config, redis),
+          }),
+          global: true,
+        },
       ],
       providers: [{ provide: APP_GUARD, useClass: ClientIpThrottlerGuard }],
     };
