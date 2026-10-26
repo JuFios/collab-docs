@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Prisma, PrismaClient } from '@collab-docs/db';
-import { type AuthSession, type AuthUser, signAccessToken } from '@collab-docs/shared';
-import { AppException, type AppConfig, logEvent } from '@collab-docs/nest';
+import type { AuthSession, AuthUser } from '@collab-docs/shared';
+import { AppException, logEvent } from '@collab-docs/nest';
+import { AccessTokenService } from './access-token.service';
 import type { LoginDto, RegisterDto } from './auth.dto';
 import { PasswordService } from './password.service';
 import { RefreshTokenService } from './refresh-token.service';
@@ -26,7 +26,7 @@ const INVALID_CREDENTIALS = 'Invalid email or password';
 export class AuthService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly config: ConfigService<AppConfig, true>,
+    private readonly accessTokens: AccessTokenService,
     private readonly passwords: PasswordService,
     private readonly refreshTokens: RefreshTokenService,
   ) {}
@@ -89,10 +89,7 @@ export class AuthService {
   }
 
   private async session(user: { id: string; email: string; name: string }): Promise<AuthSession> {
-    const { token, expiresIn } = await signAccessToken(
-      this.config.get('JWT_ACCESS_SECRET', { infer: true }),
-      user.id,
-    );
+    const { token, expiresIn } = await this.accessTokens.sign(user.id);
     return { user: toAuthUser(user), accessToken: token, expiresIn };
   }
 }
