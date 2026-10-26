@@ -166,14 +166,20 @@ describe('CommentsPanel', () => {
     threads = [];
     const user = userEvent.setup();
     const onComposeEnd = vi.fn();
+    let answer: () => void = () => undefined;
     request.mockImplementation((path: string, init?: { method?: string; body?: unknown }) => {
       if (init?.method === 'POST' && path === '/documents/doc-1/threads') {
-        return new Promise((resolve) =>
-          setTimeout(() => {
-            threads = [thread('real', 'b9')];
+        // the api answers only when the test lets it
+        return new Promise((resolve) => {
+          answer = () => {
+            threads = [
+              thread('real', 'b9', {
+                comments: [{ ...thread('x', 'b9').comments[0]!, body: 'Looks off' }],
+              }),
+            ];
             resolve({ thread: threads[0], warnings: [] });
-          }, 30),
-        );
+          };
+        });
       }
       if (path.startsWith('/documents/doc-1/threads')) return Promise.resolve(threads);
       return Promise.resolve([]);
@@ -183,13 +189,16 @@ describe('CommentsPanel', () => {
     expect(field).toHaveFocus();
     await user.type(field, 'Looks off');
     await user.click(screen.getByRole('button', { name: 'Comment' }));
-    // optimistic: the thread is there before the request is answered
+    // optimistic: the thread is there while the request is still open
     expect(await screen.findByText('Looks off')).toBeInTheDocument();
+    expect(onComposeEnd).not.toHaveBeenCalled();
     expect(request).toHaveBeenCalledWith(
       '/documents/doc-1/threads',
       expect.objectContaining({ method: 'POST', body: { blockId: 'b9', body: 'Looks off' } }),
     );
+    answer();
     await waitFor(() => expect(onComposeEnd).toHaveBeenCalled());
+    expect(await screen.findByText('Looks off')).toBeInTheDocument();
   });
 
   it('rolls an optimistic reply back when the api refuses it', async () => {
