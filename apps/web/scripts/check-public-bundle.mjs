@@ -77,9 +77,9 @@ if (!prerender.dynamicRoutes['/p/[slug]']) {
 }
 
 if (failures.length > 0) {
-  console.error(failures.map((failure) => `✗ ${failure}`).join('\n'));
+  process.stderr.write(`${failures.map((failure) => `✗ ${failure}`).join('\n')}\n`);
   process.exit(1);
 }
-console.log(
-  `✓ /p/[slug] is ISR-capable and ships ${(page.bytes / 1024).toFixed(0)} kB of gzipped JavaScript, without ${Object.keys(MARKERS).join(', ')}`,
+process.stdout.write(
+  `✓ /p/[slug] is ISR-capable and ships ${(page.bytes / 1024).toFixed(0)} kB of gzipped JavaScript, without ${Object.keys(MARKERS).join(', ')}\n`,
 );

@@ -68,7 +68,6 @@ export const envSchema = z.object({
   AUTO_VERSION_INTERVAL_MS: positiveInt.default(10 * 60 * 1000),
   REVALIDATE_DEBOUNCE_MS: positiveInt.default(3000),
   SEARCH_DEBOUNCE_MS: positiveInt.default(5000),
-  ISR_REVALIDATE_SECONDS: positiveInt.default(3600),
 
   // Rate limits and collab limits
   RATE_GLOBAL_PER_MIN_IP: positiveInt.default(600),
