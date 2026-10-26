@@ -171,6 +171,11 @@ describe('documents', () => {
         .post(`/workspaces/${team.workspaceId}/documents`)
         .send({ title: 'ok', parentId: 'not-a-uuid' })
         .expect(400);
+      // a missing parent means the root; null is not a way to say it
+      await as(team.editor)
+        .post(`/workspaces/${team.workspaceId}/documents`)
+        .send({ title: 'ok', parentId: null })
+        .expect(400);
       const doc = await createDoc(team.editor, team.workspaceId);
       await as(team.editor).patch(`/documents/${doc.id}`).send({}).expect(400);
       await as(team.editor)
@@ -755,6 +760,15 @@ describe('documents', () => {
       await as(team.editor)
         .post(`/documents/${id('d')}/move`)
         .send({ parentId: null, afterId: id('d') })
+        .expect(400);
+      // neighbours are left out, not null
+      await as(team.editor)
+        .post(`/documents/${id('d')}/move`)
+        .send({ parentId: null, beforeId: null })
+        .expect(400);
+      await as(team.editor)
+        .post(`/documents/${id('d')}/move`)
+        .send({ parentId: null, afterId: null })
         .expect(400);
     });
 

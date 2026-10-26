@@ -1,3 +1,4 @@
+import { applyDecorators } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -22,10 +23,16 @@ const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? val
 const normaliseEmail = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
 
+/** An optional uuid: it may be left out, but `null` is refused (the shared zod schemas say the same). */
+const IsUuidIfPresent = () =>
+  applyDecorators(
+    ValidateIf((_, value) => value !== undefined),
+    IsUUID(),
+  );
+
 export class CreateDocumentDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Omit to create at the workspace root' })
-  @IsOptional()
-  @IsUUID()
+  @IsUuidIfPresent()
   parentId?: string;
 
   @ApiProperty({ maxLength: 200, example: 'Meeting notes' })
@@ -69,16 +76,14 @@ export class MoveDocumentDto {
     format: 'uuid',
     description: 'Place the document right before this sibling',
   })
-  @IsOptional()
-  @IsUUID()
+  @IsUuidIfPresent()
   beforeId?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',
     description: 'Place the document right after this sibling',
   })
-  @IsOptional()
-  @IsUUID()
+  @IsUuidIfPresent()
   afterId?: string;
 }
 

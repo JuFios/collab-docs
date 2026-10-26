@@ -67,8 +67,6 @@ interface Pair {
   /** A valid payload; the cases below change one field of it. */
   base: Record<string, unknown>;
   cases: Array<[label: string, change: Record<string, unknown>]>;
-  /** Known differences: the DTO accepts what the schema refuses. Remove an entry when the two are aligned. */
-  divergences?: Array<[label: string, change: Record<string, unknown>]>;
 }
 
 const pairs: Pair[] = [
@@ -152,14 +150,13 @@ const pairs: Pair[] = [
       ['a title only', {}],
       ['a parent', { parentId: UUID }],
       ['a parent that is not a uuid', { parentId: 'nope' }],
+      ['a null parent', { parentId: null }],
       ['an empty title', { title: '' }],
       ['a title with spaces around it', { title: '  Notes  ' }],
       ['the longest title', { title: text(DOCUMENT_TITLE_MAX_LENGTH) }],
       ['a title one too long', { title: text(DOCUMENT_TITLE_MAX_LENGTH + 1) }],
       ['a missing title', { title: undefined }],
     ],
-    // `@IsOptional()` lets null through, `.optional()` does not; OpenAPI documents neither as nullable
-    divergences: [['a null parent', { parentId: null }]],
   },
   {
     name: 'move document',
@@ -174,8 +171,9 @@ const pairs: Pair[] = [
       ['a sibling before', { beforeId: UUID }],
       ['a sibling after', { afterId: UUID }],
       ['a sibling that is not a uuid', { beforeId: 'nope' }],
+      ['a null sibling before', { beforeId: null }],
+      ['a null sibling after', { afterId: null }],
     ],
-    divergences: [['a null sibling', { beforeId: null }]],
   },
   {
     name: 'create version',
@@ -215,19 +213,11 @@ const pairs: Pair[] = [
   },
 ];
 
-describe.each(pairs)('$name: DTO and schema', ({ dto, schema, base, cases, divergences = [] }) => {
+describe.each(pairs)('$name: DTO and schema', ({ dto, schema, base, cases }) => {
   it.each(cases)('agree on %s', async (_label, change) => {
     const payload = { ...base, ...change };
     const fromDto = await viaDto(dto, payload);
     const fromZod = viaZod(schema, payload);
     expect(fromDto).toEqual(fromZod);
   });
-
-  if (divergences.length > 0) {
-    it.each(divergences)('still differ on %s (known)', async (_label, change) => {
-      const payload = { ...base, ...change };
-      expect((await viaDto(dto, payload)).ok).toBe(true);
-      expect(viaZod(schema, payload).ok).toBe(false);
-    });
-  }
 });
