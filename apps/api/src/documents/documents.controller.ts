@@ -21,14 +21,15 @@ import {
 } from '@nestjs/swagger';
 import type { WorkspaceRole as Role } from '@collab-docs/shared';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
-import { CurrentUser, type RequestUser } from '../auth';
+import { CurrentUser } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
 import {
   CurrentDocumentAccess,
   CurrentWorkspaceRole,
   DocumentAccess,
   WorkspaceRole,
-  type DocumentAccessResult,
-} from '../permissions';
+} from '../permissions/permissions.decorators';
+import { type DocumentAccessResult } from '../permissions/permissions.service';
 import {
   CreateDocumentDto,
   DocumentResponse,

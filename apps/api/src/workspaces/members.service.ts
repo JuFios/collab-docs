@@ -7,7 +7,8 @@ import {
   checkRoleChange,
 } from '@collab-docs/shared';
 import { AppException, logEvent } from '@collab-docs/shared/nest';
-import { PermEventsService, notFound } from '../permissions';
+import { PermEventsService } from '../permissions/perm-events.service';
+import { notFound } from '../permissions/permissions.service';
 import { PlanLimitsService, type Tx } from './plan-limits.service';
 import type { MemberResponse } from './workspaces.dto';
 

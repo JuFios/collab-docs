@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { NotificationsModule } from '../notifications';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { InvitesController } from './invites.controller';
 import { InvitesService } from './invites.service';
 import { MembersController } from './members.controller';
@@ -7,9 +7,10 @@ import { MembersService } from './members.service';
 import { PlanLimitsService } from './plan-limits.service';
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, PermissionsModule],
   controllers: [WorkspacesController, MembersController, InvitesController],
   providers: [WorkspacesService, MembersService, InvitesService, PlanLimitsService],
   exports: [PlanLimitsService],

@@ -13,7 +13,8 @@ import {
 } from '@collab-docs/shared';
 import { currentConfig, getRootLogger } from '@collab-docs/shared/nest';
 import { createTestApp } from '../test/test-app';
-import { CurrentUser, Public, type RequestUser } from './index';
+import { CurrentUser, Public } from './auth.decorators';
+import type { RequestUser } from './auth.types';
 import { hashToken } from './refresh-token.service';
 
 const ORIGIN = 'http://localhost:3000';

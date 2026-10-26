@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@collab-docs/db';
 import { APP_CONFIG, type AppConfig, logEvent } from '@collab-docs/shared/nest';
-import { S3Storage } from '../storage';
+import { S3Storage } from '../storage/s3.service';
 
 const BATCH = 200;
 

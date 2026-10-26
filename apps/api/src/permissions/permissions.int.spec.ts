@@ -6,6 +6,7 @@ import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
 import { signAccessToken } from '@collab-docs/shared';
 import { createTestApp } from '../test/test-app';
+import { PermissionsModule } from './permissions.module';
 import { DocumentAccess } from './permissions.decorators';
 
 @Controller('test-docs')
@@ -58,7 +59,7 @@ describe('document access guard (database-backed)', () => {
   }
 
   beforeAll(async () => {
-    app = await createTestApp([DocsController]);
+    app = await createTestApp([DocsController], [PermissionsModule]);
     prisma = app.get(PrismaClient, { strict: false });
   });
 

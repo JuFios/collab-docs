@@ -18,11 +18,11 @@ import {
 import { AppException, QueueService, emitDocumentChanged } from '@collab-docs/shared/nest';
 import {
   type DocumentAccessResult,
-  PermEventsService,
   PermissionsService,
   notFound,
-} from '../permissions';
-import { PlanLimitsService, type Tx } from '../workspaces';
+} from '../permissions/permissions.service';
+import { PermEventsService } from '../permissions/perm-events.service';
+import { PlanLimitsService, type Tx } from '../workspaces/plan-limits.service';
 import type {
   CreateDocumentDto,
   DocumentResponse,

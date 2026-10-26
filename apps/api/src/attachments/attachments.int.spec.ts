@@ -5,7 +5,7 @@ import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
 import { PLAN_CATALOG } from '@collab-docs/shared';
 import { createTestApp } from '../test/test-app';
-import { S3Storage } from '../storage';
+import { S3Storage } from '../storage/s3.service';
 import { AttachmentSweeper } from './attachment-sweeper';
 
 const PASSWORD = 'correct-horse-battery';

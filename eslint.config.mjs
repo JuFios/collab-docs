@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
+import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -40,6 +41,16 @@ export default tseslint.config(
       '**/*.config.{js,mjs,ts}',
     ],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // a cycle between source files breaks Nest's module and provider resolution at start-up
+    files: ['apps/api/**/*.ts', 'apps/collab/**/*.ts', 'packages/**/*.ts'],
+    plugins: { import: importPlugin },
+    settings: {
+      'import/parsers': { '@typescript-eslint/parser': ['.ts'] },
+      'import/resolver': { typescript: { alwaysTryTypes: true } },
+    },
+    rules: { 'import/no-cycle': 'error' },
   },
   {
     files: ['**/*.spec.ts', '**/*.test.ts'],

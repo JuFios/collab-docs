@@ -1,21 +1,19 @@
 import { Module } from '@nestjs/common';
 import { PlatformModule } from '@collab-docs/shared/nest';
-import { AttachmentsModule } from './attachments';
-import { AuthModule } from './auth';
-import { CollabModule } from './collab';
-import { DocumentsModule } from './documents';
-import { PermissionsModule } from './permissions';
+import { AttachmentsModule } from './attachments/attachments.module';
+import { AuthModule } from './auth/auth.module';
+import { CollabModule } from './collab/collab.module';
+import { DocumentsModule } from './documents/documents.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { RealtimeEventsModule } from './realtime';
-import { VersionsModule } from './versions';
-import { WorkspacesModule } from './workspaces';
+import { RealtimeEventsModule } from './realtime/realtime.module';
+import { VersionsModule } from './versions/versions.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
   imports: [
     PlatformModule.forRoot(),
     PrismaModule,
     AuthModule,
-    PermissionsModule,
     WorkspacesModule,
     RealtimeEventsModule,
     DocumentsModule,

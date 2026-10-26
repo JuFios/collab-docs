@@ -9,8 +9,10 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { APP_CONFIG, type AppConfig, signCollabTicket } from '@collab-docs/shared/nest';
-import { CurrentUser, type RequestUser } from '../auth';
-import { CurrentDocumentAccess, DocumentAccess, type DocumentAccessResult } from '../permissions';
+import { CurrentUser } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
+import { CurrentDocumentAccess, DocumentAccess } from '../permissions/permissions.decorators';
+import { type DocumentAccessResult } from '../permissions/permissions.service';
 import { CollabTicketResponse } from './collab-ticket.dto';
 import { TicketThrottleGuard } from './ticket-throttle.guard';
 

@@ -4,7 +4,7 @@ import { Counter } from 'prom-client';
 import { PrismaClient } from '@collab-docs/db';
 import { MetricsService, REDIS_CLIENT, getRootLogger } from '@collab-docs/shared/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
-import { RealtimeEventsService } from '../realtime';
+import { RealtimeEventsService } from '../realtime/realtime-events.service';
 import type { TreeRow } from './tree';
 
 /** Safety net only: a version bump is what normally retires an entry. */

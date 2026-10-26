@@ -7,9 +7,10 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentUser, type RequestUser } from '../auth';
+import { CurrentUser } from '../auth/auth.decorators';
+import { type RequestUser } from '../auth/auth.types';
 import type { WorkspaceRole as Role } from '@collab-docs/shared';
-import { CurrentWorkspaceRole, WorkspaceRole } from '../permissions';
+import { CurrentWorkspaceRole, WorkspaceRole } from '../permissions/permissions.decorators';
 import type { Usage } from './plan-limits.service';
 import {
   CreateWorkspaceDto,
