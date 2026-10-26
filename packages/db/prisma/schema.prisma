@@ -67,6 +67,12 @@ enum DocumentVersionKind {
   @@map("document_version_kind")
 }
 
+enum NotificationType {
+  MENTION
+
+  @@map("notification_type")
+}
+
 enum PublicLinkMode {
   VIEW
   EDIT
@@ -91,6 +97,10 @@ model User {
   publicLinksCreated PublicLink[]
   versionsCreated    DocumentVersion[]
   attachments        Attachment[]
+  commentThreads     CommentThread[]
+  comments           Comment[]
+  commentMentions    CommentMention[]
+  notifications      Notification[]
 
   @@map("users")
 }
@@ -210,6 +220,7 @@ model Document {
   versions    DocumentVersion[]
   attachments Attachment[]
   search      DocumentSearch?
+  threads     CommentThread[]
 
   // partial in the migration: WHERE deleted_at IS NULL
   @@index([workspaceId, parentId, position], map: "documents_tree_idx")
@@ -352,4 +363,73 @@ model DocumentSearch {
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "document_search_title_trgm_idx")
   @@index([workspaceId])
   @@map("document_search")
+}
+
+// A conversation anchored to one block of a document (`block_id` is the id the editor gives the block, which is
+// not a foreign key: the block lives in the CRDT state, and a thread whose block is gone is shown as orphaned).
+model CommentThread {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  documentId String    @map("document_id") @db.Uuid
+  blockId    String    @map("block_id")
+  createdBy  String    @map("created_by") @db.Uuid
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(6)
+  resolvedBy String?   @map("resolved_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  comments Comment[]
+
+  @@index([documentId])
+  @@map("comment_threads")
+}
+
+// Plain text with `@[userId]` mention tokens; never rendered as HTML. Deleting a comment keeps the row (the
+// thread keeps its shape) and blanks the body.
+model Comment {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  threadId  String    @map("thread_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  body      String
+  editedAt  DateTime? @map("edited_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  thread   CommentThread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author   User             @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  mentions CommentMention[]
+
+  @@index([threadId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+model CommentMention {
+  commentId String @map("comment_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("comment_mentions")
+}
+
+// In-app notification of one user. `dedupe_key` makes creation idempotent: `comment:{commentId}:{userId}` for a
+// mention in a comment (and `doc:{documentId}:{userId}` for one in a document body).
+model Notification {
+  id        String           @id @default(uuid(7)) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  payload   Json
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+  dedupeKey String           @unique @map("dedupe_key")
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_user_id_list_idx")
+  @@map("notifications")
 }
