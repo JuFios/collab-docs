@@ -481,6 +481,36 @@ describe('collab gateway', () => {
       );
     });
 
+    it('names the guests in the order they arrive', async () => {
+      const { owner, editor, documentId } = await setup();
+      const link = await prisma.publicLink.create({
+        data: {
+          documentId,
+          mode: 'EDIT',
+          tokenHash: randomBytes(16).toString('hex'),
+          createdBy: owner.id,
+        },
+      });
+      const watcher = await connect(editor, documentId);
+      await waitFor(() => watcher.synced, 'sync');
+      const guests: Client[] = [];
+      for (let arrival = 1; arrival <= 2; arrival++) {
+        const ticket = await signCollabTicket(SECRET, { docId: documentId, linkId: link.id });
+        const guest = new Client(collab.wsUrl, documentId, ticket);
+        clients.push(guest);
+        guests.push(guest);
+        await waitFor(() => guest.synced, 'guest sync');
+        guest.provider.awareness.setLocalState({ user: { name: 'Mallory' } });
+      }
+      const namesSeen = () =>
+        [...watcher.provider.awareness.getStates().values()]
+          .map((state) => (state as { user?: { name?: string } }).user?.name)
+          .filter((name) => name?.startsWith('Guest'))
+          .sort();
+      await waitFor(() => namesSeen().length === 2, 'both guests to show up');
+      expect(namesSeen()).toEqual(['Guest 1', 'Guest 2']);
+    });
+
     it('refuses a guest ticket for a revoked link', async () => {
       const { owner, documentId } = await setup();
       const link = await prisma.publicLink.create({

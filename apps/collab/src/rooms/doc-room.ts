@@ -103,6 +103,7 @@ export class DocRoom {
   private readonly connections = new Map<string, ConnectionState>();
   /** Awareness client id → owner; `null` reserves the server's own id. */
   private readonly awarenessOwners = new Map<number, ConnectionState | null>();
+  private guestSequence = 0;
   private persistedStateVector: Uint8Array;
   private approximateBytes: number;
   private appliedChange = false;
@@ -128,6 +129,11 @@ export class DocRoom {
     this.doc.on('update', this.onDocUpdate);
     this.awareness.on('update', this.onAwarenessUpdate);
     this.unsubscribe = store.onPersisted(documentId, this.onPersisted);
+  }
+
+  /** Presence name of the next guest who joins with an edit link: `Guest 1`, `Guest 2`, … for as long as the room lives. */
+  nextGuestName(): string {
+    return `Guest ${++this.guestSequence}`;
   }
 
   get size(): number {
