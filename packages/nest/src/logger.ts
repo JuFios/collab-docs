@@ -1,12 +1,18 @@
 import { type DynamicModule } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectPinoLogger, Logger as PinoAppLogger, LoggerModule, PinoLogger } from 'nestjs-pino';
+import {
+  InjectPinoLogger,
+  Logger as PinoAppLogger,
+  LoggerModule,
+  PinoLogger,
+  getLoggerToken,
+} from 'nestjs-pino';
 import pino, { type DestinationStream, type Logger } from 'pino';
 import type { AppConfig } from './config';
 import { getCorrelationId } from './correlation';
 
 /** Re-exported so apps need no direct nestjs-pino dependency: `PinoAppLogger` is `app.useLogger()`'s target. */
-export { InjectPinoLogger, PinoAppLogger, PinoLogger };
+export { InjectPinoLogger, PinoAppLogger, PinoLogger, getLoggerToken };
 
 export const REDACT_PATHS = [
   'req.headers.authorization',

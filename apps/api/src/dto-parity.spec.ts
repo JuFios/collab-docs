@@ -1,0 +1,233 @@
+import type { Type } from '@nestjs/common';
+import { createValidationPipe } from '@collab-docs/nest';
+import {
+  ATTACHMENT_FILENAME_MAX_LENGTH,
+  DOCUMENT_TITLE_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  VERSION_LABEL_MAX_LENGTH,
+  WORKSPACE_NAME_MAX_LENGTH,
+  createDocumentInputSchema,
+  createVersionInputSchema,
+  createWorkspaceInputSchema,
+  inviteInputSchema,
+  loginInputSchema,
+  moveDocumentInputSchema,
+  presignAttachmentInputSchema,
+  registerInputSchema,
+  renameWorkspaceInputSchema,
+} from '@collab-docs/shared';
+import { LoginDto, RegisterDto } from './auth/auth.dto';
+import { PresignAttachmentDto } from './attachments/attachments.dto';
+import { CreateDocumentDto, MoveDocumentDto } from './documents/documents.dto';
+import { CreateVersionDto } from './versions/versions.dto';
+import {
+  CreateInviteDto,
+  CreateWorkspaceDto,
+  UpdateWorkspaceDto,
+} from './workspaces/workspaces.dto';
+
+/**
+ * The web client validates forms with the zod schemas of `@collab-docs/shared` and the api validates the same
+ * payloads with class-validator DTOs. Both have to give the same verdict (and the same normalised value), or a
+ * form would accept what the api refuses, or the other way round.
+ */
+
+const UUID = '0190b1c2-0000-7000-8000-0000000000aa';
+const pipe = createValidationPipe();
+
+/** What the tests use of a zod schema (api has no direct dependency on zod). */
+interface Schema {
+  safeParse(value: unknown): { success: boolean; data?: unknown };
+}
+
+type Verdict = { ok: true; value: unknown } | { ok: false };
+
+const plain = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+
+async function viaDto(metatype: Type, payload: unknown): Promise<Verdict> {
+  try {
+    return { ok: true, value: plain(await pipe.transform(payload, { type: 'body', metatype })) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function viaZod(schema: Schema, payload: unknown): Verdict {
+  const result = schema.safeParse(payload);
+  return result.success ? { ok: true, value: plain(result.data) } : { ok: false };
+}
+
+const text = (length: number, char = 'a') => char.repeat(length);
+
+interface Pair {
+  name: string;
+  dto: Type;
+  schema: Schema;
+  /** A valid payload; the cases below change one field of it. */
+  base: Record<string, unknown>;
+  cases: Array<[label: string, change: Record<string, unknown>]>;
+  /** Known differences: the DTO accepts what the schema refuses. Remove an entry when the two are aligned. */
+  divergences?: Array<[label: string, change: Record<string, unknown>]>;
+}
+
+const pairs: Pair[] = [
+  {
+    name: 'register',
+    dto: RegisterDto,
+    schema: registerInputSchema,
+    base: { email: 'ada@example.test', password: text(PASSWORD_MIN_LENGTH), name: 'Ada' },
+    cases: [
+      ['a valid payload', {}],
+      ['an address with capitals and spaces', { email: '  Ada@Example.TEST ' }],
+      ['an address without a domain', { email: 'ada' }],
+      ['an address over 254 characters', { email: `${text(250)}@e.test` }],
+      ['a password one short', { password: text(PASSWORD_MIN_LENGTH - 1) }],
+      ['a password at the maximum', { password: text(PASSWORD_MAX_LENGTH) }],
+      ['a password over the maximum', { password: text(PASSWORD_MAX_LENGTH + 1) }],
+      ['a password that is not text', { password: 1234567890 }],
+      ['a name with spaces around it', { name: '  Ada  ' }],
+      ['an empty name', { name: '' }],
+      ['a blank name', { name: '   ' }],
+      ['a name of 100 characters', { name: text(100) }],
+      ['a name of 101 characters', { name: text(101) }],
+      ['a missing name', { name: undefined }],
+    ],
+  },
+  {
+    name: 'login',
+    dto: LoginDto,
+    schema: loginInputSchema,
+    base: { email: 'ada@example.test', password: 'whatever' },
+    cases: [
+      ['a valid payload', {}],
+      ['an address with capitals and spaces', { email: ' ADA@example.test ' }],
+      ['an invalid address', { email: 'not an address' }],
+      ['an empty password', { password: '' }],
+      ['a password at the maximum', { password: text(PASSWORD_MAX_LENGTH) }],
+      ['a password over the maximum', { password: text(PASSWORD_MAX_LENGTH + 1) }],
+      ['a missing password', { password: undefined }],
+    ],
+  },
+  ...[
+    ['create workspace', CreateWorkspaceDto, createWorkspaceInputSchema] as const,
+    ['rename workspace', UpdateWorkspaceDto, renameWorkspaceInputSchema] as const,
+  ].map(([name, dto, schema]): Pair => ({
+    name,
+    dto,
+    schema,
+    base: { name: 'Acme' },
+    cases: [
+      ['a valid name', {}],
+      ['a name with spaces around it', { name: '  Acme  ' }],
+      ['an empty name', { name: '' }],
+      ['a blank name', { name: '   ' }],
+      ['the longest name', { name: text(WORKSPACE_NAME_MAX_LENGTH) }],
+      ['a name one too long', { name: text(WORKSPACE_NAME_MAX_LENGTH + 1) }],
+      ['a name that is not text', { name: 42 }],
+    ],
+  })),
+  {
+    name: 'invite',
+    dto: CreateInviteDto,
+    schema: inviteInputSchema,
+    base: { email: 'grace@example.test', role: 'EDITOR' },
+    cases: [
+      ['a valid invite', {}],
+      ['an address with capitals and spaces', { email: ' Grace@Example.test ' }],
+      ['an invalid address', { email: 'grace@' }],
+      ['an admin role', { role: 'ADMIN' }],
+      ['a viewer role', { role: 'VIEWER' }],
+      ['the owner role', { role: 'OWNER' }],
+      ['an unknown role', { role: 'ROOT' }],
+      ['a missing role', { role: undefined }],
+    ],
+  },
+  {
+    name: 'create document',
+    dto: CreateDocumentDto,
+    schema: createDocumentInputSchema,
+    base: { title: 'Notes' },
+    cases: [
+      ['a title only', {}],
+      ['a parent', { parentId: UUID }],
+      ['a parent that is not a uuid', { parentId: 'nope' }],
+      ['an empty title', { title: '' }],
+      ['a title with spaces around it', { title: '  Notes  ' }],
+      ['the longest title', { title: text(DOCUMENT_TITLE_MAX_LENGTH) }],
+      ['a title one too long', { title: text(DOCUMENT_TITLE_MAX_LENGTH + 1) }],
+      ['a missing title', { title: undefined }],
+    ],
+    // `@IsOptional()` lets null through, `.optional()` does not; OpenAPI documents neither as nullable
+    divergences: [['a null parent', { parentId: null }]],
+  },
+  {
+    name: 'move document',
+    dto: MoveDocumentDto,
+    schema: moveDocumentInputSchema,
+    base: { parentId: UUID },
+    cases: [
+      ['a parent', {}],
+      ['the root', { parentId: null }],
+      ['a missing parent', { parentId: undefined }],
+      ['a parent that is not a uuid', { parentId: 'nope' }],
+      ['a sibling before', { beforeId: UUID }],
+      ['a sibling after', { afterId: UUID }],
+      ['a sibling that is not a uuid', { beforeId: 'nope' }],
+    ],
+    divergences: [['a null sibling', { beforeId: null }]],
+  },
+  {
+    name: 'create version',
+    dto: CreateVersionDto,
+    schema: createVersionInputSchema,
+    base: {},
+    cases: [
+      ['no label', {}],
+      ['a label', { label: 'Before the review' }],
+      ['a label with spaces around it', { label: '  Before  ' }],
+      ['a blank label', { label: '   ' }],
+      ['the longest label', { label: text(VERSION_LABEL_MAX_LENGTH) }],
+      ['a label one too long', { label: text(VERSION_LABEL_MAX_LENGTH + 1) }],
+      ['a label that is not text', { label: 7 }],
+    ],
+  },
+  {
+    name: 'presign attachment',
+    dto: PresignAttachmentDto,
+    schema: presignAttachmentInputSchema,
+    base: { filename: 'photo.png', mime: 'image/png', size: 1024 },
+    cases: [
+      ['a valid upload', {}],
+      ['a file name with spaces around it', { filename: '  photo.png  ' }],
+      ['an empty file name', { filename: '' }],
+      ['the longest file name', { filename: text(ATTACHMENT_FILENAME_MAX_LENGTH) }],
+      ['a file name one too long', { filename: text(ATTACHMENT_FILENAME_MAX_LENGTH + 1) }],
+      ['a jpeg', { mime: 'image/jpeg', filename: 'photo.jpg' }],
+      ['an svg', { mime: 'image/svg+xml' }],
+      ['an unknown type', { mime: 'application/pdf' }],
+      ['one byte', { size: 1 }],
+      ['zero bytes', { size: 0 }],
+      ['a negative size', { size: -5 }],
+      ['a fractional size', { size: 1.5 }],
+      ['a size as text', { size: '1024' }],
+    ],
+  },
+];
+
+describe.each(pairs)('$name: DTO and schema', ({ dto, schema, base, cases, divergences = [] }) => {
+  it.each(cases)('agree on %s', async (_label, change) => {
+    const payload = { ...base, ...change };
+    const fromDto = await viaDto(dto, payload);
+    const fromZod = viaZod(schema, payload);
+    expect(fromDto).toEqual(fromZod);
+  });
+
+  if (divergences.length > 0) {
+    it.each(divergences)('still differ on %s (known)', async (_label, change) => {
+      const payload = { ...base, ...change };
+      expect((await viaDto(dto, payload)).ok).toBe(true);
+      expect(viaZod(schema, payload).ok).toBe(false);
+    });
+  }
+});
