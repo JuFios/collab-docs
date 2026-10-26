@@ -3,7 +3,9 @@ import { PlatformModule } from '@collab-docs/nest';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { CollabModule } from './collab/collab.module';
+import { CommentsModule } from './comments/comments.module';
 import { DocumentsModule } from './documents/documents.module';
+import { InboxModule } from './inbox/inbox.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
 import { RealtimeEventsModule } from './realtime/realtime.module';
@@ -24,6 +26,8 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     AttachmentsModule,
     PublishingModule,
     SearchModule,
+    InboxModule,
+    CommentsModule,
   ],
 })
 export class AppModule {}
