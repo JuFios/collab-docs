@@ -155,3 +155,9 @@ export const notificationPageSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 export type NotificationPage = z.infer<typeof notificationPageSchema>;
+
+export const unreadCountSchema = z.object({ count: z.number().int().min(0) });
+export type UnreadCount = z.infer<typeof unreadCountSchema>;
+
+export const markReadResultSchema = z.object({ updated: z.number().int().min(0) });
+export type MarkReadResult = z.infer<typeof markReadResultSchema>;
