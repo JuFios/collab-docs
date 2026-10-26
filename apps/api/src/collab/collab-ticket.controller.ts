@@ -1,4 +1,4 @@
-import { Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, HttpCode, Post, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -9,13 +9,12 @@ import {
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
-import { type AppConfig, signCollabTicket } from '@collab-docs/nest';
+import { type AppConfig, RateLimit, signCollabTicket } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { CurrentDocumentAccess, DocumentAccess } from '../permissions/permissions.decorators';
 import { type DocumentAccessResult } from '../permissions/permissions.service';
 import { CollabTicketResponse } from './collab-ticket.dto';
-import { TicketThrottleGuard } from './ticket-throttle.guard';
 
 @ApiTags('collab')
 @ApiBearerAuth()
@@ -27,7 +26,7 @@ export class CollabTicketController {
   @Post('documents/:id/collab-ticket')
   @HttpCode(200)
   @DocumentAccess('VIEW', { param: 'id' })
-  @UseGuards(TicketThrottleGuard)
+  @RateLimit.user('ticket')
   @ApiOperation({
     summary: 'Ticket for the collaboration WebSocket of a document',
     description:
