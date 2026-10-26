@@ -15,7 +15,7 @@ import {
   decideDocumentAccess,
   resolveDocumentAccess,
 } from '@collab-docs/shared';
-import { AppException, QueueService, emitDocumentChanged } from '@collab-docs/nest';
+import { AppException, QUEUE_NAMES, QueueService, emitDocumentChanged } from '@collab-docs/nest';
 import {
   type DocumentAccessResult,
   PermissionsService,
@@ -146,6 +146,12 @@ export class DocumentsService {
       return this.toResponse(document, access?.access ?? 'EDIT', document.parentId);
     });
     await this.treeCache.invalidate(workspaceId);
+    // a new document is searchable by its title before anyone has typed into it; it has no public page yet
+    await emitDocumentChanged(
+      this.queues,
+      { documentId: created.id, revision: created.revision, reason: 'title' },
+      [QUEUE_NAMES.searchSync],
+    );
     return created;
   }
 

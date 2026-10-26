@@ -58,6 +58,12 @@ const PRESETS = {
     ttl: seconds(3600),
     message: 'Too many public links created, try again later',
   },
+  search: {
+    scope: 'user',
+    limit: 'RATE_SEARCH_PER_MIN_USER',
+    ttl: seconds(60),
+    message: 'Too many searches, try again shortly',
+  },
 } as const satisfies Record<
   string,
   { scope: RateScope; limit: keyof AppConfig; ttl: number; message?: string }
@@ -160,7 +166,7 @@ export class UserThrottlerGuard extends ClientIpThrottlerGuard {
 
 /**
  * Per-route presets (limits come from env; see README). `login`, `register` and `guestTicket` count per client IP,
- * `ticket` and `publicLink` per signed-in user, which needs the route to be authenticated.
+ * `ticket`, `publicLink` and `search` per signed-in user, which needs the route to be authenticated.
  */
 export const RateLimit = {
   login: () => SetMetadata(RATE_LIMIT_PRESET, 'login' satisfies PresetOf<'ip'>),

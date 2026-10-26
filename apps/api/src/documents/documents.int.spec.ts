@@ -977,7 +977,10 @@ describe('documents', () => {
           (j) => j.data.documentId === doc.id,
         );
 
-      expect(await jobsFor(QUEUE_NAMES.searchSync)).toHaveLength(0);
+      // creating a document announces it to the search index, so that it can be found by its title before anyone
+      // edits it; there is no public page to revalidate yet
+      expect(await jobsFor(QUEUE_NAMES.searchSync)).toHaveLength(1);
+      expect(await jobsFor(QUEUE_NAMES.publicRevalidate)).toHaveLength(0);
       await as(team.owner).patch(`/documents/${doc.id}`).send({ title: 'one' }).expect(200);
       await as(team.owner).patch(`/documents/${doc.id}`).send({ title: 'two' }).expect(200);
       await as(team.owner).patch(`/documents/${doc.id}`).send({ icon: '📄' }).expect(200);
@@ -994,6 +997,11 @@ describe('documents', () => {
 
       // visibility and moves do not change derived data
       const quiet = await createDoc(team.owner, team.workspaceId);
+      const searchQueue = queues.getQueue(QUEUE_NAMES.searchSync);
+      for (const job of await searchQueue.getJobs(['delayed', 'waiting'])) {
+        if (job.data.documentId === quiet.id) await job.remove();
+      }
+      await searchQueue.removeDeduplicationKey(quiet.id);
       await as(team.owner)
         .patch(`/documents/${quiet.id}`)
         .send({ visibility: 'RESTRICTED' })

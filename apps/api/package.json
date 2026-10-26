@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.js --passWithNoTests",
     "test:integration": "jest --config jest.int.config.js",
+    "reindex": "node --env-file-if-exists=../../.env dist/scripts/reindex.js",
     "openapi:export": "nest build && node --env-file=../../.env.example dist/scripts/export-openapi.js"
   },
   "dependencies": {
