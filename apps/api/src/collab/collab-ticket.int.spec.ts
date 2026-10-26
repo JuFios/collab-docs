@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import { PrismaClient } from '@collab-docs/db';
-import { currentConfig, verifyCollabTicket } from '@collab-docs/nest';
+import { parseConfig, verifyCollabTicket } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 
 const PASSWORD = 'correct-horse-battery';
@@ -75,7 +75,7 @@ describe('collab ticket', () => {
       const response = await post(user, `/documents/${documentId}/collab-ticket`).expect(200);
       expect(response.body.wsUrl).toBe('ws://localhost:4001/ws');
       const claims = await verifyCollabTicket(
-        currentConfig().COLLAB_TICKET_SECRET,
+        parseConfig(process.env).COLLAB_TICKET_SECRET,
         response.body.ticket,
       );
       expect(claims).toMatchObject({ docId: documentId, sub: user.id });
@@ -104,7 +104,7 @@ describe('collab ticket', () => {
 
   it('limits tickets per user', async () => {
     const { owner, viewer, documentId } = await setup();
-    const limit = currentConfig().RATE_TICKET_PER_MIN_USER;
+    const limit = parseConfig(process.env).RATE_TICKET_PER_MIN_USER;
     for (let i = 0; i < limit; i += 1) {
       await post(owner, `/documents/${documentId}/collab-ticket`).expect(200);
     }

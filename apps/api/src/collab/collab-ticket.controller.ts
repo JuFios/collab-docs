@@ -1,4 +1,4 @@
-import { Controller, HttpCode, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -7,8 +7,9 @@ import {
   ApiTags,
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
-import { APP_CONFIG, type AppConfig, signCollabTicket } from '@collab-docs/nest';
+import { type AppConfig, signCollabTicket } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { CurrentDocumentAccess, DocumentAccess } from '../permissions/permissions.decorators';
@@ -21,7 +22,7 @@ import { TicketThrottleGuard } from './ticket-throttle.guard';
 @ApiCookieAuth('access-cookie')
 @Controller()
 export class CollabTicketController {
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   @Post('documents/:id/collab-ticket')
   @HttpCode(200)
@@ -41,11 +42,17 @@ export class CollabTicketController {
     @CurrentDocumentAccess() { document }: DocumentAccessResult,
     @Req() req: Request,
   ): Promise<CollabTicketResponse> {
-    const ticket = await signCollabTicket(this.config.COLLAB_TICKET_SECRET, {
-      docId: document.id,
-      sub: user.id,
-      correlationId: req.correlationId,
-    });
-    return { ticket, wsUrl: `${this.config.COLLAB_PUBLIC_URL.replace(/\/+$/, '')}/ws` };
+    const ticket = await signCollabTicket(
+      this.config.get('COLLAB_TICKET_SECRET', { infer: true }),
+      {
+        docId: document.id,
+        sub: user.id,
+        correlationId: req.correlationId,
+      },
+    );
+    return {
+      ticket,
+      wsUrl: `${this.config.get('COLLAB_PUBLIC_URL', { infer: true }).replace(/\/+$/, '')}/ws`,
+    };
   }
 }

@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@collab-docs/db';
-import { APP_CONFIG, type AppConfig, logEvent } from '@collab-docs/nest';
+import { type AppConfig, logEvent } from '@collab-docs/nest';
 import { S3Storage } from '../storage/s3.service';
 
 const BATCH = 200;
@@ -11,12 +12,14 @@ export class AttachmentSweeper {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly s3: S3Storage,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   /** Returns how many stale uploads were removed. */
   async sweep(now: Date = new Date()): Promise<number> {
-    const cutoff = new Date(now.getTime() - this.config.ATTACHMENT_PENDING_TTL_HOURS * 3_600_000);
+    const cutoff = new Date(
+      now.getTime() - this.config.get('ATTACHMENT_PENDING_TTL_HOURS', { infer: true }) * 3_600_000,
+    );
     let removed = 0;
     for (;;) {
       // Claiming the rows first is what keeps this safe against a completion that is running right now:

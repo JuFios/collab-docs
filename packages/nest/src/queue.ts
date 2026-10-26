@@ -1,8 +1,8 @@
-import { Global, Inject, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
+import { Global, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type Job, type JobsOptions, Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { Counter, Gauge } from 'prom-client';
-import { APP_CONFIG } from './app-config';
 import type { AppConfig } from './config';
 import { getCorrelationId, runWithCorrelationId } from './correlation';
 import { logEvent, getRootLogger } from './logger';
@@ -62,8 +62,8 @@ export class QueueService implements OnApplicationShutdown {
   private readonly processed: Counter<'queue' | 'result'>;
   readonly enqueueFailures: Counter<'queue'>;
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig, metrics: MetricsService) {
-    this.connection = createRedis(config.REDIS_URL, { forQueues: true });
+  constructor(config: ConfigService<AppConfig, true>, metrics: MetricsService) {
+    this.connection = createRedis(config.get('REDIS_URL', { infer: true }), { forQueues: true });
     this.jobsGauge = new Gauge({
       name: 'queue_jobs',
       help: 'Jobs per queue and state',

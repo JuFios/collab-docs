@@ -1,7 +1,12 @@
+import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '@collab-docs/nest';
 import { PasswordService } from './password.service';
 
-const config = { ARGON2_MEMORY_KIB: 1024, ARGON2_TIME_COST: 1, ARGON2_PARALLELISM: 1 } as AppConfig;
+const config = new ConfigService<AppConfig, true>({
+  ARGON2_MEMORY_KIB: 1024,
+  ARGON2_TIME_COST: 1,
+  ARGON2_PARALLELISM: 1,
+});
 
 describe('PasswordService', () => {
   const service = new PasswordService(config);

@@ -1,19 +1,20 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { hash, verify } from '@node-rs/argon2';
-import { APP_CONFIG, type AppConfig } from '@collab-docs/nest';
+import { type AppConfig } from '@collab-docs/nest';
 
 /** argon2id hashing; the algorithm is the library default and every parameter is encoded in the hash itself. */
 @Injectable()
 export class PasswordService {
   private dummyHash?: Promise<string>;
 
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   hash(password: string): Promise<string> {
     return hash(password, {
-      memoryCost: this.config.ARGON2_MEMORY_KIB,
-      timeCost: this.config.ARGON2_TIME_COST,
-      parallelism: this.config.ARGON2_PARALLELISM,
+      memoryCost: this.config.get('ARGON2_MEMORY_KIB', { infer: true }),
+      timeCost: this.config.get('ARGON2_TIME_COST', { infer: true }),
+      parallelism: this.config.get('ARGON2_PARALLELISM', { infer: true }),
     });
   }
 

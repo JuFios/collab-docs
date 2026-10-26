@@ -108,7 +108,7 @@ automatically by `typecheck` and `test`).
   through `require(esm)`, which is why Node >= 22.12 is required.
 - Dependency injection is type-based: constructors name the class and Nest reads it from the decorator
   metadata emitted by `tsc` (build) and `@swc/jest` (tests, `apps/api/.swcrc`). `@Inject()` stays only for
-  `Symbol` tokens (`APP_CONFIG`, `REDIS_CLIENT`, `DOCUMENT_STORE`). A class used in a constructor must be a value
+  `Symbol` tokens (`REDIS_CLIENT`, `DOCUMENT_STORE`) and for the one property injection in the throttler guard. A class used in a constructor must be a value
   import, never `import type`; the `consistent-type-imports` rule is configured to respect that. Vitest
   (esbuild) emits no metadata, so tests of injectable classes belong in the Jest suites.
 - Jest runs through `@swc/jest`; `transformIgnorePatterns` lets `jose` be transformed to CommonJS.
@@ -176,8 +176,13 @@ applies the migrations and truncates tables between tests.
 Shared by `api`, its queue worker and (later) `collab`: it lives in `@collab-docs/nest`, and each
 app only plugs the modules in (`PlatformModule` for HTTP services, `WorkerPlatformModule` for the worker).
 
+- **Configuration**: `@nestjs/config` (`ConfigModule`, global) validates the process environment with the zod
+  schema in `@collab-docs/nest` before anything starts, so a missing or malformed variable stops the process
+  with the full list of problems (`APP_ENV=staging` additionally rejects development placeholders). Services
+  inject `ConfigService<AppConfig, true>` and read `config.get('NAME', { infer: true })`. Env files are loaded by
+  the runtime (`node --env-file`, Docker Compose), never by the app.
 - **Prefix**: routes live under `/api`; `/health`, `/ready`, `/metrics` and `/docs` are served without it.
-- **Validation**: a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`), `ParseUuidPipe`
+- **Validation**: a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`; registered as an `APP_PIPE` provider), `ParseUuidPipe`
   for ids, and base DTOs for pagination and id params. Request/response contracts are zod schemas in
   `@collab-docs/shared`; response DTO classes `implements` the inferred types, and integration tests parse
   real responses with the same schemas, so backend and frontend cannot drift apart silently.
@@ -193,7 +198,7 @@ app only plugs the modules in (`PlatformModule` for HTTP services, `WorkerPlatfo
 
 ### Error model
 
-Every error response has the same shape, produced by one global `AllExceptionsFilter`:
+Every error response has the same shape, produced by one global `AllExceptionsFilter` (an `APP_FILTER` provider):
 
 ```json
 {

@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   DocumentStateReader,
   DocumentStateWriter,
   DocumentVersions,
   PrismaClient,
 } from '@collab-docs/db';
-import { APP_CONFIG, type AppConfig, getRootLogger } from '@collab-docs/nest';
+import { type AppConfig, getRootLogger } from '@collab-docs/nest';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DOCUMENT_STORE } from '../rooms/document-store';
 import { type DocumentStorage, PostgresDocumentStore } from '../rooms/postgres-document-store';
@@ -31,14 +32,14 @@ import { PersistenceHooksService } from './persistence-hooks.service';
       inject: [
         PrismaClient,
         DocumentStateReader,
-        APP_CONFIG,
+        ConfigService,
         CollabMetrics,
         PersistenceHooksService,
       ],
       useFactory: (
         prisma: PrismaClient,
         reader: DocumentStateReader,
-        config: AppConfig,
+        config: ConfigService<AppConfig, true>,
         metrics: CollabMetrics,
         hooks: PersistenceHooksService,
       ) => {
@@ -51,10 +52,10 @@ import { PersistenceHooksService } from './persistence-hooks.service';
         return new PostgresDocumentStore(
           storage,
           {
-            flushIntervalMs: config.COLLAB_FLUSH_INTERVAL_MS,
-            flushMaxWaitMs: config.COLLAB_FLUSH_MAX_WAIT_MS,
-            compactMaxRows: config.COLLAB_COMPACT_MAX_ROWS,
-            compactMaxBytes: config.COLLAB_COMPACT_MAX_BYTES,
+            flushIntervalMs: config.get('COLLAB_FLUSH_INTERVAL_MS', { infer: true }),
+            flushMaxWaitMs: config.get('COLLAB_FLUSH_MAX_WAIT_MS', { infer: true }),
+            compactMaxRows: config.get('COLLAB_COMPACT_MAX_ROWS', { infer: true }),
+            compactMaxBytes: config.get('COLLAB_COMPACT_MAX_BYTES', { infer: true }),
           },
           metrics,
           hooks,

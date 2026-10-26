@@ -7,7 +7,6 @@ import {
   PaginationQueryDto,
   ParseUuidPipe,
   RateLimit,
-  currentConfig,
   getCorrelationId,
 } from '@collab-docs/nest';
 import { AppModule } from '../app.module';
@@ -74,7 +73,7 @@ export async function createTestApp(
     controllers: extra,
   }).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
-  configureApp(app, currentConfig());
+  configureApp(app);
   await app.init();
   return app;
 }

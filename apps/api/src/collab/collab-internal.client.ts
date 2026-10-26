@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
-  APP_CONFIG,
   AppException,
   type AppConfig,
   CORRELATION_HEADER,
@@ -15,7 +15,7 @@ const RESTORE_TIMEOUT_MS = 15_000;
 /** Calls the collab service's internal API (port 4002, inside the network only). */
 @Injectable()
 export class CollabInternalClient {
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   /**
    * Asks collab to write what it has buffered for the document. Never throws: when collab is down or slow the
@@ -65,15 +65,18 @@ export class CollabInternalClient {
 
   private post(path: string, body: object, timeoutMs: number): Promise<Response> {
     const correlationId = getCorrelationId();
-    return fetch(`${this.config.COLLAB_INTERNAL_URL.replace(/\/+$/, '')}/internal/${path}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${this.config.INTERNAL_API_TOKEN}`,
-        ...(correlationId ? { [CORRELATION_HEADER]: correlationId } : {}),
+    return fetch(
+      `${this.config.get('COLLAB_INTERNAL_URL', { infer: true }).replace(/\/+$/, '')}/internal/${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${this.config.get('INTERNAL_API_TOKEN', { infer: true })}`,
+          ...(correlationId ? { [CORRELATION_HEADER]: correlationId } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
       },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    );
   }
 }

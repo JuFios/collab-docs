@@ -1,5 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig } from '@collab-docs/nest';
+import { ConfigService } from '@nestjs/config';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { AllExceptionsFilter, type AppConfig, createValidationPipe } from '@collab-docs/nest';
 import { VersionRestoreService } from '../persistence/version-restore.service';
 import { DOCUMENT_STORE, type DocumentStore } from '../rooms/document-store';
 import { RoomManager } from '../rooms/room-manager';
@@ -7,7 +9,7 @@ import { InternalController } from './internal.controller';
 import { InternalTokenGuard } from './internal-token.guard';
 
 export interface InternalDeps {
-  config: AppConfig;
+  config: ConfigService<AppConfig, true>;
   rooms: RoomManager;
   store: DocumentStore;
   restore: VersionRestoreService;
@@ -22,7 +24,9 @@ export class InternalModule {
       controllers: [InternalController],
       providers: [
         InternalTokenGuard,
-        { provide: APP_CONFIG, useValue: shared.config },
+        { provide: ConfigService, useValue: shared.config },
+        { provide: APP_PIPE, useFactory: createValidationPipe },
+        { provide: APP_FILTER, useClass: AllExceptionsFilter },
         { provide: RoomManager, useValue: shared.rooms },
         { provide: DOCUMENT_STORE, useValue: shared.store },
         { provide: VersionRestoreService, useValue: shared.restore },

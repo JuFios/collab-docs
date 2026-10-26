@@ -14,14 +14,14 @@ import {
   stateVectorCovers,
   base64ToBytes,
 } from '@collab-docs/shared';
-import { QUEUE_NAMES, QueueService, REDIS_CLIENT, currentConfig } from '@collab-docs/nest';
+import { QUEUE_NAMES, QueueService, REDIS_CLIENT, parseConfig } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { DOCUMENT_STORE, type DocumentStore } from './rooms/document-store';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
 import { Client, makeTeam, settle, ticketFor, waitFor } from './test/collab-fixtures';
 
-const TOKEN = currentConfig().INTERNAL_API_TOKEN;
+const TOKEN = parseConfig(process.env).INTERNAL_API_TOKEN;
 
 describe('document persistence', () => {
   let collab: RunningCollab;

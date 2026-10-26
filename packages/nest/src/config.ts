@@ -121,16 +121,3 @@ export function parseConfig(env: Record<string, string | undefined>): AppConfig 
   }
   return config;
 }
-
-/** Entry point for service startup: prints a readable message and exits instead of a stack trace. */
-export function loadConfigOrExit(env: Record<string, string | undefined> = process.env): AppConfig {
-  try {
-    return parseConfig(env);
-  } catch (error) {
-    if (error instanceof ConfigError) {
-      process.stderr.write(`${error.message}\n`);
-      process.exit(1);
-    }
-    throw error;
-  }
-}

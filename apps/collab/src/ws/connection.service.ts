@@ -1,9 +1,9 @@
 import type { IncomingMessage } from 'node:http';
-import { Inject, Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { RawData, WebSocket } from 'ws';
 import { COLLAB_CLOSE } from '@collab-docs/shared';
 import {
-  APP_CONFIG,
   type AppConfig,
   getRootLogger,
   resolveCorrelationId,
@@ -39,7 +39,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
   private pingTimer: NodeJS.Timeout | null = null;
 
   constructor(
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
     private readonly access: AccessService,
     private readonly rooms: RoomManager,
     private readonly metrics: CollabMetrics,
@@ -120,7 +120,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     let ticketCorrelationId: string | undefined;
     try {
       const claims = await verifyCollabTicket(
-        this.config.COLLAB_TICKET_SECRET,
+        this.config.get('COLLAB_TICKET_SECRET', { infer: true }),
         url.searchParams.get('ticket') ?? '',
       );
       if (claims.docId !== documentId) return fail(COLLAB_CLOSE.ticketInvalid, 'ticket invalid');

@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Inject,
-  Post,
-  Query,
-  Req,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -21,9 +10,10 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { type AuthSession, REFRESH_COOKIE, sanitizeNextPath } from '@collab-docs/shared';
-import { APP_CONFIG, AppException, type AppConfig, RateLimit } from '@collab-docs/nest';
+import { AppException, type AppConfig, RateLimit } from '@collab-docs/nest';
 import { CurrentUser, Public } from './auth.decorators';
 import { AuthSessionResponse, AuthUserResponse, LoginDto, RegisterDto } from './auth.dto';
 import { type IssuedSession, AuthService } from './auth.service';
@@ -36,8 +26,12 @@ import { LoginThrottleGuard } from './login-throttle.guard';
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
+
+  private get cookieEnv(): Pick<AppConfig, 'APP_ENV'> {
+    return { APP_ENV: this.config.get('APP_ENV', { infer: true }) };
+  }
 
   @Public()
   @Post('register')
@@ -86,7 +80,7 @@ export class AuthController {
       return this.respond(res, await this.auth.refresh(presented));
     } catch (error) {
       if (error instanceof AppException && error.code === 'UNAUTHENTICATED') {
-        clearAuthCookies(res, this.config);
+        clearAuthCookies(res, this.cookieEnv);
       }
       throw error;
     }
@@ -123,7 +117,7 @@ export class AuthController {
       res.redirect(302, next);
     } catch (error) {
       if (!(error instanceof AppException) || error.code !== 'UNAUTHENTICATED') throw error;
-      clearAuthCookies(res, this.config);
+      clearAuthCookies(res, this.cookieEnv);
       res.redirect(302, `/login?next=${encodeURIComponent(next)}`);
     }
   }
@@ -136,7 +130,7 @@ export class AuthController {
   @ApiNoContentResponse()
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.auth.logout(readCookie(req, REFRESH_COOKIE));
-    clearAuthCookies(res, this.config);
+    clearAuthCookies(res, this.cookieEnv);
   }
 
   @Get('me')
@@ -149,8 +143,8 @@ export class AuthController {
   }
 
   private respond(res: Response, issued: IssuedSession): AuthSession {
-    setAccessCookie(res, this.config, issued.session.accessToken);
-    if (issued.refreshToken) setRefreshCookie(res, this.config, issued.refreshToken);
+    setAccessCookie(res, this.cookieEnv, issued.session.accessToken);
+    if (issued.refreshToken) setRefreshCookie(res, this.cookieEnv, issued.refreshToken);
     return issued.session;
   }
 }

@@ -1,6 +1,6 @@
 import { Global, Inject, Injectable, type OnApplicationShutdown, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
-import { APP_CONFIG } from './app-config';
 import type { AppConfig } from './config';
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
@@ -28,8 +28,9 @@ class RedisLifecycle implements OnApplicationShutdown {
   providers: [
     {
       provide: REDIS_CLIENT,
-      inject: [APP_CONFIG],
-      useFactory: (config: AppConfig) => createRedis(config.REDIS_URL),
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfig, true>) =>
+        createRedis(config.get('REDIS_URL', { infer: true })),
     },
     RedisLifecycle,
   ],
