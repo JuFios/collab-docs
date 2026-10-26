@@ -9,7 +9,6 @@ import {
   Patch,
   Post,
   Query,
-  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -20,10 +19,16 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { WorkspaceRole as Role } from '@collab-docs/shared';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
 import { CurrentUser, type RequestUser } from '../auth';
-import { DocumentAccess, WorkspaceRole, documentAccessOf, workspaceRoleOf } from '../permissions';
+import {
+  CurrentDocumentAccess,
+  CurrentWorkspaceRole,
+  DocumentAccess,
+  WorkspaceRole,
+  type DocumentAccessResult,
+} from '../permissions';
 import {
   CreateDocumentDto,
   DocumentResponse,
@@ -57,9 +62,9 @@ export class DocumentsController {
     @Param('workspaceId', ParseUuidPipe) workspaceId: string,
     @Body() dto: CreateDocumentDto,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
+    @CurrentWorkspaceRole() role: Role,
   ) {
-    return this.documents.create(user.id, workspaceId, workspaceRoleOf(req), dto);
+    return this.documents.create(user.id, workspaceId, role, dto);
   }
 
   @Get('workspaces/:workspaceId/documents/tree')
@@ -73,9 +78,9 @@ export class DocumentsController {
   tree(
     @Param('workspaceId', ParseUuidPipe) workspaceId: string,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
+    @CurrentWorkspaceRole() role: Role,
   ) {
-    return this.documents.tree(user.id, workspaceId, workspaceRoleOf(req));
+    return this.documents.tree(user.id, workspaceId, role);
   }
 
   @Get('workspaces/:workspaceId/documents/recent')
@@ -89,9 +94,9 @@ export class DocumentsController {
     @Param('workspaceId', ParseUuidPipe) workspaceId: string,
     @Query() query: RecentDocumentsQueryDto,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
+    @CurrentWorkspaceRole() role: Role,
   ) {
-    return this.documents.recent(user.id, workspaceId, workspaceRoleOf(req), query.limit);
+    return this.documents.recent(user.id, workspaceId, role, query.limit);
   }
 
   @Get('workspaces/:workspaceId/trash')
@@ -101,17 +106,17 @@ export class DocumentsController {
   trash(
     @Param('workspaceId', ParseUuidPipe) workspaceId: string,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
+    @CurrentWorkspaceRole() role: Role,
   ) {
-    return this.documents.trash(user.id, workspaceId, workspaceRoleOf(req));
+    return this.documents.trash(user.id, workspaceId, role);
   }
 
   @Get('documents/:id')
   @DocumentAccess('VIEW', { param: 'id' })
   @ApiOperation({ summary: 'Document metadata with the caller access level' })
   @ApiOkResponse({ type: DocumentResponse })
-  get(@CurrentUser() user: RequestUser, @Req() req: Request) {
-    return this.documents.get(user.id, documentAccessOf(req));
+  get(@CurrentUser() user: RequestUser, @CurrentDocumentAccess() access: DocumentAccessResult) {
+    return this.documents.get(user.id, access);
   }
 
   @Patch('documents/:id')
@@ -121,8 +126,12 @@ export class DocumentsController {
     description: 'Title and icon need EDIT; visibility needs MANAGE or EDIT as the author.',
   })
   @ApiOkResponse({ type: DocumentResponse })
-  update(@Body() dto: UpdateDocumentDto, @CurrentUser() user: RequestUser, @Req() req: Request) {
-    return this.documents.update(user.id, documentAccessOf(req), dto);
+  update(
+    @Body() dto: UpdateDocumentDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentDocumentAccess() access: DocumentAccessResult,
+  ) {
+    return this.documents.update(user.id, access, dto);
   }
 
   @Delete('documents/:id')
@@ -133,8 +142,11 @@ export class DocumentsController {
     description: 'Descendants are deleted too, whether or not the caller can see them.',
   })
   @ApiNoContentResponse()
-  remove(@CurrentUser() user: RequestUser, @Req() req: Request): Promise<void> {
-    return this.documents.remove(user.id, documentAccessOf(req));
+  remove(
+    @CurrentUser() user: RequestUser,
+    @CurrentDocumentAccess() access: DocumentAccessResult,
+  ): Promise<void> {
+    return this.documents.remove(user.id, access);
   }
 
   @Post('documents/:id/restore')

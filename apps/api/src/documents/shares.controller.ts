@@ -8,7 +8,6 @@ import {
   Param,
   Patch,
   Post,
-  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -19,10 +18,9 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { ParseUuidPipe } from '@collab-docs/shared/nest';
 import { CurrentUser, type RequestUser } from '../auth';
-import { DocumentAccess, documentAccessOf } from '../permissions';
+import { CurrentDocumentAccess, DocumentAccess, type DocumentAccessResult } from '../permissions';
 import {
   CreateShareDto,
   ShareResponse,
@@ -49,8 +47,8 @@ export class SharesController {
   @DocumentAccess('EDIT', { param: 'id' })
   @ApiOperation({ summary: 'Shares of a document (MANAGE, or EDIT as the author)' })
   @ApiOkResponse({ type: [ShareResponse] })
-  list(@CurrentUser() user: RequestUser, @Req() req: Request) {
-    return this.shares.list(user.id, documentAccessOf(req));
+  list(@CurrentUser() user: RequestUser, @CurrentDocumentAccess() access: DocumentAccessResult) {
+    return this.shares.list(user.id, access);
   }
 
   @Post('documents/:id/shares')
@@ -60,8 +58,12 @@ export class SharesController {
     description: 'Unknown email: 404. An existing share is updated. Shares are not inherited.',
   })
   @ApiCreatedResponse({ type: ShareResponse })
-  add(@Body() dto: CreateShareDto, @CurrentUser() user: RequestUser, @Req() req: Request) {
-    return this.shares.add(user.id, documentAccessOf(req), dto.email, dto.role);
+  add(
+    @Body() dto: CreateShareDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentDocumentAccess() access: DocumentAccessResult,
+  ) {
+    return this.shares.add(user.id, access, dto.email, dto.role);
   }
 
   @Patch('documents/:id/shares/:userId')
@@ -72,9 +74,9 @@ export class SharesController {
     @Param('userId', ParseUuidPipe) userId: string,
     @Body() dto: UpdateShareDto,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
+    @CurrentDocumentAccess() access: DocumentAccessResult,
   ) {
-    return this.shares.update(user.id, documentAccessOf(req), userId, dto.role);
+    return this.shares.update(user.id, access, userId, dto.role);
   }
 
   @Delete('documents/:id/shares/:userId')
@@ -85,8 +87,8 @@ export class SharesController {
   remove(
     @Param('userId', ParseUuidPipe) userId: string,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
+    @CurrentDocumentAccess() access: DocumentAccessResult,
   ): Promise<void> {
-    return this.shares.remove(user.id, documentAccessOf(req), userId);
+    return this.shares.remove(user.id, access, userId);
   }
 }

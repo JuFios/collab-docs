@@ -24,15 +24,7 @@ import {
 import { PermissionsService, notFound } from '../permissions';
 import { S3Storage } from '../storage';
 import { PlanLimitsService } from '../workspaces';
-
-interface AttachmentRow {
-  id: string;
-  documentId: string;
-  mime: string;
-  size: number;
-  status: 'PENDING' | 'READY';
-  createdAt: Date;
-}
+import type { AttachmentRow } from './attachment-access';
 
 const present = (row: AttachmentRow): Attachment => ({
   id: row.id,
@@ -45,8 +37,6 @@ const present = (row: AttachmentRow): Attachment => ({
 
 const unprocessable = (reason: string, message: string) =>
   new AppException('VALIDATION_FAILED', message, { status: 422, details: { reason } });
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const attachmentKey = (workspaceId: string, documentId: string): string =>
   `ws/${workspaceId}/doc/${documentId}/${randomUUID()}`;
@@ -130,12 +120,10 @@ export class AttachmentsService {
   }
 
   /**
-   * Needs EDIT on the attachment's document. Checks what is really in the bucket (size, type, magic number);
+   * The caller needs EDIT on the attachment's document (checked by `@AttachmentAccess`). Checks what is really in the bucket (size, type, magic number);
    * an object that does not match is deleted along with its row and the call fails with 422.
    */
-  async complete(attachmentId: string, userId: string): Promise<Attachment> {
-    const row = await this.find(attachmentId);
-    await this.permissions.assertDocumentAccess(userId, row.documentId, 'EDIT');
+  async complete(row: AttachmentRow): Promise<Attachment> {
     if (row.status === 'READY') return present(row);
 
     const info = await this.s3.head(row.key);
@@ -165,10 +153,8 @@ export class AttachmentsService {
     return present({ ...row, status: 'READY' });
   }
 
-  /** Needs VIEW on the document. Only completed uploads can be read. */
-  async url(attachmentId: string, userId: string): Promise<AttachmentUrl> {
-    const row = await this.find(attachmentId);
-    await this.permissions.assertDocumentAccess(userId, row.documentId, 'VIEW');
+  /** The caller needs VIEW on the document (checked by `@AttachmentAccess`). Only completed uploads can be read. */
+  async url(row: AttachmentRow): Promise<AttachmentUrl> {
     if (row.status !== 'READY') throw notFound('Attachment');
     const url = await this.s3.presignGet({
       key: row.key,
@@ -181,30 +167,7 @@ export class AttachmentsService {
     };
   }
 
-  private async find(attachmentId: string): Promise<AttachmentRow & { key: string }> {
-    const row = UUID.test(attachmentId)
-      ? await this.prisma.attachment.findUnique({
-          where: { id: attachmentId },
-          select: {
-            id: true,
-            documentId: true,
-            key: true,
-            mime: true,
-            size: true,
-            status: true,
-            createdAt: true,
-          },
-        })
-      : null;
-    if (!row) throw notFound('Attachment');
-    return row;
-  }
-
-  private async reject(
-    row: AttachmentRow & { key: string },
-    reason: string,
-    message: string,
-  ): Promise<never> {
+  private async reject(row: AttachmentRow, reason: string, message: string): Promise<never> {
     await this.s3.delete(row.key);
     await this.prisma.attachment.deleteMany({ where: { id: row.id, status: 'PENDING' } });
     logEvent('attachment.rejected', { attachmentId: row.id, reason });

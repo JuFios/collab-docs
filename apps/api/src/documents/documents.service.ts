@@ -33,6 +33,7 @@ import type {
   TreeNodeResponse,
   UpdateDocumentDto,
 } from './documents.dto';
+import { LIVE_DOCUMENT, LIVE_DOCUMENT_SQL } from '../prisma/live-document';
 import { positionBetween } from './position';
 import { TreeCacheService } from './tree-cache.service';
 import { buildTree } from './tree';
@@ -113,7 +114,7 @@ export class DocumentsService {
       await this.limits.assertCanAddDocument(tx, workspaceId);
 
       const last = await tx.document.findFirst({
-        where: { workspaceId, parentId: dto.parentId ?? null, deletedAt: null },
+        where: { workspaceId, parentId: dto.parentId ?? null, ...LIVE_DOCUMENT },
         orderBy: { position: 'desc' },
         select: { position: true },
       });
@@ -194,7 +195,7 @@ export class DocumentsService {
     const rows = await this.prisma.document.findMany({
       where: {
         workspaceId,
-        deletedAt: null,
+        ...LIVE_DOCUMENT,
         ...(managesAll
           ? {}
           : { OR: [{ visibility: 'WORKSPACE' }, { shares: { some: { userId } } }] }),
@@ -260,7 +261,7 @@ export class DocumentsService {
       if (touchesText) data.revision = { increment: 1 };
       // the access check ran before this transaction: a concurrent delete turns the update into a 404
       const { count } = await tx.document.updateMany({
-        where: { id: document.id, deletedAt: null },
+        where: { id: document.id, ...LIVE_DOCUMENT },
         data,
       });
       if (count === 0) throw notFound('Document');
@@ -364,7 +365,7 @@ export class DocumentsService {
     const siblings = (position?: Prisma.StringFilter, id?: string) => ({
       workspaceId,
       parentId: dto.parentId,
-      deletedAt: null,
+      ...LIVE_DOCUMENT,
       id: id ? id : { not: documentId },
       ...(position ? { position } : {}),
     });
@@ -407,9 +408,9 @@ export class DocumentsService {
       // the whole live subtree goes with the document, including descendants the caller cannot see
       const rows = await tx.$queryRaw<Array<{ id: string; revision: bigint }>>`
         WITH RECURSIVE subtree AS (
-          SELECT id FROM documents WHERE id = ${current.document.id}::uuid AND deleted_at IS NULL
+          SELECT id FROM documents WHERE id = ${current.document.id}::uuid AND ${LIVE_DOCUMENT_SQL}
           UNION ALL
-          SELECT d.id FROM documents d JOIN subtree s ON d.parent_id = s.id WHERE d.deleted_at IS NULL
+          SELECT d.id FROM documents d JOIN subtree s ON d.parent_id = s.id WHERE ${LIVE_DOCUMENT_SQL}
         )
         UPDATE documents
            SET deleted_at = now(), deleted_root_id = ${current.document.id}::uuid, revision = revision + 1

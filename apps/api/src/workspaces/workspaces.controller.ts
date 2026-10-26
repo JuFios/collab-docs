@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -7,9 +7,9 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { CurrentUser, type RequestUser } from '../auth';
-import { WorkspaceRole, workspaceRoleOf } from '../permissions';
+import type { WorkspaceRole as Role } from '@collab-docs/shared';
+import { CurrentWorkspaceRole, WorkspaceRole } from '../permissions';
 import type { Usage } from './plan-limits.service';
 import {
   CreateWorkspaceDto,
@@ -44,8 +44,8 @@ export class WorkspacesController {
   @WorkspaceRole('VIEWER')
   @ApiOperation({ summary: 'A workspace the caller belongs to (404 otherwise)' })
   @ApiOkResponse({ type: WorkspaceResponse })
-  get(@Param('workspaceId') workspaceId: string, @Req() req: Request) {
-    return this.workspaces.get(workspaceId, workspaceRoleOf(req));
+  get(@Param('workspaceId') workspaceId: string, @CurrentWorkspaceRole() role: Role) {
+    return this.workspaces.get(workspaceId, role);
   }
 
   @Patch(':workspaceId')
@@ -55,9 +55,9 @@ export class WorkspacesController {
   rename(
     @Param('workspaceId') workspaceId: string,
     @Body() dto: UpdateWorkspaceDto,
-    @Req() req: Request,
+    @CurrentWorkspaceRole() role: Role,
   ) {
-    return this.workspaces.rename(workspaceId, workspaceRoleOf(req), dto.name);
+    return this.workspaces.rename(workspaceId, role, dto.name);
   }
 
   @Get(':workspaceId/usage')

@@ -8,6 +8,7 @@ import {
   storageFits,
 } from '@collab-docs/shared';
 import { AppException } from '@collab-docs/shared/nest';
+import { LIVE_DOCUMENT } from '../prisma/live-document';
 
 export type Tx = Prisma.TransactionClient;
 
@@ -88,7 +89,7 @@ export class PlanLimitsService {
     const plan = await this.planOf(tx, workspaceId);
     const limit = limitFor(plan, 'documents');
     if (limit === null) return;
-    const current = await tx.document.count({ where: { workspaceId, deletedAt: null } });
+    const current = await tx.document.count({ where: { workspaceId, ...LIVE_DOCUMENT } });
     if (current + count > limit) throw this.exceeded('documents', limit, current, plan);
   }
 
@@ -127,7 +128,7 @@ export class PlanLimitsService {
     const plan = await this.planOf(this.prisma, workspaceId);
     const [slots, documents, storageBytes] = await Promise.all([
       this.countMemberSlots(this.prisma, workspaceId),
-      this.prisma.document.count({ where: { workspaceId, deletedAt: null } }),
+      this.prisma.document.count({ where: { workspaceId, ...LIVE_DOCUMENT } }),
       this.storageBytes(this.prisma, workspaceId),
     ]);
     return {

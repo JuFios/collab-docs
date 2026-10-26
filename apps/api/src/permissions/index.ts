@@ -7,8 +7,8 @@ export {
 } from './permissions.service';
 export { PermEventsService } from './perm-events.service';
 export {
+  CurrentDocumentAccess,
+  CurrentWorkspaceRole,
   DocumentAccess,
   WorkspaceRole,
-  documentAccessOf,
-  workspaceRoleOf,
 } from './permissions.decorators';
