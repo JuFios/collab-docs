@@ -1,8 +1,6 @@
 import {
-  type CanActivate,
   type ExecutionContext,
   HttpException,
-  Inject,
   Injectable,
   SetMetadata,
   UseGuards,
@@ -11,17 +9,18 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import {
+  InjectThrottlerOptions,
+  InjectThrottlerStorage,
   ThrottlerGuard,
   type ThrottlerModuleOptions,
   type ThrottlerRequest,
+  type ThrottlerStorage,
   seconds,
 } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from './config';
-import { AppException } from './exceptions';
 import { InjectPinoLogger, PinoLogger } from './logger';
-import { REDIS_CLIENT } from './redis';
 
 export function throttlerOptions(
   config: ConfigService<AppConfig, true>,
@@ -39,18 +38,57 @@ export function throttlerOptions(
   };
 }
 
-/** Keys the counter by the real client IP (`req.ip` honours `trust proxy` = TRUSTED_PROXY_CIDRS only). */
+/** Where a preset's counter is kept: per client address, or per signed-in user. */
+type RateScope = 'ip' | 'user';
+
+/** Env key holding the limit, the window, the counter's scope and the message of the 429 of each preset. */
+const PRESETS = {
+  login: { scope: 'ip', limit: 'RATE_LOGIN_PER_MIN_IP', ttl: seconds(60) },
+  register: { scope: 'ip', limit: 'RATE_REGISTER_PER_HOUR_IP', ttl: seconds(3600) },
+  guestTicket: { scope: 'ip', limit: 'RATE_GUEST_TICKET_PER_MIN_IP', ttl: seconds(60) },
+  ticket: {
+    scope: 'user',
+    limit: 'RATE_TICKET_PER_MIN_USER',
+    ttl: seconds(60),
+    message: 'Too many connection attempts, try again shortly',
+  },
+  publicLink: {
+    scope: 'user',
+    limit: 'RATE_PUBLIC_LINK_PER_HOUR_USER',
+    ttl: seconds(3600),
+    message: 'Too many public links created, try again later',
+  },
+} as const satisfies Record<
+  string,
+  { scope: RateScope; limit: keyof AppConfig; ttl: number; message?: string }
+>;
+type RatePreset = keyof typeof PRESETS;
+type PresetOf<S extends RateScope> = {
+  [P in RatePreset]: (typeof PRESETS)[P]['scope'] extends S ? P : never;
+}[RatePreset];
+
+const RATE_LIMIT_PRESET = 'rate-limit:preset';
+
+/**
+ * Keys the counter by the real client IP (`req.ip` honours `trust proxy` = TRUSTED_PROXY_CIDRS only). Runs
+ * globally; a route's per-IP preset swaps its env limit and window in for the `default` throttler.
+ */
 @Injectable()
 export class ClientIpThrottlerGuard extends ThrottlerGuard {
-  // property injection: the base class constructor takes the throttler options, storage and reflector
-  @Inject() private readonly config!: ConfigService<AppConfig, true>;
-  @InjectPinoLogger(ClientIpThrottlerGuard.name) private readonly pino!: PinoLogger;
+  protected readonly scope: RateScope = 'ip';
+
+  constructor(
+    @InjectThrottlerOptions() options: ThrottlerModuleOptions,
+    @InjectThrottlerStorage() storageService: ThrottlerStorage,
+    reflector: Reflector,
+    private readonly config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(ClientIpThrottlerGuard.name) private readonly pino: PinoLogger,
+  ) {
+    super(options, storageService, reflector);
+  }
 
   protected override handleRequest(request: ThrottlerRequest): Promise<boolean> {
-    const preset = this.reflector.getAllAndOverride<IpRatePreset | undefined>(RATE_LIMIT_PRESET, [
-      request.context.getHandler(),
-      request.context.getClass(),
-    ]);
+    const preset = this.presetOf(request.context);
     if (!preset || request.throttler.name !== 'default') return super.handleRequest(request);
     const { limit, ttl } = PRESETS[preset];
     return super.handleRequest({
@@ -65,6 +103,24 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
     return typeof req.ip === 'string' ? req.ip : 'unknown';
   }
 
+  protected override async getErrorMessage(
+    context: ExecutionContext,
+    detail: Parameters<ThrottlerGuard['getErrorMessage']>[1],
+  ): Promise<string> {
+    const preset = this.presetOf(context);
+    const custom = preset ? (PRESETS[preset] as { message?: string }).message : undefined;
+    return custom ?? super.getErrorMessage(context, detail);
+  }
+
+  /** The route's preset, if it belongs to this guard's scope. */
+  private presetOf(context: ExecutionContext): RatePreset | undefined {
+    const preset = this.reflector.getAllAndOverride<RatePreset | undefined>(RATE_LIMIT_PRESET, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    return preset && PRESETS[preset].scope === this.scope ? preset : undefined;
+  }
+
   /** Fail open: a Redis outage must degrade rate limiting, not take the API down. */
   override async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
@@ -77,88 +133,39 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
   }
 }
 
-/** Presets counted per client IP by the global guard; the limit comes from env and replaces the global one. */
-type IpRatePreset = 'login' | 'register' | 'guestTicket';
-/** Presets counted per signed-in user by `UserRateLimitGuard`. */
-type UserRatePreset = 'ticket' | 'publicLink';
-
-/** Env key holding the limit, and the window, of each per-IP preset. */
-const PRESETS: Record<IpRatePreset, { limit: keyof AppConfig; ttl: number }> = {
-  login: { limit: 'RATE_LOGIN_PER_MIN_IP', ttl: seconds(60) },
-  register: { limit: 'RATE_REGISTER_PER_HOUR_IP', ttl: seconds(3600) },
-  guestTicket: { limit: 'RATE_GUEST_TICKET_PER_MIN_IP', ttl: seconds(60) },
-};
-
-/** Per-user presets: limit, window and the message of the 429. */
-const USER_PRESETS: Record<
-  UserRatePreset,
-  { limit: keyof AppConfig; ttl: number; message: string }
-> = {
-  ticket: {
-    limit: 'RATE_TICKET_PER_MIN_USER',
-    ttl: seconds(60),
-    message: 'Too many connection attempts, try again shortly',
-  },
-  publicLink: {
-    limit: 'RATE_PUBLIC_LINK_PER_HOUR_USER',
-    ttl: seconds(3600),
-    message: 'Too many public links created, try again later',
-  },
-};
-
-const RATE_LIMIT_PRESET = 'rate-limit:preset';
-const USER_RATE_LIMIT_PRESET = 'rate-limit:user-preset';
-
 /**
- * Per-route presets (limits come from env; see README). `ClientIpThrottlerGuard` swaps the preset's limit and
- * window in for the `default` throttler on that route, replacing the global limit. `user(...)` counts per signed-in
- * user instead (tickets are fetched on every reconnect of every tab, public links are created by people, not
- * by addresses) and needs the route to be authenticated.
- */
-export const RateLimit = {
-  login: () => SetMetadata(RATE_LIMIT_PRESET, 'login'),
-  register: () => SetMetadata(RATE_LIMIT_PRESET, 'register'),
-  guestTicket: () => SetMetadata(RATE_LIMIT_PRESET, 'guestTicket'),
-  user: (preset: UserRatePreset) =>
-    applyDecorators(SetMetadata(USER_RATE_LIMIT_PRESET, preset), UseGuards(UserRateLimitGuard)),
-};
-
-/**
- * Fixed-window counter per user in Redis (`@RateLimit.user(preset)`). Runs after the global auth guard, so
- * `request.user` is set. Fails open when Redis is down, like the global limiter.
+ * Keys the counter by the signed-in user (`@RateLimit.user(...)`): tickets are fetched on every reconnect of every
+ * tab and public links are created by people, not by addresses. A route-level guard, so it runs after the global
+ * auth guard and `request.user` is set.
  */
 @Injectable()
-export class UserRateLimitGuard implements CanActivate {
-  // property injection: keeps the guard constructible without a constructor list in `@UseGuards`
-  @Inject(REDIS_CLIENT) private readonly redis!: Redis;
-  @Inject() private readonly reflector!: Reflector;
-  @Inject() private readonly config!: ConfigService<AppConfig, true>;
-  @InjectPinoLogger(UserRateLimitGuard.name) private readonly logger!: PinoLogger;
+export class UserThrottlerGuard extends ClientIpThrottlerGuard {
+  protected override readonly scope: RateScope = 'user';
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const preset = this.reflector.getAllAndOverride<UserRatePreset | undefined>(
-      USER_RATE_LIMIT_PRESET,
-      [context.getHandler(), context.getClass()],
-    );
-    if (!preset) return true;
-    const request = context.switchToHttp().getRequest<{ user?: { id: string } }>();
-    const userId = request.user?.id;
-    if (!userId) return true; // the auth guard has already rejected anonymous callers
-    const { limit, ttl, message } = USER_PRESETS[preset];
-    const windowSeconds = Math.ceil(ttl / 1000);
-    const key = `rl:${preset}:${userId}`;
-    try {
-      const count = await this.redis.incr(key);
-      if (count === 1) await this.redis.expire(key, windowSeconds);
-      if (count <= Number(this.config.get(limit, { infer: true }))) return true;
-      const remaining = await this.redis.ttl(key);
-      throw new AppException('RATE_LIMITED', message, {
-        headers: { 'Retry-After': String(remaining > 0 ? remaining : windowSeconds) },
-      });
-    } catch (error) {
-      if (error instanceof AppException) throw error;
-      this.logger.error({ err: error, preset }, 'user rate limiter unavailable, allowing request');
-      return true;
-    }
+  constructor(
+    @InjectThrottlerOptions() options: ThrottlerModuleOptions,
+    @InjectThrottlerStorage() storageService: ThrottlerStorage,
+    reflector: Reflector,
+    config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(UserThrottlerGuard.name) pino: PinoLogger,
+  ) {
+    super(options, storageService, reflector, config, pino);
+  }
+
+  protected override async getTracker(req: Record<string, unknown>): Promise<string> {
+    const userId = (req.user as { id?: string } | undefined)?.id;
+    return userId ? `user:${userId}` : super.getTracker(req);
   }
 }
+
+/**
+ * Per-route presets (limits come from env; see README). `login`, `register` and `guestTicket` count per client IP,
+ * `ticket` and `publicLink` per signed-in user, which needs the route to be authenticated.
+ */
+export const RateLimit = {
+  login: () => SetMetadata(RATE_LIMIT_PRESET, 'login' satisfies PresetOf<'ip'>),
+  register: () => SetMetadata(RATE_LIMIT_PRESET, 'register' satisfies PresetOf<'ip'>),
+  guestTicket: () => SetMetadata(RATE_LIMIT_PRESET, 'guestTicket' satisfies PresetOf<'ip'>),
+  user: (preset: PresetOf<'user'>) =>
+    applyDecorators(SetMetadata(RATE_LIMIT_PRESET, preset), UseGuards(UserThrottlerGuard)),
+};
