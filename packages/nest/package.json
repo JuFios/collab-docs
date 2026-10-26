@@ -22,6 +22,7 @@
   "dependencies": {
     "@collab-docs/shared": "workspace:*",
     "@nest-lab/throttler-storage-redis": "1.2.0",
+    "@nestjs/bullmq": "11.0.5",
     "@nestjs/config": "4.0.4",
     "@nestjs/swagger": "11.4.7",
     "@nestjs/throttler": "6.7.1",

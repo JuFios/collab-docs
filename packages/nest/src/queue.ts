@@ -1,13 +1,13 @@
-import { Global, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
+import { Global, Inject, Injectable, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Job, type JobsOptions, Queue, Worker } from 'bullmq';
-import type { Redis } from 'ioredis';
+import { ModuleRef } from '@nestjs/core';
+import { BullModule, OnWorkerEvent, WorkerHost, getQueueToken } from '@nestjs/bullmq';
+import type { ConnectionOptions, Job, JobsOptions, Queue } from 'bullmq';
 import { Counter, Gauge } from 'prom-client';
 import type { AppConfig } from './config';
 import { getCorrelationId, runWithCorrelationId } from './correlation';
-import { logEvent, getRootLogger } from './logger';
+import { getRootLogger, logEvent } from './logger';
 import { MetricsService } from './metrics';
-import { createRedis } from './redis';
 
 export const QUEUE_NAMES = {
   searchSync: 'search-sync',
@@ -53,27 +53,55 @@ export function enqueueDebounced<T extends object = Record<string, never>>(
   );
 }
 
+/** BullMQ connection options from `REDIS_URL`. Every queue and worker opens (and closes) its own connection. */
+export function queueConnection(redisUrl: string): ConnectionOptions {
+  const url = new URL(redisUrl);
+  const db = Number(url.pathname.replace('/', ''));
+  return {
+    host: url.hostname,
+    port: url.port ? Number(url.port) : 6379,
+    username: url.username ? decodeURIComponent(url.username) : undefined,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
+    db: Number.isInteger(db) ? db : 0,
+    tls: url.protocol === 'rediss:' ? {} : undefined,
+    // BullMQ workers need unlimited retries
+    maxRetriesPerRequest: null,
+  };
+}
+
+/** Adds a job to `queue`, stamping the ambient correlation id into its data. */
+export function addJob<T extends object>(
+  queue: Queue,
+  jobName: string,
+  data: T,
+  options?: JobsOptions,
+) {
+  return queue.add(jobName, { ...data, correlationId: getCorrelationId() }, options);
+}
+
+/**
+ * Producer-side helpers and queue metrics. The queues themselves are `BullModule` providers
+ * (`@InjectQueue(name)`); this service looks them up by name and adds what BullMQ does not: the ambient
+ * correlation id in every job, and the queue metrics.
+ */
 @Injectable()
-export class QueueService implements OnApplicationShutdown {
-  private readonly connection: Redis;
-  private readonly queues = new Map<string, Queue>();
-  private readonly workers: Worker[] = [];
+export class QueueService {
   private readonly jobsGauge: Gauge<'queue' | 'state'>;
-  private readonly processed: Counter<'queue' | 'result'>;
   readonly enqueueFailures: Counter<'queue'>;
 
-  constructor(config: ConfigService<AppConfig, true>, metrics: MetricsService) {
-    this.connection = createRedis(config.get('REDIS_URL', { infer: true }), { forQueues: true });
+  constructor(
+    private readonly moduleRef: ModuleRef,
+    metrics: MetricsService,
+  ) {
     this.jobsGauge = new Gauge({
       name: 'queue_jobs',
       help: 'Jobs per queue and state',
       labelNames: ['queue', 'state'],
       registers: [metrics.registry],
       collect: async () => {
-        for (const name of Object.values(QUEUE_NAMES)) this.getQueue(name);
         await Promise.all(
-          [...this.queues].map(async ([name, queue]) => {
-            const counts = await queue.getJobCounts(...COUNTED_STATES);
+          Object.values(QUEUE_NAMES).map(async (name) => {
+            const counts = await this.getQueue(name).getJobCounts(...COUNTED_STATES);
             for (const state of COUNTED_STATES) {
               this.jobsGauge.set({ queue: name, state }, counts[state] ?? 0);
             }
@@ -87,24 +115,10 @@ export class QueueService implements OnApplicationShutdown {
       labelNames: ['queue'],
       registers: [metrics.registry],
     });
-    this.processed = new Counter({
-      name: 'queue_jobs_processed_total',
-      help: 'Processed jobs per queue and result',
-      labelNames: ['queue', 'result'],
-      registers: [metrics.registry],
-    });
   }
 
   getQueue(name: QueueName | (string & {})): Queue {
-    let queue = this.queues.get(name);
-    if (!queue) {
-      queue = new Queue(name, {
-        connection: this.connection,
-        defaultJobOptions: DEFAULT_JOB_OPTIONS,
-      });
-      this.queues.set(name, queue);
-    }
-    return queue;
+    return this.moduleRef.get<Queue>(getQueueToken(name), { strict: false });
   }
 
   /** Adds a job, stamping the ambient correlation id into its data. */
@@ -114,56 +128,78 @@ export class QueueService implements OnApplicationShutdown {
     data: T,
     options?: JobsOptions,
   ) {
-    return this.getQueue(queueName).add(
-      jobName,
-      { ...data, correlationId: getCorrelationId() },
-      options,
-    );
-  }
-
-  /** Registers a processor; runs each job inside its original correlation context. */
-  process<T extends object>(
-    queueName: QueueName | (string & {}),
-    handler: (job: Job<T & JobEnvelope>) => Promise<void>,
-    options: { concurrency?: number } = {},
-  ): Worker {
-    const worker = new Worker<T & JobEnvelope>(
-      queueName,
-      (job) =>
-        runWithCorrelationId(job.data.correlationId ?? `job-${job.id}`, async () => {
-          await handler(job);
-        }),
-      { connection: this.connection, concurrency: options.concurrency ?? 5 },
-    );
-    worker.on('completed', () => this.processed.inc({ queue: queueName, result: 'completed' }));
-    worker.on('failed', (job, error) => {
-      this.processed.inc({ queue: queueName, result: 'failed' });
-      runWithCorrelationId(job?.data?.correlationId ?? 'unknown', () =>
-        logEvent('queue.job_failed', {
-          queue: queueName,
-          jobId: job?.id,
-          attemptsMade: job?.attemptsMade,
-          error: error.message,
-        }),
-      );
-    });
-    worker.on('error', (error) =>
-      getRootLogger().error({ err: error, queue: queueName }, 'worker error'),
-    );
-    this.workers.push(worker);
-    return worker;
-  }
-
-  /** Graceful shutdown: stop taking jobs, wait for active ones, then close connections. */
-  async onApplicationShutdown(): Promise<void> {
-    await Promise.all(this.workers.map((worker) => worker.close()));
-    await Promise.all([...this.queues.values()].map((queue) => queue.close()));
-    if (this.connection.status !== 'end') {
-      await this.connection.quit().catch(() => this.connection.disconnect());
-    }
+    return addJob(this.getQueue(queueName), jobName, data, options);
   }
 }
 
+/** Counts finished jobs per queue and result. */
+@Injectable()
+export class QueueMetrics {
+  readonly processed: Counter<'queue' | 'result'>;
+
+  constructor(metrics: MetricsService) {
+    this.processed = new Counter({
+      name: 'queue_jobs_processed_total',
+      help: 'Processed jobs per queue and result',
+      labelNames: ['queue', 'result'],
+      registers: [metrics.registry],
+    });
+  }
+}
+
+/**
+ * Base class of the queue processors (`@Processor(name)` classes): runs every job inside its original correlation
+ * context, counts the results and logs failures. Subclasses implement `handle`; a thrown error makes BullMQ
+ * retry with the queue's backoff.
+ */
+export abstract class QueueProcessor<T extends object = Record<string, never>> extends WorkerHost {
+  // property injection: subclasses declare their own constructors
+  @Inject() private readonly queueMetrics!: QueueMetrics;
+
+  protected abstract handle(job: Job<T & JobEnvelope>): Promise<void>;
+
+  process(job: Job<T & JobEnvelope>): Promise<void> {
+    return runWithCorrelationId(job.data.correlationId ?? `job-${job.id}`, () => this.handle(job));
+  }
+
+  @OnWorkerEvent('completed')
+  protected onCompleted(): void {
+    this.queueMetrics.processed.inc({ queue: this.worker.name, result: 'completed' });
+  }
+
+  @OnWorkerEvent('failed')
+  protected onFailed(job: Job<T & JobEnvelope> | undefined, error: Error): void {
+    this.queueMetrics.processed.inc({ queue: this.worker.name, result: 'failed' });
+    runWithCorrelationId(job?.data?.correlationId ?? 'unknown', () =>
+      logEvent('queue.job_failed', {
+        queue: this.worker.name,
+        jobId: job?.id,
+        attemptsMade: job?.attemptsMade,
+        error: error.message,
+      }),
+    );
+  }
+
+  @OnWorkerEvent('error')
+  protected onError(error: Error): void {
+    getRootLogger().error({ err: error, queue: this.worker.name }, 'worker error');
+  }
+}
+
+/** Registers every queue once, for all processes; processors are added by the worker modules. */
 @Global()
-@Module({ providers: [QueueService], exports: [QueueService] })
+@Module({
+  imports: [
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfig, true>) => ({
+        connection: queueConnection(config.get('REDIS_URL', { infer: true })),
+        defaultJobOptions: DEFAULT_JOB_OPTIONS,
+      }),
+    }),
+    BullModule.registerQueue(...Object.values(QUEUE_NAMES).map((name) => ({ name }))),
+  ],
+  providers: [QueueService, QueueMetrics],
+  exports: [BullModule, QueueService, QueueMetrics],
+})
 export class QueueModule {}

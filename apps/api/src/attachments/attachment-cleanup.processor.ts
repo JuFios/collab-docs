@@ -1,24 +1,27 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
+import { InjectQueue, Processor } from '@nestjs/bullmq';
+import { type OnModuleInit } from '@nestjs/common';
+import { Queue } from 'bullmq';
+import { QUEUE_NAMES, QueueProcessor } from '@collab-docs/nest';
 import { AttachmentSweeper } from './attachment-sweeper';
 
 const SWEEP_EVERY_MS = 60 * 60 * 1000;
 const SCHEDULER_ID = 'attachment-cleanup-hourly';
 
 /** Runs the sweep of abandoned uploads once an hour. */
-@Injectable()
-export class AttachmentCleanupProcessor implements OnModuleInit {
+@Processor(QUEUE_NAMES.attachmentCleanup, { concurrency: 5 })
+export class AttachmentCleanupProcessor extends QueueProcessor implements OnModuleInit {
   constructor(
-    private readonly queues: QueueService,
+    @InjectQueue(QUEUE_NAMES.attachmentCleanup) private readonly queue: Queue,
     private readonly sweeper: AttachmentSweeper,
-  ) {}
+  ) {
+    super();
+  }
 
   async onModuleInit(): Promise<void> {
-    this.queues.process(QUEUE_NAMES.attachmentCleanup, async () => {
-      await this.sweeper.sweep();
-    });
-    await this.queues
-      .getQueue(QUEUE_NAMES.attachmentCleanup)
-      .upsertJobScheduler(SCHEDULER_ID, { every: SWEEP_EVERY_MS }, { name: 'sweep' });
+    await this.queue.upsertJobScheduler(SCHEDULER_ID, { every: SWEEP_EVERY_MS }, { name: 'sweep' });
+  }
+
+  protected async handle(): Promise<void> {
+    await this.sweeper.sweep();
   }
 }
