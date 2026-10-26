@@ -231,8 +231,10 @@ with `logEvent('document.published', { … })`.
 
 ### Observability
 
-- `GET /health` — liveness. `GET /ready` — readiness: pings Postgres and Redis and answers `503` with the
-  per-dependency state when one is down.
+- `GET /health` — liveness (checks nothing, so a database outage never restarts the container; the Docker
+  healthchecks use it). `GET /ready` — readiness: pings Postgres and Redis (2 s each) and answers `503` when one is
+  down. Both use the standard `@nestjs/terminus` body, `{ status, info, error, details }`; a failing dependency
+  shows up as `{ status: 'down' }` under `error` and `details`, without the underlying error message.
 - `GET /metrics` — Prometheus: default process metrics, `http_request_duration_seconds{route,method,status}`
   (labelled by route pattern, not raw URL) and queue metrics (`queue_jobs{queue,state}`,
   `queue_jobs_processed_total{queue,result}`). The endpoint is unauthenticated, so keep it off public ingress.

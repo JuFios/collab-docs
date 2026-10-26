@@ -598,14 +598,14 @@ describe('collab gateway', () => {
 
   describe('operations', () => {
     it('serves health, readiness and metrics', async () => {
-      await expect(fetch(`${collab.httpUrl}/health`).then((r) => r.json())).resolves.toEqual({
+      await expect(fetch(`${collab.httpUrl}/health`).then((r) => r.json())).resolves.toMatchObject({
         status: 'ok',
       });
       const ready = await fetch(`${collab.httpUrl}/ready`);
       expect(ready.status).toBe(200);
       expect(await ready.json()).toMatchObject({
         status: 'ok',
-        checks: { redis: 'up', postgres: 'up' },
+        details: { redis: { status: 'up' }, postgres: { status: 'up' } },
       });
 
       const { editor, documentId } = await setup();
