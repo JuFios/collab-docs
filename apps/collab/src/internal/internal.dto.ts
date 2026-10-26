@@ -1,6 +1,22 @@
-import { IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
-export class RestoreVersionDto {
+/** Every message of the internal API carries the shared secret and, when there is one, the caller's correlation id. */
+export class InternalRequestDto {
+  @IsString()
+  @MinLength(1)
+  token!: string;
+
+  @IsOptional()
+  @IsString()
+  correlationId?: string;
+}
+
+export class DocumentRequestDto extends InternalRequestDto {
+  @IsUUID()
+  documentId!: string;
+}
+
+export class RestoreVersionRequestDto extends DocumentRequestDto {
   @IsUUID()
   versionId!: string;
 

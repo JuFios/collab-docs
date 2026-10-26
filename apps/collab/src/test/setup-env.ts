@@ -24,7 +24,7 @@ const defaults: Record<string, string> = {
   WEB_ORIGIN: 'http://localhost:3000',
   WEB_INTERNAL_URL: 'http://localhost:3000',
   API_INTERNAL_URL: 'http://localhost:4000',
-  COLLAB_INTERNAL_URL: 'http://localhost:4002',
+  COLLAB_INTERNAL_URL: 'tcp://localhost:4002',
   COLLAB_PUBLIC_URL: 'ws://localhost:4001',
   // short intervals so that the timer-driven behaviour can be observed in a test
   COLLAB_FLUSH_INTERVAL_MS: '60',

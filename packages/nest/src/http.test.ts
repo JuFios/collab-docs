@@ -28,7 +28,7 @@ describe('http config helpers', () => {
       WEB_ORIGIN: 'https://app.example.test',
       WEB_INTERNAL_URL: 'http://web:3000',
       API_INTERNAL_URL: 'http://api:4000',
-      COLLAB_INTERNAL_URL: 'http://collab:4002',
+      COLLAB_INTERNAL_URL: 'tcp://collab:4002',
       COLLAB_PUBLIC_URL: 'wss://collab.example.test',
     };
     const config = parseConfig({

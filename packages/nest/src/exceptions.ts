@@ -6,13 +6,14 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { type Observable, throwError } from 'rxjs';
 import {
   type ApiErrorBody,
   ERROR_STATUS,
   type ErrorCode,
   type ValidationIssue,
 } from '@collab-docs/shared';
-import { getCorrelationId } from './correlation';
+import { getCorrelationId, runWithCorrelationId } from './correlation';
 import { InjectPinoLogger, PinoLogger } from './logger';
 
 /** Throw this from application code to return a specific catalog code. */
@@ -160,18 +161,33 @@ export function toErrorResponse(exception: unknown, correlationId: string): ApiE
 export class AllExceptionsFilter implements ExceptionFilter {
   constructor(@InjectPinoLogger(AllExceptionsFilter.name) private readonly logger: PinoLogger) {}
 
-  catch(exception: unknown, host: ArgumentsHost): void {
-    if (host.getType() !== 'http') throw exception;
-    const response = host.switchToHttp().getResponse<Response>();
-    const correlationId = getCorrelationId() ?? 'unknown';
+  /**
+   * HTTP: writes the error body. RPC (the collab internal API): answers with the same body as an error, so the
+   * caller can tell a 404 from a 500. Other contexts are left to Nest's defaults.
+   */
+  catch(exception: unknown, host: ArgumentsHost): Observable<never> | void {
+    const type = host.getType();
+    if (type !== 'http' && type !== 'rpc') throw exception;
+    // an RPC message cannot carry headers, so its correlation id travels in the payload
+    const payload =
+      type === 'rpc' ? host.switchToRpc().getData<{ correlationId?: unknown }>() : null;
+    const fromPayload =
+      typeof payload?.correlationId === 'string' ? payload.correlationId : undefined;
+    const correlationId = getCorrelationId() ?? fromPayload ?? 'unknown';
     const body = toErrorResponse(exception, correlationId);
 
     if (body.statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(
-        { err: exception, statusCode: body.statusCode, code: body.code },
-        'request failed',
-      );
+      const log = () =>
+        this.logger.error(
+          { err: exception, statusCode: body.statusCode, code: body.code },
+          'request failed',
+        );
+      if (fromPayload && !getCorrelationId()) runWithCorrelationId(fromPayload, log);
+      else log();
     }
+    if (type === 'rpc') return throwError(() => body);
+
+    const response = host.switchToHttp().getResponse<Response>();
     if (response.headersSent) return;
     if (exception instanceof AppException) response.set(exception.headers);
     response.status(body.statusCode).json(body);

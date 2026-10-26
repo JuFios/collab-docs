@@ -1,10 +1,11 @@
 import '../test/versions-env';
 import { ConfigService } from '@nestjs/config';
-import http from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { createServer, type AddressInfo } from 'node:net';
+import { ServerTCP } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
+import { NEVER, type Observable, of, throwError } from 'rxjs';
 import * as Y from 'yjs';
 import {
   DocumentStateWriter,
@@ -12,6 +13,7 @@ import {
   MAX_VERSIONS,
   type PrismaClient,
 } from '@collab-docs/db';
+import { COLLAB_INTERNAL } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService, parseConfig } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { VersionPruneProcessor } from './version-prune.processor';
@@ -27,11 +29,21 @@ interface TestUser {
   email: string;
 }
 
+/** A message the fake collab service received on its internal port. */
 interface RecordedCall {
-  path: string;
-  authorization?: string;
-  body: unknown;
+  pattern: string;
+  data: Record<string, unknown>;
 }
+
+const freePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
 
 describe('document versions', () => {
   let app: NestExpressApplication;
@@ -39,12 +51,14 @@ describe('document versions', () => {
   let versions: DocumentVersions;
   let writer: DocumentStateWriter;
   let redis: Redis;
-  let collab: http.Server;
+  let collab: ServerTCP;
   let collabUrl: string;
   let counter = 0;
   const calls: RecordedCall[] = [];
-  let collabStatus = 200;
+  /** How the fake collab answers: a body, a refusal with this status, or never. */
+  let collabStatus: number | null = null;
   let collabBody: object = {};
+  let collabSilent = false;
 
   const http$ = () => request(app.getHttpServer());
 
@@ -104,21 +118,25 @@ describe('document versions', () => {
     flush.disconnect();
     redis = new Redis(process.env.REDIS_URL as string);
 
-    collab = http.createServer((req, res) => {
-      let raw = '';
-      req.on('data', (chunk: Buffer) => (raw += chunk.toString()));
-      req.on('end', () => {
-        calls.push({
-          path: req.url ?? '',
-          authorization: req.headers.authorization,
-          body: raw ? JSON.parse(raw) : undefined,
-        });
-        res.writeHead(collabStatus, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(collabBody));
+    const port = await freePort();
+    collab = new ServerTCP({ host: '127.0.0.1', port });
+    for (const pattern of [COLLAB_INTERNAL.flush, COLLAB_INTERNAL.restore]) {
+      collab.addHandler(pattern, (data: Record<string, unknown>) => {
+        calls.push({ pattern, data });
+        const answer: Observable<object> = collabSilent
+          ? NEVER
+          : collabStatus === null
+            ? of(collabBody)
+            : throwError(() => ({
+                statusCode: collabStatus,
+                code: 'INTERNAL_ERROR',
+                message: 'no',
+              }));
+        return Promise.resolve(answer);
       });
-    });
-    await new Promise<void>((resolve) => collab.listen(0, '127.0.0.1', resolve));
-    collabUrl = `http://127.0.0.1:${(collab.address() as AddressInfo).port}`;
+    }
+    await new Promise<void>((resolve) => collab.listen(() => resolve()));
+    collabUrl = `tcp://127.0.0.1:${port}`;
 
     app = await createTestApp([], [VersionsWorkerModule]);
     // the client reads the url from the shared config object on every call
@@ -130,15 +148,16 @@ describe('document versions', () => {
 
   beforeEach(() => {
     calls.length = 0;
-    collabStatus = 200;
+    collabStatus = null;
     collabBody = {};
+    collabSilent = false;
     app.get(ConfigService).set('COLLAB_INTERNAL_URL', collabUrl);
   });
 
   afterAll(async () => {
     redis.disconnect();
     await app.close();
-    await new Promise((resolve) => collab.close(resolve));
+    collab.close();
   });
 
   describe('permissions', () => {
@@ -197,9 +216,12 @@ describe('document versions', () => {
       });
       expect(calls).toEqual([
         {
-          path: `/internal/documents/${documentId}/flush`,
-          authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}`,
-          body: {},
+          pattern: COLLAB_INTERNAL.flush,
+          data: {
+            token: parseConfig(process.env).INTERNAL_API_TOKEN,
+            correlationId: expect.any(String),
+            documentId,
+          },
         },
       ]);
 
@@ -215,7 +237,7 @@ describe('document versions', () => {
     it('still saves, and says so, when collab cannot be reached', async () => {
       const { owner, documentId } = await setup();
       await writeContent(documentId, 'stored');
-      app.get(ConfigService).set('COLLAB_INTERNAL_URL', 'http://127.0.0.1:1');
+      app.get(ConfigService).set('COLLAB_INTERNAL_URL', 'tcp://127.0.0.1:1');
       const response = await as(owner)
         .post(`/documents/${documentId}/versions`)
         .send({})
@@ -232,6 +254,18 @@ describe('document versions', () => {
         .send({})
         .expect(201);
       expect(response.body.flushed).toBe(false);
+    });
+
+    it('gives up on a collab that does not answer within the flush deadline', async () => {
+      const { owner, documentId } = await setup();
+      collabSilent = true;
+      const started = Date.now();
+      const response = await as(owner)
+        .post(`/documents/${documentId}/versions`)
+        .send({})
+        .expect(201);
+      expect(response.body.flushed).toBe(false);
+      expect(Date.now() - started).toBeLessThan(5000);
     });
 
     it('snapshots an empty document', async () => {
@@ -337,9 +371,14 @@ describe('document versions', () => {
       expect(response.body).toEqual({ revision: 7 });
       expect(calls).toEqual([
         {
-          path: `/internal/documents/${documentId}/restore`,
-          authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}`,
-          body: { versionId: created.body.id, userId: owner.id },
+          pattern: COLLAB_INTERNAL.restore,
+          data: {
+            token: parseConfig(process.env).INTERNAL_API_TOKEN,
+            correlationId: expect.any(String),
+            documentId,
+            versionId: created.body.id,
+            userId: owner.id,
+          },
         },
       ]);
     });
@@ -358,6 +397,18 @@ describe('document versions', () => {
       expect(calls).toHaveLength(0);
     });
 
+    it('answers 404 when collab says the version does not exist', async () => {
+      const { owner, documentId } = await setup();
+      const created = await as(owner)
+        .post(`/documents/${documentId}/versions`)
+        .send({})
+        .expect(201);
+      collabStatus = 404;
+      await as(owner)
+        .post(`/documents/${documentId}/versions/${created.body.id}/restore`)
+        .expect(404);
+    });
+
     it('answers 503 when collab is down or fails, so a restore never looks successful by accident', async () => {
       const { owner, documentId } = await setup();
       const created = await as(owner)
@@ -368,8 +419,8 @@ describe('document versions', () => {
 
       collabStatus = 500;
       expect((await as(owner).post(url).expect(503)).body.code).toBe('SERVICE_UNAVAILABLE');
-      collabStatus = 200;
-      app.get(ConfigService).set('COLLAB_INTERNAL_URL', 'http://127.0.0.1:1');
+      collabStatus = null;
+      app.get(ConfigService).set('COLLAB_INTERNAL_URL', 'tcp://127.0.0.1:1');
       expect((await as(owner).post(url).expect(503)).body.code).toBe('SERVICE_UNAVAILABLE');
     });
   });

@@ -38,7 +38,7 @@ export const envSchema = z.object({
   WEB_ORIGIN: url,
   WEB_INTERNAL_URL: url,
   API_INTERNAL_URL: url,
-  COLLAB_INTERNAL_URL: url,
+  COLLAB_INTERNAL_URL: z.string().regex(/^tcp:\/\/[^/:]+:\d+$/, 'must look like tcp://host:port'),
   COLLAB_PUBLIC_URL: z.string().regex(/^wss?:\/\//, 'must start with ws:// or wss://'),
   TRUSTED_PROXY_CIDRS: z.string().default(''),
   /** Comma-separated extra CORS origins; WEB_ORIGIN is always allowed. */

@@ -17,8 +17,9 @@ side builds on it.
 3. The server verifies the ticket, loads the permissions, admits the socket to the document's room and sends the
    handshake: sync step 1, the presence of everybody in the room, an `access` event and a `persisted` event.
 
-Port **4001** is public (`/ws/<docId>`, `/health`, `/ready`, `/metrics`). Port **4002** serves `/internal/*`, is
-not published by compose and needs `Authorization: Bearer <INTERNAL_API_TOKEN>`.
+Port **4001** is public (`/ws/<docId>`, `/health`, `/ready`, `/metrics`). Port **4002** is the internal API (a TCP
+microservice, see the end of this document); it is not published by compose and every message has to carry
+`INTERNAL_API_TOKEN`.
 
 ## Messages
 
@@ -107,11 +108,18 @@ implementation is described in the README ("CRDT persistence strategy").
 
 ## Internal API (port 4002)
 
-Not published; every request needs `Authorization: Bearer <INTERNAL_API_TOKEN>`.
+A TCP microservice of the collab application (`@nestjs/microservices`, request/response `@MessagePattern`s), not
+published. Every message is an object with `token` (`INTERNAL_API_TOKEN`, compared in constant time) and, when the
+caller has one, `correlationId`; the other fields are validated like an HTTP body. A failure is answered as an
+error whose body is the usual error body (`statusCode`, `code`, `message`, `correlationId`), so a missing token is
+`401`, an unknown document or version `404`, a malformed field `400`.
 
-| Request                                                   | Effect                                                                                         |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `POST /internal/documents/:id/flush`                      | Writes the buffered updates; `{ revision }`. 500 if the database refuses (the buffer is kept). |
-| `POST /internal/documents/:id/restore {versionId,userId}` | Snapshots the current content (`PRE_RESTORE`), replaces it with the version's; `{ revision }`. |
-| `POST /internal/documents/:id/close`                      | Final flush, `deleted` event, close 4410 for every connection; `{ closed }`, idempotent.       |
-| `GET /internal/status`                                    | `{ rooms, connections }`.                                                                      |
+| Pattern                                            | Effect                                                                                         |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `collab.flush { documentId }`                      | Writes the buffered updates; `{ revision }`. 500 if the database refuses (the buffer is kept). |
+| `collab.restore { documentId, versionId, userId }` | Snapshots the current content (`PRE_RESTORE`), replaces it with the version's; `{ revision }`. |
+| `collab.close { documentId }`                      | Final flush, `deleted` event, close 4410 for every connection; `{ closed }`, idempotent.       |
+| `collab.status`                                    | `{ rooms, connections }`.                                                                      |
+
+The api waits 2 s for a flush (and carries on with the stored state if it gets none) and 15 s for a restore (`503`
+when collab is unreachable, slow or fails).

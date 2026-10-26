@@ -26,6 +26,14 @@ export const COLLAB_CLOSE = {
   rateLimited: 4429,
 } as const;
 
+/** Message patterns of the collab internal API (TCP, port 4002, never published). */
+export const COLLAB_INTERNAL = {
+  status: 'collab.status',
+  flush: 'collab.flush',
+  restore: 'collab.restore',
+  close: 'collab.close',
+} as const;
+
 export type CollabCloseCode = (typeof COLLAB_CLOSE)[keyof typeof COLLAB_CLOSE];
 
 /** Codes after which a client must call `provider.disconnect()`; reconnecting cannot succeed. */
