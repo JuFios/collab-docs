@@ -108,7 +108,7 @@ export class CommentsService {
     dto: CreateCommentDto,
   ): Promise<CommentWriteResponse> {
     const { comment, warnings, created } = await this.prisma.$transaction(async (tx) => {
-      const thread = await this.threadOr404(tx, threadId);
+      const thread = await this.liveThreadOr404(tx, threadId);
       await this.permissions.assertDocumentAccess(userId, thread.documentId, 'COMMENT', tx);
       const prepared = await this.prepareBody(tx, thread.documentId, dto.body);
       const { comment, created } = await this.insertComment(
@@ -241,6 +241,16 @@ export class CommentsService {
       );
       return null;
     }
+  }
+
+  /** Just enough to address a reply: the thread exists and still has a comment. */
+  private async liveThreadOr404(tx: Prisma.TransactionClient, threadId: string) {
+    const thread = await tx.commentThread.findFirst({
+      where: { id: threadId, comments: { some: { deletedAt: null } } },
+      select: { id: true, documentId: true },
+    });
+    if (!thread) throw notFound('Thread');
+    return thread;
   }
 
   private async threadOr404(tx: Prisma.TransactionClient, threadId: string): Promise<ThreadRow> {
