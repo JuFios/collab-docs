@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@collab-docs/db';
+import type { PrismaService } from '../prisma/prisma.service';
 import type { PinoLogger } from '@collab-docs/nest';
 import { REFRESH_GRACE_MS, RefreshTokenService, hashToken } from './refresh-token.service';
 
@@ -51,7 +51,7 @@ function fakePrisma() {
     refreshToken,
     $transaction: async <T>(fn: (tx: unknown) => Promise<T>) => fn({ refreshToken }),
   };
-  return { prisma: prisma as unknown as PrismaClient, rows };
+  return { prisma: prisma as unknown as PrismaService, rows };
 }
 
 const USER = '0190b1c2-0000-7000-8000-000000000001';

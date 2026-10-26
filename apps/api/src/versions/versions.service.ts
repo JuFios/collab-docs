@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
+import { DocumentVersions, MAX_VERSIONS } from '@collab-docs/db';
 import { sanitizeContent, yDocToContentJson } from '@collab-docs/shared/content';
 import { AppException } from '@collab-docs/nest';
 import type {
@@ -9,6 +9,7 @@ import type {
   RestoredVersion,
 } from '@collab-docs/shared';
 import { CollabInternalClient } from '../collab/collab-internal.client';
+import { PrismaService } from '../prisma/prisma.service';
 
 const SELECT = {
   id: true,
@@ -46,7 +47,7 @@ const notFound = () => new AppException('NOT_FOUND', 'Version not found');
 @Injectable()
 export class VersionsService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly versions: DocumentVersions,
     private readonly collab: CollabInternalClient,
   ) {}

@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { PrismaClient } from '@collab-docs/db';
+
 import {
   ATTACHMENT_READ_TTL_SECONDS,
   ATTACHMENT_UPLOAD_TTL_SECONDS,
@@ -12,6 +12,7 @@ import { S3Storage } from '../storage/s3.service';
 import { PlanLimitsService } from '../workspaces/plan-limits.service';
 import type { AttachmentRow } from './attachment-access';
 import { AttachmentsService } from './attachments.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const USER = '0190b1c2-0000-7000-8000-000000000001';
 const WORKSPACE = '0190b1c2-0000-7000-8000-0000000000aa';
@@ -59,7 +60,7 @@ async function setup() {
   const moduleRef = await Test.createTestingModule({
     providers: [
       AttachmentsService,
-      { provide: PrismaClient, useValue: prisma },
+      { provide: PrismaService, useValue: prisma },
       { provide: PermissionsService, useValue: permissions },
       { provide: PlanLimitsService, useValue: limits },
       { provide: S3Storage, useValue: s3 },

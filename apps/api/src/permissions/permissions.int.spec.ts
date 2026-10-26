@@ -3,11 +3,12 @@ import { Controller, Get, Param, Post, Req } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import request from 'supertest';
-import { PrismaClient } from '@collab-docs/db';
+import { type PrismaClient } from '@collab-docs/db';
 import { signAccessToken } from '@collab-docs/shared';
 import { createTestApp } from '../test/test-app';
 import { PermissionsModule } from './permissions.module';
 import { DocumentAccess } from './permissions.decorators';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('test-docs')
 class DocsController {
@@ -60,7 +61,7 @@ describe('document access guard (database-backed)', () => {
 
   beforeAll(async () => {
     app = await createTestApp([DocsController], [PermissionsModule]);
-    prisma = app.get(PrismaClient, { strict: false });
+    prisma = app.get(PrismaService, { strict: false });
   });
 
   afterAll(async () => {

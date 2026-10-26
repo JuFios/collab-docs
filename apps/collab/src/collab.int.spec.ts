@@ -4,7 +4,7 @@ import * as decoding from 'lib0/decoding';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import WebSocket from 'ws';
-import { DocumentStateReader, DocumentStateWriter, PrismaClient } from '@collab-docs/db';
+import { DocumentStateReader, DocumentStateWriter, type PrismaClient } from '@collab-docs/db';
 import {
   COLLAB_CLOSE,
   COLLAB_MESSAGE,
@@ -15,6 +15,7 @@ import { REDIS_CLIENT, parseConfig, signCollabTicket } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
+import { PrismaService } from './prisma/prisma.service';
 
 const SECRET = parseConfig(process.env).COLLAB_TICKET_SECRET;
 const IDLE_MS = parseConfig(process.env).COLLAB_ROOM_IDLE_MS;
@@ -174,7 +175,7 @@ describe('collab gateway', () => {
 
   beforeAll(async () => {
     collab = await startCollab();
-    prisma = collab.app.get(PrismaClient);
+    prisma = collab.app.get(PrismaService);
     redis = collab.app.get(REDIS_CLIENT);
     stateReader = collab.app.get(DocumentStateReader);
     rooms = collab.app.get(RoomManager);

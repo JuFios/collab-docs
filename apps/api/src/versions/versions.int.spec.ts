@@ -6,11 +6,17 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import * as Y from 'yjs';
-import { DocumentStateWriter, DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
+import {
+  DocumentStateWriter,
+  DocumentVersions,
+  MAX_VERSIONS,
+  type PrismaClient,
+} from '@collab-docs/db';
 import { QUEUE_NAMES, QueueService, parseConfig } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { VersionPruneProcessor } from './version-prune.processor';
 import { VersionsWorkerModule } from './versions.module';
+import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
 const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
@@ -117,7 +123,7 @@ describe('document versions', () => {
     app = await createTestApp([], [VersionsWorkerModule]);
     // the client reads the url from the shared config object on every call
     app.get(ConfigService).set('COLLAB_INTERNAL_URL', collabUrl);
-    prisma = app.get(PrismaClient, { strict: false });
+    prisma = app.get(PrismaService, { strict: false });
     versions = app.get(DocumentVersions, { strict: false });
     writer = new DocumentStateWriter(prisma);
   });

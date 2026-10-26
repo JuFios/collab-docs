@@ -11,26 +11,27 @@ import { CollabMetrics } from '../metrics/collab-metrics.service';
 import { DOCUMENT_STORE } from '../rooms/document-store';
 import { type DocumentStorage, PostgresDocumentStore } from '../rooms/postgres-document-store';
 import { PersistenceHooksService } from './persistence-hooks.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** Storage of document content: the Postgres-backed `DocumentStore` and what hangs off it (versions, restore). */
 @Module({
   providers: [
     {
       provide: DocumentStateReader,
-      inject: [PrismaClient],
-      useFactory: (prisma: PrismaClient) => new DocumentStateReader(prisma),
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => new DocumentStateReader(prisma),
     },
     {
       provide: DocumentVersions,
-      inject: [PrismaClient, DocumentStateReader],
-      useFactory: (prisma: PrismaClient, reader: DocumentStateReader) =>
+      inject: [PrismaService, DocumentStateReader],
+      useFactory: (prisma: PrismaService, reader: DocumentStateReader) =>
         new DocumentVersions(prisma, reader),
     },
     PersistenceHooksService,
     {
       provide: DOCUMENT_STORE,
       inject: [
-        PrismaClient,
+        PrismaService,
         DocumentStateReader,
         ConfigService,
         CollabMetrics,

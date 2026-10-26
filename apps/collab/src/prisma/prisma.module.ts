@@ -1,44 +1,10 @@
-import {
-  Global,
-  Injectable,
-  Module,
-  type OnApplicationShutdown,
-  type OnModuleInit,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createPrismaClient, PrismaClient } from '@collab-docs/db';
-import { type AppConfig, ReadinessService } from '@collab-docs/nest';
+import { Global, Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
 
-/** Registers the Postgres probe and closes the connection pool on shutdown. */
-@Injectable()
-class PrismaLifecycle implements OnModuleInit, OnApplicationShutdown {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly readiness: ReadinessService,
-  ) {}
-
-  onModuleInit(): void {
-    this.readiness.register('postgres', () => this.prisma.$queryRaw`SELECT 1`);
-  }
-
-  // after beforeApplicationShutdown, where the rooms write their last updates
-  async onApplicationShutdown(): Promise<void> {
-    await this.prisma.$disconnect();
-  }
-}
-
-/** Singleton Prisma client: inject `PrismaClient` directly. Connections open lazily on first query. */
+/** Global module for the Prisma client provider. */
 @Global()
 @Module({
-  providers: [
-    {
-      provide: PrismaClient,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<AppConfig, true>) =>
-        createPrismaClient(config.get('DATABASE_URL', { infer: true })),
-    },
-    PrismaLifecycle,
-  ],
-  exports: [PrismaClient],
+  providers: [PrismaService],
+  exports: [PrismaService],
 })
 export class PrismaModule {}

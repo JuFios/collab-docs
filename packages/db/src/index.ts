@@ -1,4 +1,4 @@
-export { createPrismaClient, PrismaClient } from './client';
+export { createPrismaClient, PrismaClient, prismaClientOptions } from './client';
 export { Prisma } from './generated/client';
 export * from './generated/enums';
 export type {

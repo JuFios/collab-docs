@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@collab-docs/db';
 import { canManageDocument, type ShareRole } from '@collab-docs/shared';
 import { AppException } from '@collab-docs/nest';
 import { type DocumentAccessResult, notFound } from '../permissions/permissions.service';
@@ -7,12 +6,13 @@ import { PermEventsService } from '../permissions/perm-events.service';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
 import type { ShareResponse, SharedDocumentResponse } from './documents.dto';
 import { TreeCacheService } from './tree-cache.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** Sharing by email, for registered users only (P2). Managing shares needs MANAGE, or EDIT for the author. */
 @Injectable()
 export class SharesService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly permEvents: PermEventsService,
     private readonly treeCache: TreeCacheService,
   ) {}

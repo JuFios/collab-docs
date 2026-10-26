@@ -2,11 +2,12 @@ import '../test/attachments-env';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { PrismaClient } from '@collab-docs/db';
+import { type PrismaClient } from '@collab-docs/db';
 import { PLAN_CATALOG } from '@collab-docs/shared';
 import { createTestApp } from '../test/test-app';
 import { S3Storage } from '../storage/s3.service';
 import { AttachmentSweeper } from './attachment-sweeper';
+import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
 const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
@@ -139,7 +140,7 @@ describe('attachments', () => {
     flush.disconnect();
     redis = new Redis(process.env.REDIS_URL as string);
     app = await createTestApp();
-    prisma = app.get(PrismaClient, { strict: false });
+    prisma = app.get(PrismaService, { strict: false });
     s3 = app.get(S3Storage, { strict: false });
     sweeper = app.get(AttachmentSweeper, { strict: false });
   });

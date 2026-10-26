@@ -1,7 +1,8 @@
 import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@collab-docs/db';
+
 import { PLAN_CATALOG, type PlanTier } from '@collab-docs/shared';
 import { PlanLimitsService, type Tx } from './plan-limits.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** The few Prisma operations the service reads; the same object serves as the client and as the transaction. */
 function fakeDb(plan: PlanTier | null = 'FREE') {
@@ -20,7 +21,7 @@ function fakeDb(plan: PlanTier | null = 'FREE') {
 async function setup(plan: PlanTier | null = 'FREE') {
   const db = fakeDb(plan);
   const moduleRef = await Test.createTestingModule({
-    providers: [PlanLimitsService, { provide: PrismaClient, useValue: db }],
+    providers: [PlanLimitsService, { provide: PrismaService, useValue: db }],
   }).compile();
   return { db, service: moduleRef.get(PlanLimitsService), tx: db as unknown as Tx };
 }

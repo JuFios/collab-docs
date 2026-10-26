@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaClient } from '@collab-docs/db';
 import { type AppConfig, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { S3Storage } from '../storage/s3.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const BATCH = 200;
 
@@ -10,7 +10,7 @@ const BATCH = 200;
 @Injectable()
 export class AttachmentSweeper {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly s3: S3Storage,
     private readonly config: ConfigService<AppConfig, true>,
     @InjectPinoLogger(AttachmentSweeper.name) private readonly logger: PinoLogger,

@@ -8,7 +8,6 @@ import {
   createParamDecorator,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaClient } from '@collab-docs/db';
 import type { Access } from '@collab-docs/shared';
 import { AppException, ParseUuidPipe } from '@collab-docs/nest';
 import type { Request } from 'express';
@@ -18,6 +17,7 @@ import {
   PermissionsService,
   notFound,
 } from '../permissions/permissions.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const ATTACHMENT_ACCESS_KEY = 'attachments:access';
 
@@ -50,7 +50,7 @@ interface Requirement {
 export class AttachmentAccessGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
   ) {}
 
