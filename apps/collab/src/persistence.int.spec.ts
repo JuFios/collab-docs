@@ -282,7 +282,12 @@ describe('document persistence', () => {
         'both sockets to close with 4410',
       );
       expect(a.event('deleted')).toEqual({ type: 'deleted' });
-      expect(await content(documentId)).toContain('last words');
+      // The access re-check can close the sockets (4410) just before the event is handled, so the text is
+      // guaranteed to reach the database, not to be there at the instant the last socket closes.
+      await waitFor(
+        async () => (await content(documentId)).includes('last words'),
+        'the last words to reach the database',
+      );
     });
 
     it('does the same through the internal close endpoint, and is idempotent', async () => {
