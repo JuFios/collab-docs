@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
-import { mergeStateVectors } from '@collab-docs/shared';
 import type { DocumentStore } from './document-store';
+import { advanceStateVector } from './state-vector';
 
 /** What the store needs from the database layer; `@collab-docs/db` provides it, tests replace it. */
 export interface DocumentStorage {
@@ -256,10 +256,7 @@ export class PostgresDocumentStore implements DocumentStore {
     }
     this.observer.persisted((this.clock() - startedAt) / 1000);
     state.retryAttempt = 0;
-    state.persistedStateVector = mergeStateVectors(
-      state.persistedStateVector,
-      Y.encodeStateVectorFromUpdate(merged),
-    );
+    state.persistedStateVector = advanceStateVector(state.persistedStateVector, merged);
     if (result.inserted) {
       state.tailRows += 1;
       state.tailBytes += merged.byteLength;

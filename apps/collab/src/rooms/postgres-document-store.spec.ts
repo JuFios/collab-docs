@@ -251,6 +251,19 @@ describe('PostgresDocumentStore', () => {
       expect(stateVectorCovers(seen[0]!, Y.encodeStateVector(client.doc))).toBe(false);
     });
 
+    it('keeps covering the document across several flushes of incremental updates', async () => {
+      const { store } = setup();
+      const client = typist();
+      const seen: Uint8Array[] = [];
+      store.onPersisted(DOC, (sv) => seen.push(sv));
+      for (const word of ['one', ' two', ' three']) {
+        store.enqueue(DOC, client.type(word));
+        await store.flush(DOC);
+        expect(stateVectorCovers(seen.at(-1)!, Y.encodeStateVector(client.doc))).toBe(true);
+      }
+      expect(seen).toHaveLength(3);
+    });
+
     it('does not announce anything for a failed flush', async () => {
       const { store, storage } = setup();
       const listener = jest.fn();

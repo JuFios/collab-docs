@@ -125,6 +125,24 @@ describe('document persistence', () => {
       expect(await content(documentId)).toContain('acknowledged');
     });
 
+    it('keeps reporting a covering "persisted" while the client keeps typing', async () => {
+      const { editor, documentId } = await makeTeam(prisma);
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      for (const word of ['first', ' second', ' third']) {
+        client.paragraph().insert(client.paragraph().length, word);
+        await internal('flush', { documentId: documentId });
+        await waitFor(() => {
+          const persisted = client.event('persisted');
+          return (
+            !!persisted &&
+            stateVectorCovers(base64ToBytes(persisted.sv), Y.encodeStateVector(client.doc))
+          );
+        }, `a persisted event covering "${word}"`);
+      }
+      expect(await content(documentId)).toContain('first second third');
+    });
+
     it('writes a closing room and a shutting down service without waiting for the timers', async () => {
       const { editor, documentId } = await makeTeam(prisma);
       const first = await connect(editor, documentId);
