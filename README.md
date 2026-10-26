@@ -278,8 +278,13 @@ Both are `Secure` when `APP_ENV=staging`. The browser reaches the API same-origi
 
 For other modules: every route requires a valid access token unless it is marked `@Public()`; the user is
 available through `@CurrentUser()` (`{ id, jti }`). The guard verifies the JWT locally and never touches the
-database. `verifyAccessToken()` and `signAccessToken()` live in `@collab-docs/shared` and use only `jose` and
-Web APIs, so Next's Edge middleware and the collab service verify tokens exactly as the API does.
+database. The API issues and verifies the token with `@nestjs/jwt` (`AccessTokenService`, `JwtModule` configured
+from `JWT_ACCESS_SECRET`). Next's Edge middleware cannot use it, so `verifyAccessToken()` in `@collab-docs/shared`
+verifies the same token with `jose` (Web APIs only). The two implementations are tied together by a contract test
+(`access-token.service.spec.ts`): a token from either side must verify on the other with the same claims, and
+expired, tampered, wrong-audience, wrong-algorithm and incomplete tokens must be rejected by both. The collab
+ticket stays on `jose` (`signCollabTicket`/`verifyCollabTicket`), because the API signs it and collab verifies
+it with the same code, so there is no second implementation to keep in step.
 
 ### Auth design & rationale
 
@@ -314,7 +319,7 @@ which honours `x-forwarded-for` only from `TRUSTED_PROXY_CIDRS`.
 **HS256 vs ES256/JWKS.** HS256 with a dedicated secret (`JWT_ACCESS_SECRET`) is the simplest thing that works
 for services we deploy together; every verifier holds the secret. The cost is that every verifier could also
 mint tokens. To move to ES256 with a JWKS endpoint, the API would sign with a private key and publish the
-public key; `signAccessToken`/`verifyAccessToken` are the only places that change, and `jose` already supports
+public key; `AccessTokenService` and `verifyAccessToken` are the only places that change, and `jose` already supports
 `createRemoteJWKSet`. Rotating keys then needs only a `kid`, with no secret redistribution.
 
 ## Workspaces, members and invites

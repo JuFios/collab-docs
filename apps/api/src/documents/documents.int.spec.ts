@@ -106,7 +106,9 @@ describe('documents', () => {
       .expect(201);
   }
 
-  const messagesOn = (channel: string) => published.filter((m) => m.channel === channel);
+  // the channels are global and other suites publish on them in parallel: keep only one workspace's events
+  const messagesOn = (channel: string, workspaceId: string) =>
+    published.filter((m) => m.channel === channel && m.payload.workspaceId === workspaceId);
   const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
 
   beforeAll(async () => {
@@ -904,7 +906,9 @@ describe('documents', () => {
       await as(team.owner).post(`/documents/${doc.id}/restore`).expect(200);
       await settle();
 
-      expect(messagesOn(PERM_EVENT_CHANNELS.permChanged).map((m) => m.payload)).toEqual([
+      expect(
+        messagesOn(PERM_EVENT_CHANNELS.permChanged, team.workspaceId).map((m) => m.payload),
+      ).toEqual([
         expect.objectContaining({
           documentId: doc.id,
           workspaceId: team.workspaceId,
@@ -916,12 +920,12 @@ describe('documents', () => {
           reason: 'share_changed',
         }),
       ]);
-      const deleted = messagesOn(PERM_EVENT_CHANNELS.docDeleted);
+      const deleted = messagesOn(PERM_EVENT_CHANNELS.docDeleted, team.workspaceId);
       expect(deleted).toHaveLength(1);
       expect((deleted[0]!.payload.documentIds as string[]).sort()).toEqual(
         [doc.id, child.id].sort(),
       );
-      expect(messagesOn(PERM_EVENT_CHANNELS.docRestored)).toHaveLength(1);
+      expect(messagesOn(PERM_EVENT_CHANNELS.docRestored, team.workspaceId)).toHaveLength(1);
     });
 
     it('publishes nothing when the transaction rolls back', async () => {

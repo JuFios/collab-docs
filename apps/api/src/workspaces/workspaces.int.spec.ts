@@ -401,7 +401,11 @@ describe('workspaces, members, invites', () => {
       const team = await setupTeam();
       const subscriber = new Redis(process.env.REDIS_URL as string);
       const messages: Array<Record<string, unknown>> = [];
-      subscriber.on('message', (_channel, payload) => messages.push(JSON.parse(payload)));
+      // the channel is global: other suites run in parallel and publish their own events, so keep only ours
+      subscriber.on('message', (_channel, payload) => {
+        const event = JSON.parse(payload) as Record<string, unknown>;
+        if (event.workspaceId === team.workspaceId) messages.push(event);
+      });
       await subscriber.subscribe(PERM_EVENT_CHANNELS.permChanged);
       try {
         const base = `/workspaces/${team.workspaceId}/members`;
