@@ -64,6 +64,12 @@ const PRESETS = {
     ttl: seconds(60),
     message: 'Too many searches, try again shortly',
   },
+  comment: {
+    scope: 'user',
+    limit: 'RATE_COMMENT_PER_MIN_USER',
+    ttl: seconds(60),
+    message: 'Too many comments, try again shortly',
+  },
 } as const satisfies Record<
   string,
   { scope: RateScope; limit: keyof AppConfig; ttl: number; message?: string }
