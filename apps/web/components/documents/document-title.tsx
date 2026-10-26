@@ -2,12 +2,11 @@
 
 import { type DocumentDetails, DOCUMENT_TITLE_MAX_LENGTH } from '@collab-docs/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { TitleSaveState } from '@/lib/collab/save-status';
 import { useSaveDocumentTitle } from '@/lib/documents/queries';
 import { consumeTitleFocus } from '@/lib/documents/title-focus';
 
 const SAVE_DEBOUNCE_MS = 700;
-
-export type TitleSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /**
  * Inline title: typing is saved after a pause, on Enter, on blur and when leaving the page. A newly created

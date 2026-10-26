@@ -1,9 +1,14 @@
 'use client';
 
 import { type DocumentDetails, accessAtLeast } from '@collab-docs/shared';
-import { Link2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { History, Link2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { CollabErrorState } from '@/components/editor/collab-error-state';
+import { DocumentEditor } from '@/components/editor/document-editor';
+import { PresenceAvatars } from '@/components/editor/presence-avatars';
+import { SaveIndicator } from '@/components/editor/save-indicator';
+import { VersionsPanel } from '@/components/editor/versions-panel';
 import { LoadingState } from '@/components/states';
 import {
   DropdownMenu,
@@ -16,23 +21,20 @@ import { useOptionalWorkspace } from '@/components/workspaces/workspace-provider
 import { isApiError } from '@/lib/api/errors';
 import { useDocumentQuery, useTree } from '@/lib/documents/queries';
 import { descendantIds, pathTo } from '@/lib/documents/tree';
+import { type TitleSaveState, deriveSaveStatus } from '@/lib/collab/save-status';
+import { useCollabConnection } from '@/lib/collab/use-collab-connection';
+import { useOnlineStatus } from '@/lib/collab/use-online-status';
+import { usePresence } from '@/lib/collab/use-presence';
 import { Breadcrumbs } from './breadcrumbs';
 import { DeleteDocumentDialog } from './delete-document-dialog';
 import { DocumentGone } from './document-gone';
-import { DocumentTitle, type TitleSaveState } from './document-title';
+import { DocumentTitle } from './document-title';
 import { useDocumentActions } from './use-document-actions';
 
-const SAVE_LABELS: Record<TitleSaveState, string> = {
-  idle: '',
-  saving: 'Saving…',
-  saved: 'Saved',
-  error: 'Could not save',
-};
-
 /**
- * The page around a document: breadcrumbs, title, actions and the state banners. The editor itself is not part of
- * this shell yet; `data-testid="editor-placeholder"` marks where it mounts. A guest (not a member, opened through a
- * share) gets the same shell without the tree-dependent parts.
+ * The page around a document: breadcrumbs, title, presence, save status, actions and the editor. The page owns the
+ * real-time connection (`useCollabConnection`) because the header and the editor both depend on it. A guest (not a
+ * member, opened through a share) gets the same shell without the tree-dependent parts.
  */
 export function DocumentShell({
   workspaceId,
@@ -167,9 +169,50 @@ function Frame({
   menu: (focusTitle: () => void) => React.ReactNode;
   member: boolean;
 }) {
-  const editable = accessAtLeast(document.myAccess, 'EDIT');
   const titleField = useRef<HTMLInputElement>(null);
   const [saveState, setSaveState] = useState<TitleSaveState>('idle');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const online = useOnlineStatus();
+  const connection = useCollabConnection(document.id, {
+    onDowngrade: ({ discardedChanges }) =>
+      toast.warning(
+        discardedChanges
+          ? 'Your access changed to read-only. Edits that were not saved were discarded.'
+          : 'Your access changed to read-only.',
+      ),
+  });
+  const presence = usePresence(connection.provider);
+  // the REST answer decides until the server reports the live level on connect
+  const editable = accessAtLeast(connection.accessLevel ?? document.myAccess, 'EDIT');
+  const status = deriveSaveStatus({
+    connection: connection.status,
+    synced: connection.synced,
+    hasUnsyncedChanges: connection.hasUnsyncedChanges,
+    online,
+    title: saveState,
+  });
+  // a reader has nothing to save; only the connection problems matter to them
+  const showStatus = editable || status === 'offline' || status === 'connecting';
+  const unsaved = editable && connection.hasUnsyncedChanges;
+
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [unsaved]);
+
+  if (connection.error && connection.error.kind !== 'unavailable') {
+    return (
+      <CollabErrorState
+        error={connection.error}
+        workspaceId={workspaceId}
+        documentId={document.id}
+        member={member}
+        onRetry={connection.retry}
+      />
+    );
+  }
 
   return (
     <article
@@ -197,19 +240,54 @@ function Frame({
             Read-only
           </span>
         )}
-        <span role="status" aria-live="polite" className="shrink-0 text-xs text-muted-foreground">
-          {SAVE_LABELS[saveState]}
+        {showStatus ? <SaveIndicator status={status} /> : null}
+        <span className="ml-auto flex items-center gap-2">
+          <PresenceAvatars users={presence} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-pressed={historyOpen}
+            onClick={() => setHistoryOpen((open) => !open)}
+          >
+            <History className="h-4 w-4" aria-hidden /> History
+          </Button>
+          {menu(() => {
+            titleField.current?.focus();
+            titleField.current?.select();
+          })}
         </span>
-        {menu(() => {
-          titleField.current?.focus();
-          titleField.current?.select();
-        })}
       </div>
-      <div
-        data-testid="editor-placeholder"
-        className="grid min-h-64 place-items-center rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
-      >
-        The document editor is not available yet. Title, structure and sharing already work.
+      <div className={historyOpen ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]' : 'grid gap-4'}>
+        <div className="min-w-0">
+          {connection.error ? (
+            <CollabErrorState
+              error={connection.error}
+              workspaceId={workspaceId}
+              documentId={document.id}
+              member={member}
+              onRetry={connection.retry}
+            />
+          ) : connection.ydoc && connection.provider ? (
+            <DocumentEditor
+              key={connection.ydoc.guid}
+              documentId={document.id}
+              ydoc={connection.ydoc}
+              provider={connection.provider}
+              synced={connection.synced}
+              editable={editable}
+            />
+          ) : (
+            <LoadingState label="Opening the document…" />
+          )}
+        </div>
+        {historyOpen ? (
+          <VersionsPanel
+            documentId={document.id}
+            canEdit={editable}
+            onClose={() => setHistoryOpen(false)}
+          />
+        ) : null}
       </div>
     </article>
   );

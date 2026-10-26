@@ -1,43 +1,6 @@
-import type { Browser, BrowserContext, Page } from '@playwright/test';
-import { inviteLinkFor } from '../mailpit';
+import type { Page } from '@playwright/test';
 import { expect, newUser, registerViaApi, test } from '../fixtures';
-
-const ORIGIN = 'http://localhost:3000';
-
-async function signedIn(
-  browser: Browser,
-  baseURL: string | undefined,
-  user: { email: string; password: string },
-): Promise<{ page: Page; context: BrowserContext }> {
-  const context = await browser.newContext({ baseURL });
-  const login = await context.request.post('/api/auth/login', {
-    data: { email: user.email, password: user.password },
-  });
-  expect(login.status(), await login.text()).toBe(200);
-  return { page: await context.newPage(), context };
-}
-
-async function createWorkspace(page: Page, name: string): Promise<string> {
-  await page.goto('/w');
-  await page.getByLabel('Workspace name').fill(name);
-  await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
-  return new URL(page.url()).pathname.split('/')[2] as string;
-}
-
-async function createDocument(
-  page: Page,
-  workspaceId: string,
-  title: string,
-  parentId?: string,
-): Promise<string> {
-  const response = await page.request.post(`/api/workspaces/${workspaceId}/documents`, {
-    data: { title, parentId },
-    headers: { origin: ORIGIN },
-  });
-  expect(response.status(), await response.text()).toBe(201);
-  return ((await response.json()) as { id: string }).id;
-}
+import { ORIGIN, createDocument, createWorkspace, invitedMember, signedIn } from '../workspace';
 
 /** Runs `action` and waits for the matching api call to succeed, so a following reload sees persisted data. */
 async function persisted(
@@ -63,28 +26,6 @@ async function rows(page: Page): Promise<string[]> {
     .evaluateAll((items) =>
       items.map((item) => `${item.getAttribute('aria-label')}@${item.getAttribute('aria-level')}`),
     );
-}
-
-async function invitedMember(
-  browser: Browser,
-  baseURL: string | undefined,
-  owner: Page,
-  workspaceId: string,
-  role: 'Editor' | 'Viewer',
-): Promise<Page> {
-  const member = await registerViaApi(
-    (await browser.newContext({ baseURL })).request,
-    newUser(role.toLowerCase()),
-  );
-  await owner.goto(`/w/${workspaceId}/settings`);
-  await owner.getByRole('textbox', { name: 'Email' }).fill(member.email);
-  await owner.getByRole('combobox', { name: 'Role' }).selectOption({ label: role });
-  await owner.getByRole('button', { name: 'Send invitation' }).click();
-  const { page } = await signedIn(browser, baseURL, member);
-  await page.goto(new URL(await inviteLinkFor(member.email)).pathname);
-  await page.getByRole('button', { name: 'Accept invitation' }).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}$`));
-  return page;
 }
 
 test.describe('document tree', () => {
@@ -113,7 +54,9 @@ test.describe('document tree', () => {
       'aria-current',
       'page',
     );
-    await expect(page.getByRole('article').getByTestId('editor-placeholder')).toBeVisible();
+    await expect(
+      page.getByRole('article').getByRole('textbox', { name: 'Document content' }),
+    ).toBeVisible();
   });
 
   test('a node moves by dragging and the order survives a reload', async ({
@@ -253,7 +196,7 @@ test.describe('document tree', () => {
   }) => {
     const workspaceId = await createWorkspace(owner, 'Roles');
     const docId = await createDocument(owner, workspaceId, 'Handbook');
-    const viewer = await invitedMember(browser, baseURL, owner, workspaceId, 'Viewer');
+    const { page: viewer } = await invitedMember(browser, baseURL, owner, workspaceId, 'Viewer');
 
     await viewer.goto(`/w/${workspaceId}/d/${docId}`);
     await expect(viewer.getByRole('heading', { name: 'Handbook', level: 2 })).toBeVisible();

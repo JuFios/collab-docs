@@ -675,38 +675,40 @@ bundled through npm so builds need no network).
 Server Component is the default: anything that reads data and needs no browser state. A Client Component
 (`"use client"`) exists only where the browser is required, and each one is listed here with the reason:
 
-| Client component                                                                                            | Why                                                                                                                           |
-| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `components/providers.tsx`                                                                                  | TanStack Query provider and the toast outlet                                                                                  |
-| `components/auth/login-form.tsx`, `register-form.tsx`                                                       | `useActionState` (pending state, field errors) and a zod pass before the round trip                                           |
-| `components/user-menu.tsx`                                                                                  | Radix menu; the logout Server Action runs from its event handler                                                              |
-| `components/workspaces/create-workspace-form`, `rename-workspace-form`, `invite-form`, `accept-invite-form` | `useActionState` (pending state, field errors, plan-limit explanation) and a zod pass before the round trip                   |
-| `components/workspaces/members-table.tsx`, `pending-invites.tsx`                                            | Role selects, the remove confirmation and revoke call Server Actions from event handlers                                      |
-| `components/workspaces/leave-workspace-button.tsx`                                                          | Confirmation dialog; the action runs from an event handler, then navigation and refresh                                       |
-| `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                    |
-| `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                        |
-| `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action |
-| `components/workspaces/workspace-provider.tsx`                                                              | Owns the tab's single SSE connection and hands the workspace role, the initial tree and the connection state to the sidebar   |
-| `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server           |
-| `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                        |
-| `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                |
-| `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                            |
-| `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                               |
-| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                  |
-| `app/error.tsx`                                                                                             | Error boundaries must be Client Components                                                                                    |
+| Client component                                                                                            | Why                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `components/providers.tsx`                                                                                  | TanStack Query provider and the toast outlet                                                                                         |
+| `components/auth/login-form.tsx`, `register-form.tsx`                                                       | `useActionState` (pending state, field errors) and a zod pass before the round trip                                                  |
+| `components/user-menu.tsx`                                                                                  | Radix menu; the logout Server Action runs from its event handler                                                                     |
+| `components/workspaces/create-workspace-form`, `rename-workspace-form`, `invite-form`, `accept-invite-form` | `useActionState` (pending state, field errors, plan-limit explanation) and a zod pass before the round trip                          |
+| `components/workspaces/members-table.tsx`, `pending-invites.tsx`                                            | Role selects, the remove confirmation and revoke call Server Actions from event handlers                                             |
+| `components/workspaces/leave-workspace-button.tsx`                                                          | Confirmation dialog; the action runs from an event handler, then navigation and refresh                                              |
+| `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                           |
+| `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                               |
+| `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action        |
+| `components/workspaces/workspace-provider.tsx`                                                              | Owns the tab's single SSE connection and hands the workspace role, the initial tree and the connection state to the sidebar          |
+| `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server                  |
+| `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                               |
+| `components/editor/*`, `lib/collab/use-collab-connection.ts`                                                | The block editor, the WebSocket, presence, save status and version history: Yjs, ProseMirror and `navigator.onLine` are browser-only |
+| `components/content/content-renderer.tsx` (not a client component)                                          | Stateless render of sanitised JSON; usable from a Server Component (the public page) and from the version preview                    |
+| `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                       |
+| `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                                   |
+| `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                                      |
+| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                         |
+| `app/error.tsx`                                                                                             | Error boundaries must be Client Components                                                                                           |
 
 Screens and where they render (everything not listed as a client island is a Server Component):
 
-| Screen                | Renders in                             | Why                                                                                                                                                                                                             |
-| --------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/w`                  | RSC page + client create form          | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                |
-| `/w/[id]` (dashboard) | RSC, four async RSC blocks             | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                               |
-| `/w/[id]/settings`    | RSC page + client forms/tables         | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                          |
-| `/invite/[token]`     | RSC                                    | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                 |
-| `/w/[id]/d/[docId]`   | RSC page + client shell                | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island for the inline title and live refresh |
-| `/w/[id]/trash`       | RSC page + client list                 | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                |
-| `/shared`             | RSC                                    | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                |
-| Navbar                | RSC shell + switcher/user-menu islands | The workspace list is fetched in the layout and passed down as typed props                                                                                                                                      |
+| Screen                | Renders in                             | Why                                                                                                                                                                                                                                                           |
+| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/w`                  | RSC page + client create form          | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
+| `/w/[id]` (dashboard) | RSC, four async RSC blocks             | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
+| `/w/[id]/settings`    | RSC page + client forms/tables         | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
+| `/invite/[token]`     | RSC                                    | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
+| `/w/[id]/d/[docId]`   | RSC page + client shell and editor     | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
+| `/w/[id]/trash`       | RSC page + client list                 | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
+| `/shared`             | RSC                                    | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
+| Navbar                | RSC shell + switcher/user-menu islands | The workspace list is fetched in the layout and passed down as typed props                                                                                                                                                                                    |
 
 **Dashboard streaming.** `app/(app)/w/[id]/page.tsx` awaits nothing but the workspace the layout already loaded
 (deduplicated by `React.cache`). The blocks (`components/dashboard/blocks.tsx`: recent documents, members,
@@ -759,6 +761,83 @@ document page reads breadcrumbs from it, and mutations update it.
   deleted" with Restore, otherwise "no longer available". A guest (a user with a share but no membership)
   opens `/w/[id]/d/[docId]` without the workspace frame: the layout renders its children bare when the user is
   not a member, and every other page of the segment answers 404 through `requireWorkspace`.
+
+### Editor & real-time client
+
+The document body is edited with Tiptap on top of the `Y.Doc` that the collab service synchronises (`field:
+'content'`). Everything that touches the connection lives in one hook, `useCollabConnection(documentId)`
+(`lib/collab/use-collab-connection.ts`): it is the only place that creates a `WebsocketProvider` and the only
+place that interprets a close code (`lib/collab/errors.ts`).
+
+**Schema.** `components/editor/extensions.ts` expresses the content model of `@collab-docs/shared/content` as
+Tiptap extensions: StarterKit without history, strike, underline, quote and rule (the sanitiser would remove
+them from every published page, so the editor does not offer them), headings 1-3, task lists, a block `image`
+that stores an attachment id and alt text only, a code block with a language picker, the `mention` node (rendered,
+no suggestion UI yet) and `UniqueID` for block ids. `extensions.test.ts` builds an editor from the list and fails
+if its node and mark names, or any node attribute, differ from the model. Undo and redo are the Yjs UndoManager's
+(only the user's own changes), not ProseMirror history.
+
+**Connection lifecycle.**
+
+| Event                     | Behaviour                                                                                                                                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount                     | `POST /documents/:id/collab-ticket`, then `new WebsocketProvider(wsUrl, docId, ydoc, { params: { ticket }, disableBc: true })`; cross-tab sync is off so every update goes through the server, which owns permissions |
+| Close 4401 (ticket)       | Fetch a new ticket, set `provider.params.ticket`, `provider.connect()`; gives up after five failed rounds in a row and offers "Try again"                                                                             |
+| Close 4403 / 4404 / 4410  | `provider.disconnect()`; the editor is replaced by an access-denied, not-found or deleted screen. Room event `deleted` is handled the same way                                                                        |
+| Close 4429                | Back off (1 s, 2 s, 4 s ... 30 s) before asking for a new ticket                                                                                                                                                      |
+| Any other close           | Left to `y-websocket`'s own reconnect loop; a ticket that expired meanwhile ends in 4401 above                                                                                                                        |
+| Ticket request fails      | 403 / 404 stop with the same screens; 429, 5xx and network errors back off, other errors stop with "Could not connect"                                                                                                |
+| `access` event, downgrade | A client that could edit and now cannot discards its `Y.Doc` and starts a new session from the server state (a warning toast says whether unsaved edits were dropped); an upgrade rebuilds the editor as editable     |
+| `persisted` event         | Recomputes `hasUnsyncedChanges` (below)                                                                                                                                                                               |
+
+The hook returns `{ ydoc, provider, status, synced, hasUnsyncedChanges, accessLevel, error, retry }`.
+`y-websocket` 3.x already treats close codes 4400-4499 as final and reports them through its `closed` event
+instead of reconnecting forever; the hook still calls `disconnect()` on the final codes and uses `connect()` for
+the two it recovers from.
+
+**Why "Saved" rests on `persisted`.** A WebSocket send succeeding says nothing about the database, and
+`y-websocket` has no acknowledgements. The server therefore announces, after every flush and once on connect, the
+state vector of what is durable. The client compares it with its own: `hasUnsyncedChanges =
+!stateVectorCovers(persisted, encodeStateVector(ydoc))`. The indicator (`lib/collab/save-status.ts`) is derived from
+that and from the connection, so it cannot claim more than the server confirmed:
+
+| Indicator                                  | When                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `Connecting…`                              | Before the first sync of this session                                                                     |
+| `Saving…`                                  | Connected and synced, but the persisted vector does not cover the local one (or the title is being saved) |
+| `Saved`                                    | Connected, synced, everything covered by `persisted`, title saved                                         |
+| `Offline — changes will sync on reconnect` | `navigator.onLine` is false or the socket dropped after it had been open                                  |
+| `Could not save`                           | The title request failed                                                                                  |
+
+Readers (Viewer, or EDIT revoked) see only the connection states, never "Saved". Edits made while offline stay
+in the in-memory `Y.Doc` and merge on reconnect; nothing is kept in IndexedDB, so closing the tab while offline
+loses them. `beforeunload` asks for confirmation while `hasUnsyncedChanges` is true. The same flag is what the
+publishing flow will use to refuse "publish with unsaved changes".
+
+**Presence.** The awareness state is written by the server (`user` is replaced with the authenticated identity),
+so names and colours are trustworthy. Remote cursors and selections are drawn by `CollaborationCaret` with a
+renderer that builds DOM from text nodes only and accepts nothing but a hex colour. The header shows one avatar per
+other participant; viewers see presence too.
+
+**Images.** A file chosen from the toolbar or slash menu, dropped on the editor or pasted as a bare image goes
+`presign` -> `POST` to the bucket (multipart, with progress through `XMLHttpRequest`) -> `complete`; only then is
+an `image` block inserted. The block reads the picture through `GET /attachments/:id/url` and refreshes the signed URL
+shortly before it expires. Type, size and quota failures are ordinary mutation errors and reach the shared handler
+(toast, or the plan-limit event).
+
+**Version history.** The History button opens a panel next to the editor: automatic and saved versions, "Save
+version" with an optional name, a read-only preview rendered by `ContentRenderer`, and "Restore" (confirmation,
+EDIT or better). The collab service applies a restore as an ordinary edit after saving a `Before restore`
+version, so the open editor, and every other client, converges through the CRDT without a reload.
+
+**Known limitation.** If two people type their very first characters into the same empty block at the same
+moment, one character can end up duplicated in both copies. It reproduces with stock Tiptap `Collaboration` and no
+other extension (`@tiptap/y-tiptap` creating the first text node of an empty paragraph on both sides), so it is not
+specific to this editor's configuration. Once the block has any text, concurrent typing in it merges exactly; the
+two-editor e2e spec seeds the block first for that reason.
+
+`ContentRenderer` has no `"use client"`: it renders sanitised JSON (and checks link protocols again), and takes a
+`resolveImageSrc(attachmentId)` callback so that the editor can use signed URLs and the public page `/media/:id`.
 
 ### Server Actions vs REST vs WebSocket
 
@@ -878,7 +957,7 @@ DASHBOARD_BLOCK_DELAY_MS=600 pnpm test:e2e
 
 Every test runs from the same address (the proxy overwrites `X-Forwarded-For`), so CI raises the per-IP limits
 through the `RATE_*` variables; `client-ip.spec.ts` proves that a spoofed header gets no fresh bucket. Fixtures
-create users through the API and reuse the session cookies instead of logging in through the UI. Traces
+create users through the API and reuse the session cookies instead of logging in through the UI. Shared helpers (`e2e/workspace.ts`) create workspaces and documents and accept invitations; `e2e/collab-client.ts` is a raw `y-websocket` peer for tests that must bypass the editor (a viewer writing over the socket). Traces
 and videos are kept for failed tests (`test-results/`, `playwright-report/`). CI runs the same steps in the
 `e2e` job and uploads both folders as artifacts.
 
