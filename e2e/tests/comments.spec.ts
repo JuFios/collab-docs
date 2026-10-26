@@ -32,7 +32,7 @@ async function startThread(page: Page, text: string): Promise<void> {
 }
 
 async function submitComment(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name }).click();
+  await page.getByRole('button', { name, exact: true }).click();
 }
 
 test.describe('comments', () => {
@@ -195,7 +195,7 @@ test.describe('comments', () => {
     const documentId = await createDocument(author, workspaceId, 'Keys');
     await openEditable(author, workspaceId, documentId);
     await writeParagraph(author, 'Keyboard only');
-    await author.keyboard.press('Control+Alt+m');
+    await author.keyboard.press('ControlOrMeta+Alt+m');
     await expect(author.getByRole('combobox', { name: 'New comment' })).toBeFocused();
     await author.keyboard.type('From the keyboard');
     await author.keyboard.press('Control+Enter');
