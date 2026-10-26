@@ -9,6 +9,7 @@ import { Placeholder } from '@tiptap/extensions';
 import StarterKit from '@tiptap/starter-kit';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import { BlockComments, type BlockCommentsController } from './block-comments';
 import { renderCaret, renderSelection } from './caret';
 import { CodeBlockWithLanguage } from './code-block-extension';
 import { ImageBlock } from './image-extension';
@@ -24,6 +25,8 @@ export interface EditorExtensionOptions {
    * local copy: the server ignores a reader's updates, and the copy would stay "unsaved" for good.
    */
   editable: boolean;
+  /** Comment markers next to blocks. Omitted where there are no comments (the extension list is then unchanged). */
+  blockComments?: BlockCommentsController;
 }
 
 /** Block types that carry a stable `id` (comment anchors); taken from the content model, not repeated here. */
@@ -63,6 +66,7 @@ export function createEditorExtensions({
   provider,
   pickImage,
   editable,
+  blockComments,
 }: EditorExtensionOptions): Extensions {
   return [
     StarterKit.configure({
@@ -97,6 +101,7 @@ export function createEditorExtensions({
     }),
     Placeholder.configure({ placeholder: 'Type “/” for blocks' }),
     SlashCommand.configure({ pickImage }),
+    ...(blockComments ? [BlockComments.configure({ controller: blockComments })] : []),
     Collaboration.configure({ document: ydoc, field: CONTENT_FIELD }),
     CollaborationCaret.configure({
       provider,
