@@ -7,6 +7,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
 import { RealtimeEventsModule } from './realtime/realtime.module';
+import { SearchModule } from './search/search.module';
 import { VersionsModule } from './versions/versions.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 
@@ -22,6 +23,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     VersionsModule,
     AttachmentsModule,
     PublishingModule,
+    SearchModule,
   ],
 })
 export class AppModule {}

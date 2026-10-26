@@ -16,6 +16,11 @@ export function WorkspaceNav({
   const base = `/w/${workspaceId}`;
   const links = [
     { href: base, label: 'Overview', active: pathname === base },
+    {
+      href: `${base}/search`,
+      label: 'Search',
+      active: pathname.startsWith(`${base}/search`),
+    },
     ...(canManage
       ? [
           {

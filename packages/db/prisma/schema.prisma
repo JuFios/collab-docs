@@ -4,6 +4,8 @@
 //  - documents.position is COLLATE "C" (fractional keys compare bytewise)
 //  - partial indexes (WHERE deleted_at IS NULL) keep the names declared below, so `migrate diff` sees no drift
 //  - pg_trgm / unaccent extensions
+//  - document_search.tsv is a GENERATED column (and cd_unaccent() its IMMUTABLE wrapper); the GIN indexes on it
+//    and on the title use the operator classes declared below
 //
 // onDelete policy: Cascade for rows that are meaningless without their parent (memberships, tokens, shares,
 // links, subscription); Restrict where deleting would silently destroy shared user content
@@ -125,6 +127,7 @@ model Workspace {
   subscription Subscription?
   documents    Document[]
   attachments  Attachment[]
+  searchRows   DocumentSearch[]
 
   @@map("workspaces")
 }
@@ -206,6 +209,7 @@ model Document {
   state       DocumentState?
   versions    DocumentVersion[]
   attachments Attachment[]
+  search      DocumentSearch?
 
   // partial in the migration: WHERE deleted_at IS NULL
   @@index([workspaceId, parentId, position], map: "documents_tree_idx")
@@ -327,4 +331,25 @@ model Attachment {
   // stale PENDING sweep
   @@index([status, createdAt])
   @@map("attachments")
+}
+
+// The full-text index of a document (spec §7), written only by the `search-sync` worker. It holds no access
+// information: permissions are applied by the query. `tsv` is generated from title (weight A) and body (weight B).
+model DocumentSearch {
+  documentId      String                   @id @map("document_id") @db.Uuid
+  workspaceId     String                   @map("workspace_id") @db.Uuid
+  title           String
+  body            String
+  tsv             Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('simple'::regconfig, cd_unaccent(title)), 'A'::\"char\") || setweight(to_tsvector('simple'::regconfig, cd_unaccent(body)), 'B'::\"char\"))"))
+  // `documents.revision` the row was built from; an older job never overwrites a newer row
+  indexedRevision BigInt                   @map("indexed_revision")
+  indexedAt       DateTime                 @default(now()) @map("indexed_at") @db.Timestamptz(6)
+
+  document  Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([tsv], type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "document_search_title_trgm_idx")
+  @@index([workspaceId])
+  @@map("document_search")
 }
