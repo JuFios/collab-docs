@@ -60,10 +60,7 @@ export default tseslint.config(
       parserOptions: { emitDecoratorMetadata: true, experimentalDecorators: true },
     },
     rules: {
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        { fixStyle: 'inline-type-imports' },
-      ],
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
     },
   },
   {

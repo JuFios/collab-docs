@@ -106,6 +106,11 @@ automatically by `typecheck` and `test`).
   (and by swc), not by esbuild; it requires ESM-only `jose` the same way the apps do.
 - `apps/api` and `apps/collab` stay CommonJS (NestJS). At runtime Node loads ESM-only `jose`
   through `require(esm)`, which is why Node >= 22.12 is required.
+- Dependency injection is type-based: constructors name the class and Nest reads it from the decorator
+  metadata emitted by `tsc` (build) and `@swc/jest` (tests, `apps/api/.swcrc`). `@Inject()` stays only for
+  `Symbol` tokens (`APP_CONFIG`, `REDIS_CLIENT`, `DOCUMENT_STORE`). A class used in a constructor must be a value
+  import, never `import type`; the `consistent-type-imports` rule is configured to respect that. Vitest
+  (esbuild) emits no metadata, so tests of injectable classes belong in the Jest suites.
 - Jest runs through `@swc/jest`; `transformIgnorePatterns` lets `jose` be transformed to CommonJS.
 - Vitest (web, shared) and `next build` import the package natively as ESM.
 
