@@ -51,21 +51,27 @@ test.describe('search', () => {
     await expect(result).toContainText('nests above the cloud forest');
     await expect(page).toHaveTitle('quetz · Search · Collab Docs');
 
-    // typing a new query in the field works like the form: Enter submits it
-    await searchField(page).fill('quetzal forest');
-    await searchField(page).press('Enter');
-    await expect(page).toHaveURL(/search\?q=quetzal\+forest$/);
+    // typing a new query in the field works like the form: Enter submits it. A page that has not hydrated yet
+    // resets the field and ignores keys, so the step is repeated until it takes effect.
+    await expect(async () => {
+      await searchField(page).fill('quetzal forest');
+      await searchField(page).press('Enter');
+      await expect(page).toHaveURL(/search\?q=quetzal\+forest$/, { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
     await expect(result).toBeVisible();
 
     // accents and case do not matter
     await searchField(page).fill('QUÉTZAL');
     await searchField(page).press('Enter');
+    await expect(page).toHaveURL(/search\?q=QU%C3%89TZAL$/);
     await expect(result).toBeVisible();
 
     // keyboard: Down enters the list, Enter opens the document, Escape/Up lead back to the field
-    await searchField(page).focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(result).toBeFocused();
+    await expect(async () => {
+      await searchField(page).focus();
+      await page.keyboard.press('ArrowDown');
+      await expect(result).toBeFocused({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
     await page.keyboard.press('ArrowUp');
     await expect(searchField(page)).toBeFocused();
     await page.keyboard.press('ArrowDown');
