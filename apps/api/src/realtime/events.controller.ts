@@ -1,14 +1,13 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Controller, type MessageEvent, Query, Sse } from '@nestjs/common';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { Request, Response } from 'express';
+import type { Observable } from 'rxjs';
 import { ParseUuidPipe } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { PermissionsService } from '../permissions/permissions.service';
+import { eventStream } from './event-stream';
 import { RealtimeEventsService } from './realtime-events.service';
-
-const HEARTBEAT_MS = 25_000;
 
 @ApiTags('events')
 @ApiBearerAuth()
@@ -21,7 +20,6 @@ export class EventsController {
     private readonly permissions: PermissionsService,
   ) {}
 
-  @Get('stream')
   @ApiOperation({
     summary: 'Server-sent events for a workspace and the caller',
     description:
@@ -29,40 +27,16 @@ export class EventsController {
       'Members only (404 otherwise); the stream closes when membership is lost.',
   })
   @ApiQuery({ name: 'workspaceId', format: 'uuid' })
+  @Sse('stream')
   async stream(
     @Query('workspaceId', ParseUuidPipe) workspaceId: string,
     @CurrentUser() user: RequestUser,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
+  ): Promise<Observable<MessageEvent>> {
     await this.permissions.assertWorkspaceRole(user.id, workspaceId, 'VIEWER');
-    const events = await this.realtime.stream(workspaceId, user.id);
-
-    // no-transform and X-Accel-Buffering keep proxies (including the Next.js rewrite) from buffering the stream
-    res.status(200).set({
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
+    return eventStream({
+      envelopes: await this.realtime.stream(workspaceId, user.id),
+      isMember: async () =>
+        (await this.permissions.getWorkspaceRole(user.id, workspaceId)) !== null,
     });
-    res.flushHeaders();
-    res.write('retry: 3000\n\n');
-
-    const subscription = events.subscribe((envelope) => {
-      res.write(`event: ${envelope.event.type}\ndata: ${JSON.stringify(envelope.event)}\n\n`);
-    });
-    const heartbeat = setInterval(() => {
-      res.write(': ping\n\n');
-      // a removed member must not keep receiving the workspace's events
-      void this.permissions.getWorkspaceRole(user.id, workspaceId).then((role) => {
-        if (!role) res.end();
-      });
-    }, HEARTBEAT_MS);
-    const close = () => {
-      clearInterval(heartbeat);
-      subscription.unsubscribe();
-    };
-    req.on('close', close);
-    res.on('close', close);
   }
 }
