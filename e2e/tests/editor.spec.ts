@@ -44,7 +44,7 @@ async function controllableSocket(page: Page) {
   };
 }
 
-test.describe('viewer (TST-2)', () => {
+test.describe('viewer access', () => {
   test('a viewer reads the document but cannot change it, in the UI or over the wire', async ({
     browser,
     baseURL,
@@ -110,7 +110,7 @@ test.describe('viewer (TST-2)', () => {
   });
 });
 
-test.describe('two editors (TST-3)', () => {
+test.describe('concurrent editing', () => {
   test('simultaneous typing, in one block and in different blocks, loses nothing', async ({
     browser,
     baseURL,
