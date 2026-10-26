@@ -24,7 +24,7 @@ const defaults: Record<string, string> = {
   WEB_ORIGIN: 'http://localhost:3000',
   WEB_INTERNAL_URL: 'http://localhost:3000',
   API_INTERNAL_URL: 'http://localhost:4000',
-  COLLAB_INTERNAL_URL: 'http://localhost:4002',
+  COLLAB_INTERNAL_URL: 'tcp://localhost:4002',
   COLLAB_PUBLIC_URL: 'ws://localhost:4001',
   TRUSTED_PROXY_CIDRS: '127.0.0.1/32',
   HTTP_BODY_LIMIT: '10kb',

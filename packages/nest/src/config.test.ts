@@ -20,7 +20,7 @@ const validEnv: Record<string, string> = {
   WEB_ORIGIN: 'http://localhost:3000',
   WEB_INTERNAL_URL: 'http://web:3000',
   API_INTERNAL_URL: 'http://api:4000',
-  COLLAB_INTERNAL_URL: 'http://collab:4002',
+  COLLAB_INTERNAL_URL: 'tcp://collab:4002',
   COLLAB_PUBLIC_URL: 'ws://localhost:4001',
 };
 

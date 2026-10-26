@@ -7,6 +7,7 @@ import WebSocket from 'ws';
 import { DocumentStateReader, DocumentStateWriter, type PrismaClient } from '@collab-docs/db';
 import {
   COLLAB_CLOSE,
+  COLLAB_INTERNAL,
   COLLAB_MESSAGE,
   type CollabRoomEvent,
   PERM_EVENT_CHANNELS,
@@ -623,24 +624,12 @@ describe('collab gateway', () => {
     });
 
     it('requires the internal token on port 4002', async () => {
-      const url = `${collab.internalUrl}/internal/status`;
-      expect((await fetch(url)).status).toBe(401);
-      expect((await fetch(url, { headers: { authorization: 'Bearer wrong' } })).status).toBe(401);
-      expect(
-        (
-          await fetch(url, {
-            headers: { 'x-internal-token': parseConfig(process.env).INTERNAL_API_TOKEN },
-          })
-        ).status,
-      ).toBe(401);
-      const ok = await fetch(url, {
-        headers: { authorization: `Bearer ${parseConfig(process.env).INTERNAL_API_TOKEN}` },
-      });
+      const status = COLLAB_INTERNAL.status;
+      expect((await collab.send(status, {}, { token: null })).status).toBe(401);
+      expect((await collab.send(status, {}, { token: 'wrong' })).status).toBe(401);
+      const ok = await collab.send(status, {});
       expect(ok.status).toBe(200);
-      expect(await ok.json()).toEqual({
-        rooms: expect.any(Number),
-        connections: expect.any(Number),
-      });
+      expect(ok.body).toEqual({ rooms: expect.any(Number), connections: expect.any(Number) });
     });
 
     it('does not expose the internal API on the public port', async () => {

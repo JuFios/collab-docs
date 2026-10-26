@@ -1,11 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { type MicroserviceOptions, Transport } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { type AppConfig, configureHttpApp, correlationMiddleware } from '@collab-docs/nest';
-import { InternalModule } from './internal/internal.module';
-import { VersionRestoreService } from './persistence/version-restore.service';
-import { DOCUMENT_STORE } from './rooms/document-store';
-import { RoomManager } from './rooms/room-manager';
+import { type AppConfig, configureHttpApp } from '@collab-docs/nest';
 import { CollabWsAdapter } from './ws/collab-ws.adapter';
 
 /** Frames carry the update (≤ COLLAB_MAX_UPDATE_BYTES) plus a few bytes of protocol framing. */
@@ -23,22 +19,17 @@ export function configureApp(app: NestExpressApplication): void {
   );
 }
 
-/** The application behind port 4002; call after `app.init()` (it reuses the main app's room manager). */
-export async function createInternalApp(
+/**
+ * The internal API (flush, restore, close) as a TCP microservice of the same application, so it shares the rooms
+ * and the store through the one DI container. Call it before `app.init()`, then `startAllMicroservices()`.
+ */
+export function connectInternalApi(
   app: NestExpressApplication,
-): Promise<NestExpressApplication> {
-  const config = app.get<ConfigService<AppConfig, true>>(ConfigService);
-  const internal = await NestFactory.create<NestExpressApplication>(
-    InternalModule.forRoot({
-      config,
-      rooms: app.get(RoomManager),
-      store: app.get(DOCUMENT_STORE),
-      restore: app.get(VersionRestoreService),
-    }),
-    { logger: ['error', 'warn'] },
+  port: number,
+  host = '0.0.0.0',
+): void {
+  app.connectMicroservice<MicroserviceOptions>(
+    { transport: Transport.TCP, options: { host, port } },
+    { inheritAppConfig: true },
   );
-  internal.use(correlationMiddleware);
-  internal.useBodyParser('json', { limit: config.get('HTTP_BODY_LIMIT', { infer: true }) });
-  internal.enableShutdownHooks();
-  return internal;
 }

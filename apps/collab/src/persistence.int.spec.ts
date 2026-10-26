@@ -14,15 +14,14 @@ import {
   stateVectorCovers,
   base64ToBytes,
 } from '@collab-docs/shared';
-import { QUEUE_NAMES, QueueService, REDIS_CLIENT, parseConfig } from '@collab-docs/nest';
+import { COLLAB_INTERNAL } from '@collab-docs/shared';
+import { QUEUE_NAMES, QueueService, REDIS_CLIENT } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { DOCUMENT_STORE, type DocumentStore } from './rooms/document-store';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
 import { Client, makeTeam, settle, ticketFor, waitFor } from './test/collab-fixtures';
 import { PrismaService } from './prisma/prisma.service';
-
-const TOKEN = parseConfig(process.env).INTERNAL_API_TOKEN;
 
 describe('document persistence', () => {
   let collab: RunningCollab;
@@ -55,18 +54,11 @@ describe('document persistence', () => {
     redis = collab.app.get(REDIS_CLIENT);
   }
 
-  const internal = (path: string, init: RequestInit & { token?: string | null } = {}) => {
-    const { token = TOKEN, ...rest } = init;
-    return fetch(`${collab.internalUrl}${path}`, {
-      method: 'POST',
-      ...rest,
-      headers: {
-        'content-type': 'application/json',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-        ...rest.headers,
-      },
-    });
-  };
+  const internal = (
+    action: keyof typeof COLLAB_INTERNAL,
+    payload: Record<string, unknown> = {},
+    options?: { token?: string | null },
+  ) => collab.send(COLLAB_INTERNAL[action], payload, options);
 
   const content = async (documentId: string): Promise<string> => {
     const doc = await reader.readDoc(documentId);
@@ -105,12 +97,10 @@ describe('document persistence', () => {
       await settle(200);
       expect(await content(documentId)).toBe('');
 
-      const response = await internal(`/internal/documents/${documentId}/flush`);
+      const response = await internal('flush', { documentId: documentId });
       expect(response.status).toBe(200);
       expect(await content(documentId)).toContain('buffered');
-      expect(((await response.json()) as { revision: number }).revision).toBe(
-        await revisionOf(documentId),
-      );
+      expect((response.body as { revision: number }).revision).toBe(await revisionOf(documentId));
       expect(await revisionOf(documentId)).toBeGreaterThan(0);
     });
 
@@ -124,7 +114,7 @@ describe('document persistence', () => {
       expect(client.events.filter((e) => e.type === 'persisted')).toHaveLength(before);
       expect(await content(documentId)).toBe('');
 
-      await internal(`/internal/documents/${documentId}/flush`);
+      await internal('flush', { documentId: documentId });
       await waitFor(() => {
         const persisted = client.event('persisted');
         return (
@@ -179,13 +169,13 @@ describe('document persistence', () => {
       const append = jest
         .spyOn(DocumentStateWriter.prototype, 'append')
         .mockRejectedValueOnce(new Error('connection reset'));
-      const failed = await internal(`/internal/documents/${documentId}/flush`);
+      const failed = await internal('flush', { documentId: documentId });
       expect(failed.status).toBe(500);
       expect(append).toHaveBeenCalledTimes(1);
       expect(await content(documentId)).toBe('');
 
       client.paragraph().insert(0, 'and more ');
-      const retried = await internal(`/internal/documents/${documentId}/flush`);
+      const retried = await internal('flush', { documentId: documentId });
       expect(retried.status).toBe(200);
       const stored = await content(documentId);
       expect(stored).toContain('not lost');
@@ -197,7 +187,7 @@ describe('document persistence', () => {
       const client = await connect(editor, documentId);
       await waitFor(() => client.synced, 'sync');
       client.paragraph().insert(0, 'once');
-      await internal(`/internal/documents/${documentId}/flush`);
+      await internal('flush', { documentId: documentId });
       const rows = await rowsOf(documentId);
       const stored = await prisma.documentUpdate.findFirstOrThrow({ where: { documentId } });
       const writer = new DocumentStateWriter(prisma);
@@ -227,7 +217,7 @@ describe('document persistence', () => {
 
       // the room keeps working
       client.doc.getXmlFragment('content').insert(1, [new Y.XmlText('more')]);
-      await internal(`/internal/documents/${documentId}/flush`);
+      await internal('flush', { documentId: documentId });
       expect(await content(documentId)).toContain('more');
     });
   });
@@ -238,10 +228,10 @@ describe('document persistence', () => {
       const client = await connect(editor, documentId);
       await waitFor(() => client.synced, 'sync');
       client.paragraph().insert(0, 'a');
-      await internal(`/internal/documents/${documentId}/flush`);
+      await internal('flush', { documentId: documentId });
       const first = await revisionOf(documentId);
       client.paragraph().insert(1, 'b');
-      await internal(`/internal/documents/${documentId}/flush`);
+      await internal('flush', { documentId: documentId });
       expect(await revisionOf(documentId)).toBe(first + 1);
 
       const jobs = async (queue: string) =>
@@ -265,7 +255,7 @@ describe('document persistence', () => {
         throw new Error('redis is down');
       });
       client.paragraph().insert(0, 'despite redis');
-      const response = await internal(`/internal/documents/${documentId}/flush`);
+      const response = await internal('flush', { documentId: documentId });
       expect(response.status).toBe(200);
       expect(await content(documentId)).toContain('despite redis');
       expect(await revisionOf(documentId)).toBeGreaterThan(0);
@@ -302,12 +292,12 @@ describe('document persistence', () => {
       client.paragraph().insert(0, 'final');
       await waitFor(() => client.event('persisted') !== undefined, 'connected');
 
-      const first = await internal(`/internal/documents/${documentId}/close`);
-      expect(await first.json()).toEqual({ closed: true });
+      const first = await internal('close', { documentId: documentId });
+      expect(first.body).toEqual({ closed: true });
       await waitFor(() => client.closes.includes(COLLAB_CLOSE.deleted), 'the 4410 close');
       expect(await content(documentId)).toContain('final');
-      const second = await internal(`/internal/documents/${documentId}/close`);
-      expect(await second.json()).toEqual({ closed: false });
+      const second = await internal('close', { documentId: documentId });
+      expect(second.body).toEqual({ closed: false });
     });
   });
 
@@ -319,7 +309,7 @@ describe('document persistence', () => {
       await waitFor(() => a.synced && b.synced, 'sync');
       a.paragraph().insert(0, 'version one');
       await waitFor(() => b.text() === 'version one', 'delivery');
-      await internal(`/internal/documents/${team.documentId}/flush`);
+      await internal('flush', { documentId: team.documentId });
       const snapshot = await versions.create({
         documentId: team.documentId,
         kind: 'MANUAL',
@@ -335,11 +325,13 @@ describe('document persistence', () => {
       const { documentId, a, b, snapshot, editor } = await twoVersionsOfOneDocument();
       const before = await revisionOf(documentId);
 
-      const response = await internal(`/internal/documents/${documentId}/restore`, {
-        body: JSON.stringify({ versionId: snapshot.id, userId: editor.id }),
+      const response = await internal('restore', {
+        documentId: documentId,
+        versionId: snapshot.id,
+        userId: editor.id,
       });
       expect(response.status).toBe(200);
-      const { revision } = (await response.json()) as { revision: number };
+      const { revision } = response.body as { revision: number };
       expect(revision).toBeGreaterThan(before);
 
       await waitFor(
@@ -359,13 +351,15 @@ describe('document persistence', () => {
 
     it('keeps working afterwards: edits after the restore merge as usual', async () => {
       const { documentId, a, b, snapshot, editor } = await twoVersionsOfOneDocument();
-      await internal(`/internal/documents/${documentId}/restore`, {
-        body: JSON.stringify({ versionId: snapshot.id, userId: editor.id }),
+      await internal('restore', {
+        documentId: documentId,
+        versionId: snapshot.id,
+        userId: editor.id,
       });
       await waitFor(() => a.text() === 'version one' && b.text() === 'version one', 'converge');
       a.paragraph().insert(0, '>> ');
       await waitFor(() => b.text() === '>> version one', 'edit after restore');
-      await internal(`/internal/documents/${documentId}/flush`);
+      await internal('flush', { documentId: documentId });
       expect(await content(documentId)).toContain('>> version one');
     });
 
@@ -382,8 +376,10 @@ describe('document persistence', () => {
       await writer.append(documentId, Y.encodeStateAsUpdate(source));
       expect(await content(documentId)).toContain('NEW old text');
 
-      const response = await internal(`/internal/documents/${documentId}/restore`, {
-        body: JSON.stringify({ versionId: snapshot.id, userId: editor.id }),
+      const response = await internal('restore', {
+        documentId: documentId,
+        versionId: snapshot.id,
+        userId: editor.id,
       });
       expect(response.status).toBe(200);
       const restored = await content(documentId);
@@ -402,16 +398,21 @@ describe('document persistence', () => {
       const first = await makeTeam(prisma);
       const second = await makeTeam(prisma);
       const foreign = await versions.create({ documentId: second.documentId, kind: 'MANUAL' });
-      const missing = await internal(`/internal/documents/${first.documentId}/restore`, {
-        body: JSON.stringify({ versionId: foreign.id, userId: first.editor.id }),
+      const missing = await internal('restore', {
+        documentId: first.documentId,
+        versionId: foreign.id,
+        userId: first.editor.id,
       });
       expect(missing.status).toBe(404);
-      const unknown = await internal(`/internal/documents/${first.documentId}/restore`, {
-        body: JSON.stringify({ versionId: randomUUID(), userId: first.editor.id }),
+      const unknown = await internal('restore', {
+        documentId: first.documentId,
+        versionId: randomUUID(),
+        userId: first.editor.id,
       });
       expect(unknown.status).toBe(404);
-      const malformed = await internal(`/internal/documents/${first.documentId}/restore`, {
-        body: JSON.stringify({ versionId: 'nope' }),
+      const malformed = await internal('restore', {
+        documentId: first.documentId,
+        versionId: 'nope',
       });
       expect(malformed.status).toBe(400);
     });
@@ -420,19 +421,25 @@ describe('document persistence', () => {
   describe('internal API', () => {
     it('requires the token on every endpoint', async () => {
       const id = randomUUID();
-      for (const path of ['flush', 'restore', 'close']) {
-        expect((await internal(`/internal/documents/${id}/${path}`, { token: null })).status).toBe(
-          401,
-        );
-        expect(
-          (await internal(`/internal/documents/${id}/${path}`, { token: 'wrong' })).status,
-        ).toBe(401);
+      for (const action of ['flush', 'restore', 'close'] as const) {
+        const payload = { documentId: id };
+        expect((await internal(action, payload, { token: null })).status).toBe(401);
+        expect((await internal(action, payload, { token: 'wrong' })).status).toBe(401);
       }
     });
 
     it('answers 404 when flushing an unknown document and 400 for a malformed id', async () => {
-      expect((await internal(`/internal/documents/${randomUUID()}/flush`)).status).toBe(404);
-      expect((await internal('/internal/documents/not-a-uuid/flush')).status).toBe(400);
+      const unknown = await internal('flush', {
+        documentId: randomUUID(),
+        correlationId: 'corr-from-the-api-0001',
+      });
+      expect(unknown.status).toBe(404);
+      // the error carries the id of the request that caused it, as an HTTP error would
+      expect(unknown.body).toMatchObject({
+        code: 'NOT_FOUND',
+        correlationId: 'corr-from-the-api-0001',
+      });
+      expect((await internal('flush', { documentId: 'not-a-uuid' })).status).toBe(400);
     });
   });
 });

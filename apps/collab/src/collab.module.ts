@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { AccessReevaluator } from './access/access-reevaluator.service';
 import { AccessService } from './access/access.service';
 import { PermissionEventsService } from './events/permission-events.service';
+import { InternalController } from './internal/internal.controller';
+import { InternalTokenGuard } from './internal/internal-token.guard';
 import { PersistenceModule } from './persistence/persistence.module';
 import { CollabMetricsModule } from './metrics/collab-metrics.module';
 import { VersionRestoreService } from './persistence/version-restore.service';
@@ -11,7 +13,9 @@ import { ConnectionService } from './ws/connection.service';
 
 @Module({
   imports: [CollabMetricsModule, PersistenceModule],
+  controllers: [InternalController],
   providers: [
+    InternalTokenGuard,
     AccessService,
     AccessReevaluator,
     RoomManager,
