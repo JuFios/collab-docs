@@ -10,7 +10,10 @@ side builds on it.
    `{ ticket, wsUrl }`. The ticket is a JWT (HS256, `aud=collab`, 60 s) with the document id and the user id. It
    only says who is asking: the collab service reads the permissions from the database when the socket opens, so
    a viewer receives a read-only connection from the same kind of ticket as an editor. `wsUrl` comes from the
-   runtime variable `COLLAB_PUBLIC_URL` (`ws://host:4001/ws`).
+   runtime variable `COLLAB_PUBLIC_URL` (`ws://host:4001/ws`). A guest with an edit link gets the same kind of
+   ticket from `POST /api/public/links/:token/ticket`, carrying `{docId, linkId}` instead of a user id; the api
+   has checked the secret, and the collab service resolves the link (`mode`, `revoked_at`, `expires_at`) from the
+   database as it does for a user.
 2. The browser opens `${wsUrl}/${documentId}?ticket=${ticket}`. `y-websocket` builds the URL from
    `provider.params` on every connection attempt, so the client refreshes `provider.params.ticket` before a
    reconnect. A ticket is checked once, at connect time; it is not a session.
@@ -57,7 +60,8 @@ Offline` indicator from it. Publishing is allowed only when the persisted vector
 
 The awareness state is `{ user: { id, name, color }, cursor }`. The server **replaces `user`** with the
 authenticated identity (the id of the signed-in user, `guest-<connection>` for a link guest, the name from the
-database and a colour derived from the user id) and keeps only `cursor` from the client, limited to
+database and a colour derived from the user id; guests are called `Guest 1`, `Guest 2`, … in order of arrival
+at that room) and keeps only `cursor` from the client, limited to
 `COLLAB_MAX_AWARENESS_BYTES`. A connection may only change the awareness client ids it registered first (at most
 four) and never the server's own, so one client cannot move or remove another's cursor. When a socket closes its
 presence is removed for everybody.
@@ -99,8 +103,9 @@ The api publishes `perm.changed`, `doc.deleted` and `doc.restored` on Redis afte
 collab service subscribes and re-reads the permissions of the affected sockets from the database: a downgrade
 turns a socket read-only (and sends `access`), a grant makes it editable again, lost access closes it with 4403,
 a deleted document is flushed, announced with `deleted` and closed with 4410. Every socket is also re-evaluated
-every `COLLAB_ACCESS_RECHECK_MS` (60 s), which covers a lost Redis message and is the only thing that ends a
-guest's session when an EDIT link expires.
+every `COLLAB_ACCESS_RECHECK_MS` (60 s), which covers a lost Redis message. Revoking or replacing an EDIT link
+publishes `perm.changed` (reason `link_changed`) for the document, and the job that runs when a link expires
+does the same, so guests are cut off at once; the 60 s check remains the fallback.
 
 ## Rooms
 

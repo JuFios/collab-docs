@@ -10,7 +10,8 @@ export interface PermChangedEvent {
   /** Whose access changed; omitted when it changed for many users (e.g. a visibility change). */
   userId?: string;
   documentId?: string;
-  reason: 'role_changed' | 'member_removed' | 'share_changed' | 'visibility_changed';
+  reason:
+    'role_changed' | 'member_removed' | 'share_changed' | 'visibility_changed' | 'link_changed';
 }
 
 /** Published after commit when documents are soft-deleted or restored; collab closes or reopens the affected rooms. */

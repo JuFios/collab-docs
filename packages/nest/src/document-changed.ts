@@ -1,10 +1,10 @@
 import type { DocumentChangedEvent } from '@collab-docs/shared';
 import { QUEUE_NAMES, type QueueService, enqueueDebounced } from './queue';
 
-/** Debounce windows (spec §7a): page revalidation 3 s, search indexing 5 s. */
+/** Debounce windows (spec §7a, env): page revalidation 3 s, search indexing 5 s by default. */
 export const DOCUMENT_CHANGED_TARGETS = [
-  { queue: QUEUE_NAMES.publicRevalidate, delayMs: 3000 },
-  { queue: QUEUE_NAMES.searchSync, delayMs: 5000 },
+  { queue: QUEUE_NAMES.publicRevalidate, debounce: 'REVALIDATE_DEBOUNCE_MS' },
+  { queue: QUEUE_NAMES.searchSync, debounce: 'SEARCH_DEBOUNCE_MS' },
 ] as const;
 
 /**
@@ -17,9 +17,9 @@ export async function emitDocumentChanged(
   event: DocumentChangedEvent,
 ): Promise<void> {
   await Promise.all(
-    DOCUMENT_CHANGED_TARGETS.map(async ({ queue, delayMs }) => {
+    DOCUMENT_CHANGED_TARGETS.map(async ({ queue, debounce }) => {
       try {
-        await enqueueDebounced(queues.getQueue(queue), event.documentId, delayMs, {
+        await enqueueDebounced(queues.getQueue(queue), event.documentId, queues.setting(debounce), {
           revision: event.revision,
           reason: event.reason,
         });

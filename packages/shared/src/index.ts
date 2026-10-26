@@ -29,3 +29,4 @@ export * from './collab';
 export * from './state-vector';
 export * from './versions';
 export * from './attachments';
+export * from './public-links';

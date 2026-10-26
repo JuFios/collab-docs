@@ -303,6 +303,17 @@ describe('DocRoom', () => {
       });
     });
 
+    it('numbers guests one after the other, independent of other rooms', () => {
+      const { room } = setup();
+      const other = setup().room;
+      expect([room.nextGuestName(), room.nextGuestName(), room.nextGuestName()]).toEqual([
+        'Guest 1',
+        'Guest 2',
+        'Guest 3',
+      ]);
+      expect(other.nextGuestName()).toBe('Guest 1');
+    });
+
     it('lets a guest in with a presence id of its own', () => {
       const { room } = setup();
       const guest = new TestClient(room, { userId: null, name: 'Guest' });

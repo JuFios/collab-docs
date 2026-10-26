@@ -140,8 +140,8 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
       if (outcome.status === 'deleted') return fail(COLLAB_CLOSE.deleted, 'document deleted');
       if (outcome.status === 'forbidden') return fail(COLLAB_CLOSE.forbidden, 'no access');
 
-      const name = identity.userId ? await this.access.userName(identity.userId) : 'Guest';
-      if (name === null) return fail(COLLAB_CLOSE.forbidden, 'no access');
+      const userName = identity.userId ? await this.access.userName(identity.userId) : undefined;
+      if (userName === null) return fail(COLLAB_CLOSE.forbidden, 'no access');
 
       state.documentId = documentId;
       const room = await this.rooms.acquire(documentId);
@@ -152,7 +152,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
       const conn = new WsConnection(
         socket,
         identity.userId ?? null,
-        name,
+        userName ?? room.nextGuestName(),
         presenceColor(identity.userId ?? identity.linkId ?? 'guest'),
         ticketCorrelationId ?? correlationId,
       );

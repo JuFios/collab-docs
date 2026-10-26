@@ -91,6 +91,7 @@ export class QueueService {
 
   constructor(
     private readonly moduleRef: ModuleRef,
+    private readonly config: ConfigService<AppConfig, true>,
     metrics: MetricsService,
     @InjectPinoLogger(QueueService.name) private readonly logger: PinoLogger,
   ) {
@@ -122,6 +123,11 @@ export class QueueService {
   recordEnqueueFailure(queue: string, event: string, fields: Record<string, unknown>): void {
     this.enqueueFailures.inc({ queue });
     logEvent(this.logger, event, { queue, ...fields });
+  }
+
+  /** A numeric tunable from the environment (the debounce windows of the derived-data queues). */
+  setting(key: 'REVALIDATE_DEBOUNCE_MS' | 'SEARCH_DEBOUNCE_MS'): number {
+    return this.config.get(key, { infer: true });
   }
 
   getQueue(name: QueueName | (string & {})): Queue {
