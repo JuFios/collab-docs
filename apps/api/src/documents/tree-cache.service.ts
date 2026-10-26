@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import { Counter } from 'prom-client';
-import { PrismaClient } from '@collab-docs/db';
 import { MetricsService, REDIS_CLIENT, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
 import type { TreeRow } from './tree';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** Safety net only: a version bump is what normally retires an entry. */
 const ENTRY_TTL_SECONDS = 300;
@@ -20,7 +20,7 @@ export class TreeCacheService {
   private readonly lookups: Counter<'result'>;
 
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly realtime: RealtimeEventsService,
     metrics: MetricsService,

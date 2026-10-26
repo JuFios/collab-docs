@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DocumentVersions, PrismaClient } from '@collab-docs/db';
+import { DocumentVersions } from '@collab-docs/db';
 import { AppException } from '@collab-docs/nest';
 import { DOCUMENT_STORE, type DocumentStore } from '../rooms/document-store';
 import { RoomManager } from '../rooms/room-manager';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Restores a document to a stored version (spec §5). The content is replaced inside the live room, as one Yjs
@@ -14,7 +15,7 @@ export class VersionRestoreService {
     private readonly rooms: RoomManager,
     @Inject(DOCUMENT_STORE) private readonly store: DocumentStore,
     private readonly versions: DocumentVersions,
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
   ) {}
 
   /** Returns the document revision after the restore. */

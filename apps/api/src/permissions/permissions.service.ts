@@ -11,6 +11,7 @@ import {
   resolveWorkspaceRole,
 } from '@collab-docs/shared';
 import { AppException } from '@collab-docs/nest';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface DocumentAccessResult {
   access: Access;
@@ -48,7 +49,7 @@ function raise(decision: Decision, what: string): void {
  */
 @Injectable()
 export class PermissionsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getWorkspaceRole(userId: string, workspaceId: string): Promise<WorkspaceRole | null> {
     if (!UUID.test(workspaceId)) return null;

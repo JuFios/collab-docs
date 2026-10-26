@@ -6,7 +6,7 @@ import {
   DocumentStateReader,
   DocumentStateWriter,
   DocumentVersions,
-  PrismaClient,
+  type PrismaClient,
 } from '@collab-docs/db';
 import {
   COLLAB_CLOSE,
@@ -20,6 +20,7 @@ import { DOCUMENT_STORE, type DocumentStore } from './rooms/document-store';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
 import { Client, makeTeam, settle, ticketFor, waitFor } from './test/collab-fixtures';
+import { PrismaService } from './prisma/prisma.service';
 
 const TOKEN = parseConfig(process.env).INTERNAL_API_TOKEN;
 
@@ -45,7 +46,7 @@ describe('document persistence', () => {
   }
 
   async function bind(): Promise<void> {
-    prisma = collab.app.get(PrismaClient);
+    prisma = collab.app.get(PrismaService);
     reader = collab.app.get(DocumentStateReader);
     versions = collab.app.get(DocumentVersions);
     store = collab.app.get(DOCUMENT_STORE);

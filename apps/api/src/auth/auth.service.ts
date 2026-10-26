@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@collab-docs/db';
+import { Prisma } from '@collab-docs/db';
 import type { AuthSession, AuthUser } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { AccessTokenService } from './access-token.service';
 import type { LoginDto, RegisterDto } from './auth.dto';
 import { PasswordService } from './password.service';
 import { RefreshTokenService } from './refresh-token.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** What the controller needs to answer: the JSON body plus the cookies to set. */
 export interface IssuedSession {
@@ -25,7 +26,7 @@ const INVALID_CREDENTIALS = 'Invalid email or password';
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly accessTokens: AccessTokenService,
     private readonly passwords: PasswordService,
     private readonly refreshTokens: RefreshTokenService,

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@collab-docs/db';
 import {
   type MemberRuleViolation,
   type WorkspaceRole,
@@ -11,6 +10,7 @@ import { PermEventsService } from '../permissions/perm-events.service';
 import { notFound } from '../permissions/permissions.service';
 import { PlanLimitsService, type Tx } from './plan-limits.service';
 import type { MemberResponse } from './workspaces.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 function violation(rule: MemberRuleViolation): AppException {
   switch (rule) {
@@ -28,7 +28,7 @@ function violation(rule: MemberRuleViolation): AppException {
 @Injectable()
 export class MembersService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly limits: PlanLimitsService,
     private readonly events: PermEventsService,
     @InjectPinoLogger(MembersService.name) private readonly logger: PinoLogger,

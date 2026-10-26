@@ -1,8 +1,9 @@
 import { Test } from '@nestjs/testing';
 import * as Y from 'yjs';
-import { DocumentVersions, MAX_VERSIONS, PrismaClient } from '@collab-docs/db';
+import { DocumentVersions, MAX_VERSIONS } from '@collab-docs/db';
 import { CollabInternalClient } from '../collab/collab-internal.client';
 import { VersionsService } from './versions.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const USER = '0190b1c2-0000-7000-8000-000000000001';
 const DOCUMENT = '0190b1c2-0000-7000-8000-0000000000dd';
@@ -47,7 +48,7 @@ async function setup() {
   const moduleRef = await Test.createTestingModule({
     providers: [
       VersionsService,
-      { provide: PrismaClient, useValue: prisma },
+      { provide: PrismaService, useValue: prisma },
       { provide: DocumentVersions, useValue: versions },
       { provide: CollabInternalClient, useValue: collab },
     ],

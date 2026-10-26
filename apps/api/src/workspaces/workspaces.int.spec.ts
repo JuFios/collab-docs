@@ -2,11 +2,12 @@ import '../test/workspaces-env';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { PrismaClient } from '@collab-docs/db';
+import { type PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, type WorkspaceRole } from '@collab-docs/shared';
 import { MailQueueService } from '../notifications/mail-queue.service';
 import { MailWorkerModule } from '../notifications/notifications.module';
 import { createTestApp } from '../test/test-app';
+import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
 const MAILPIT_URL = process.env.MAILPIT_URL;
@@ -103,7 +104,7 @@ describe('workspaces, members, invites', () => {
     flush.disconnect();
     redis = new Redis(process.env.REDIS_URL as string);
     app = await createTestApp([], [MailWorkerModule]);
-    prisma = app.get(PrismaClient, { strict: false });
+    prisma = app.get(PrismaService, { strict: false });
 
     // capture the invite links regardless of whether a Mailpit is running; delivery still happens through the queue
     const mailQueue = app.get(MailQueueService, { strict: false });

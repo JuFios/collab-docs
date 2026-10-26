@@ -4,10 +4,11 @@ import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { PrismaClient } from '@collab-docs/db';
+import { type PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, REALTIME_CHANNEL, type WorkspaceRole } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
 const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
@@ -122,7 +123,7 @@ describe('documents', () => {
       published.push({ channel, payload: JSON.parse(raw) as Record<string, unknown> }),
     );
     app = await createTestApp();
-    prisma = app.get(PrismaClient, { strict: false });
+    prisma = app.get(PrismaService, { strict: false });
   });
 
   afterAll(async () => {

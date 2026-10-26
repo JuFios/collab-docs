@@ -2,9 +2,10 @@ import '../test/collab-env';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { PrismaClient } from '@collab-docs/db';
+import { type PrismaClient } from '@collab-docs/db';
 import { parseConfig, verifyCollabTicket } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
 
@@ -61,7 +62,7 @@ describe('collab ticket', () => {
     redis = new Redis(process.env.REDIS_URL as string);
     await redis.flushdb();
     app = await createTestApp();
-    prisma = app.get(PrismaClient, { strict: false });
+    prisma = app.get(PrismaService, { strict: false });
   });
 
   afterAll(async () => {

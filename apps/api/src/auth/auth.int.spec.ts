@@ -3,7 +3,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { PrismaClient } from '@collab-docs/db';
+import { type PrismaClient } from '@collab-docs/db';
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -16,6 +16,7 @@ import { createTestApp } from '../test/test-app';
 import { CurrentUser, Public } from './auth.decorators';
 import type { RequestUser } from './auth.types';
 import { hashToken } from './refresh-token.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const ORIGIN = 'http://localhost:3000';
 const PASSWORD = 'correct-horse-battery';
@@ -86,7 +87,7 @@ describe('auth', () => {
     await redis.flushdb();
     redis.disconnect();
     app = await createTestApp([ProtectedController]);
-    prisma = app.get(PrismaClient);
+    prisma = app.get(PrismaService);
   });
 
   afterAll(async () => {

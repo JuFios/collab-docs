@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@collab-docs/db';
 import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** A just-rotated token may be presented again for this long (parallel requests, several tabs). */
 export const REFRESH_GRACE_MS = 30_000;
@@ -28,7 +28,7 @@ const rejected = () => new AppException('UNAUTHENTICATED', 'Invalid or expired s
 @Injectable()
 export class RefreshTokenService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     @InjectPinoLogger(RefreshTokenService.name) private readonly logger: PinoLogger,
   ) {}
 

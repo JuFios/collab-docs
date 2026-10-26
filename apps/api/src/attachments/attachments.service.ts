@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, PrismaClient } from '@collab-docs/db';
+import { Prisma } from '@collab-docs/db';
 import {
   ATTACHMENT_READ_TTL_SECONDS,
   ATTACHMENT_UPLOAD_TTL_SECONDS,
@@ -27,6 +27,7 @@ import { PermissionsService, notFound } from '../permissions/permissions.service
 import { S3Storage } from '../storage/s3.service';
 import { PlanLimitsService } from '../workspaces/plan-limits.service';
 import type { AttachmentRow } from './attachment-access';
+import { PrismaService } from '../prisma/prisma.service';
 
 const present = (row: AttachmentRow): Attachment => ({
   id: row.id,
@@ -50,7 +51,7 @@ export const attachmentKey = (workspaceId: string, documentId: string): string =
 @Injectable()
 export class AttachmentsService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
     private readonly limits: PlanLimitsService,
     private readonly s3: S3Storage,

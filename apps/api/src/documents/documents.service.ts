@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@collab-docs/db';
+import { Prisma } from '@collab-docs/db';
 import {
   type Access,
   type DocumentChangeReason,
@@ -37,6 +37,7 @@ import { LIVE_DOCUMENT, LIVE_DOCUMENT_SQL } from '../prisma/live-document';
 import { positionBetween } from './position';
 import { TreeCacheService } from './tree-cache.service';
 import { buildTree } from './tree';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface Changed {
   id: string;
@@ -82,7 +83,7 @@ function toChanged(rows: Array<{ id: string; revision: bigint }>): Changed[] {
 @Injectable()
 export class DocumentsService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
     private readonly limits: PlanLimitsService,
     private readonly permEvents: PermEventsService,

@@ -9,6 +9,7 @@ import {
 } from '@collab-docs/shared';
 import { AppException } from '@collab-docs/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
+import { PrismaService } from '../prisma/prisma.service';
 
 export type Tx = Prisma.TransactionClient;
 
@@ -25,7 +26,7 @@ export interface Usage {
  */
 @Injectable()
 export class PlanLimitsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /** `SELECT ... FOR UPDATE` on the workspace row; blocks until concurrent holders commit. */
   async lockWorkspace(tx: Tx, workspaceId: string): Promise<void> {

@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@collab-docs/db';
+import { Prisma } from '@collab-docs/db';
 import type { PlanTier, WorkspaceRole } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { notFound } from '../permissions/permissions.service';
 import { type Usage, PlanLimitsService } from './plan-limits.service';
 import { generateSlug } from './slug';
 import type { WorkspaceResponse } from './workspaces.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 type WorkspaceWithPlan = Prisma.WorkspaceGetPayload<{ include: { subscription: true } }>;
 
@@ -25,7 +26,7 @@ const SLUG_ATTEMPTS = 3;
 @Injectable()
 export class WorkspacesService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly limits: PlanLimitsService,
     @InjectPinoLogger(WorkspacesService.name) private readonly logger: PinoLogger,
   ) {}

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaClient } from '@collab-docs/db';
 import type { WorkspaceRole } from '@collab-docs/shared';
 import {
   AppException,
@@ -14,6 +13,7 @@ import { notFound } from '../permissions/permissions.service';
 import { INVITE_TOKEN_PATTERN, INVITE_TTL_MS, hashToken, newInviteToken } from './invite-token';
 import { PlanLimitsService } from './plan-limits.service';
 import type { AcceptInviteResponse, InvitePreviewResponse, InviteResponse } from './workspaces.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 const invalidInvite = () =>
   new AppException('INVITE_INVALID', 'This invitation is invalid or has expired');
@@ -39,7 +39,7 @@ function toResponse(invite: {
 @Injectable()
 export class InvitesService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly limits: PlanLimitsService,
     private readonly mail: MailQueueService,
     private readonly config: ConfigService<AppConfig, true>,
