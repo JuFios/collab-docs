@@ -3,6 +3,7 @@ import type { Redis } from 'ioredis';
 import { Counter } from 'prom-client';
 import { PrismaClient } from '@collab-docs/db';
 import { MetricsService, REDIS_CLIENT, getRootLogger } from '@collab-docs/shared/nest';
+import { LIVE_DOCUMENT } from '../prisma/live-document';
 import { RealtimeEventsService } from '../realtime';
 import type { TreeRow } from './tree';
 
@@ -68,7 +69,7 @@ export class TreeCacheService {
 
   private async load(workspaceId: string): Promise<TreeRow[]> {
     return this.prisma.document.findMany({
-      where: { workspaceId, deletedAt: null },
+      where: { workspaceId, ...LIVE_DOCUMENT },
       select: {
         id: true,
         parentId: true,

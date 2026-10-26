@@ -3,6 +3,7 @@ import { PrismaClient } from '@collab-docs/db';
 import { canManageDocument, type ShareRole } from '@collab-docs/shared';
 import { AppException } from '@collab-docs/shared/nest';
 import { type DocumentAccessResult, PermEventsService, notFound } from '../permissions';
+import { LIVE_DOCUMENT } from '../prisma/live-document';
 import type { ShareResponse, SharedDocumentResponse } from './documents.dto';
 import { TreeCacheService } from './tree-cache.service';
 
@@ -94,7 +95,7 @@ export class SharesService {
   /** Documents explicitly shared with the caller (the guest's only entry point, plus members' extra grants). */
   async sharedWith(userId: string): Promise<SharedDocumentResponse[]> {
     const shares = await this.prisma.documentShare.findMany({
-      where: { userId, document: { deletedAt: null } },
+      where: { userId, document: LIVE_DOCUMENT },
       include: {
         document: { select: { id: true, workspaceId: true, title: true, icon: true } },
       },
