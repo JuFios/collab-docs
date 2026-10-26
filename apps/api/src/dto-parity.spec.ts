@@ -2,13 +2,16 @@ import type { Type } from '@nestjs/common';
 import { createValidationPipe } from '@collab-docs/nest';
 import {
   ATTACHMENT_FILENAME_MAX_LENGTH,
+  COMMENT_BODY_MAX_LENGTH,
   DOCUMENT_TITLE_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   VERSION_LABEL_MAX_LENGTH,
   WORKSPACE_NAME_MAX_LENGTH,
+  createCommentInputSchema,
   createDocumentInputSchema,
   createPublicLinkInputSchema,
+  createThreadInputSchema,
   createVersionInputSchema,
   createWorkspaceInputSchema,
   inviteInputSchema,
@@ -21,6 +24,7 @@ import {
 } from '@collab-docs/shared';
 import { LoginDto, RegisterDto } from './auth/auth.dto';
 import { PresignAttachmentDto } from './attachments/attachments.dto';
+import { CreateCommentDto, CreateThreadDto } from './comments/comments.dto';
 import { CreateDocumentDto, MoveDocumentDto } from './documents/documents.dto';
 import { CreatePublicLinkDto, UpdatePublicLinkDto } from './publishing/public-links.dto';
 import { CreateVersionDto } from './versions/versions.dto';
@@ -246,6 +250,42 @@ const pairs: Pair[] = [
       ['a missing expiry', { expiresAt: undefined }],
       ['a date without a time', { expiresAt: '2030-01-31' }],
       ['an expiry that is not text', { expiresAt: 5 }],
+    ],
+  },
+  {
+    name: 'create comment',
+    dto: CreateCommentDto,
+    schema: createCommentInputSchema,
+    base: { body: 'Looks good' },
+    cases: [
+      ['a valid comment', {}],
+      ['a comment with spaces around it', { body: '  Looks good \n' }],
+      ['a mention', { body: 'cc @[0198d6c0-0000-7000-8000-00000000000a]' }],
+      ['an empty body', { body: '' }],
+      ['a blank body', { body: ' \n\t ' }],
+      ['a missing body', { body: undefined }],
+      ['the longest body', { body: text(COMMENT_BODY_MAX_LENGTH) }],
+      ['a body one too long', { body: text(COMMENT_BODY_MAX_LENGTH + 1) }],
+      ['a body that is not text', { body: 7 }],
+    ],
+  },
+  {
+    name: 'create thread',
+    dto: CreateThreadDto,
+    schema: createThreadInputSchema,
+    base: { blockId: 'block-1', body: 'Why?' },
+    cases: [
+      ['a valid thread', {}],
+      ['a generated id', { blockId: 'a1B2_c3-D4' }],
+      ['the longest block id', { blockId: text(64) }],
+      ['a block id one too long', { blockId: text(65) }],
+      ['an empty block id', { blockId: '' }],
+      ['a block id with a space', { blockId: 'a b' }],
+      ['a block id with markup', { blockId: '<b>' }],
+      ['a block id with a slash', { blockId: 'a/b' }],
+      ['a block id that is not text', { blockId: 5 }],
+      ['a missing block id', { blockId: undefined }],
+      ['a blank body', { body: '  ' }],
     ],
   },
 ];

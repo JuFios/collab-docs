@@ -2225,6 +2225,522 @@
           "search"
         ]
       }
+    },
+    "/api/notifications": {
+      "get": {
+        "description": "From every workspace. A notification about a document the caller can no longer open is not listed.",
+        "operationId": "InboxController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "`nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unread",
+            "required": false,
+            "in": "query",
+            "description": "Only notifications that have not been read",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Notifications of the caller, newest first",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "InboxController_unreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCountResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Number of unread notifications that the list shows",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/read": {
+      "post": {
+        "description": "Pass `ids` (up to 100) or `all: true`. Only the caller’s own notifications are affected.",
+        "operationId": "InboxController_markRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkReadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark notifications as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/documents/{id}/threads": {
+      "get": {
+        "description": "Oldest thread first, each with its comments. A thread whose block is no longer in the document has `orphaned: true`. Deleted comments stay in their thread as blank placeholders. Anyone who can view the document reads.",
+        "operationId": "CommentsController_threads",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "open",
+                "resolved",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comment threads of a document",
+        "tags": [
+          "comments"
+        ]
+      },
+      "post": {
+        "description": "Needs permission to comment (editors and up; viewers get 403). Mentioned users who can view the document get a notification and an email.",
+        "operationId": "CommentsController_createThread",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateThreadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadWriteResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a thread on a block",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/documents/{id}/mentionable": {
+      "get": {
+        "description": "People who can view the document, filtered by the start of a name or an email; at most 10.",
+        "operationId": "CommentsController_mentionable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Start of a name or an email address; empty lists the first users by name",
+            "schema": {
+              "maxLength": 50,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentionableUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Users that can be mentioned in a comment",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/threads/{threadId}/comments": {
+      "post": {
+        "description": "Needs permission to comment on the document.",
+        "operationId": "CommentsController_reply",
+        "parameters": [
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentWriteResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reply in a thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/threads/{threadId}/resolve": {
+      "post": {
+        "description": "Idempotent. Needs permission to comment.",
+        "operationId": "CommentsController_resolve",
+        "parameters": [
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve a thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/threads/{threadId}/reopen": {
+      "post": {
+        "description": "Idempotent. Needs permission to comment.",
+        "operationId": "CommentsController_reopen",
+        "parameters": [
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reopen a resolved thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/comments/{commentId}": {
+      "patch": {
+        "description": "Author only. A user mentioned for the first time is notified; saving the same mention again is not a new notification.",
+        "operationId": "CommentsController_edit",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentWriteResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a comment",
+        "tags": [
+          "comments"
+        ]
+      },
+      "delete": {
+        "description": "The author, or an owner/admin of the workspace. The text is erased and the notifications it caused are removed; a thread without comments is no longer listed.",
+        "operationId": "CommentsController_remove",
+        "parameters": [
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a comment",
+        "tags": [
+          "comments"
+        ]
+      }
     }
   },
   "info": {
@@ -3610,6 +4126,406 @@
         "required": [
           "items",
           "nextCursor"
+        ]
+      },
+      "MentionActorResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "NotificationPayloadResponse": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentTitle": {
+            "type": "string",
+            "description": "The title when the notification was created"
+          },
+          "threadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/MentionActorResponse"
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Start of the comment as plain text (never HTML)"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "documentId",
+          "documentTitle",
+          "threadId",
+          "commentId",
+          "actor",
+          "excerpt"
+        ]
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "MENTION"
+            ]
+          },
+          "payload": {
+            "$ref": "#/components/schemas/NotificationPayloadResponse"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "payload",
+          "read",
+          "createdAt"
+        ]
+      },
+      "NotificationPageResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "UnreadCountResponse": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "MarkReadDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Notifications to mark as read; give this or `all`, not both. Ids that are not the caller’s are ignored.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "all": {
+            "type": "boolean",
+            "description": "Mark every notification of the caller as read",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "MarkReadResponse": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Notifications that were unread and are read now"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
+      "PersonResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CommentMentionResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "name"
+        ]
+      },
+      "CommentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "author": {
+            "$ref": "#/components/schemas/PersonResponse"
+          },
+          "body": {
+            "type": "string",
+            "description": "Empty when the comment was deleted. Plain text with `@[user id]` tokens."
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "mentions": {
+            "description": "The users the body mentions, with names",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentMentionResponse"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "editedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "body",
+          "deleted",
+          "mentions",
+          "createdAt",
+          "editedAt"
+        ]
+      },
+      "ThreadResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blockId": {
+            "type": "string"
+          },
+          "orphaned": {
+            "type": "boolean",
+            "description": "The block is not in the document any more"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "documentId",
+          "blockId",
+          "orphaned",
+          "resolved",
+          "resolvedAt",
+          "createdAt",
+          "comments"
+        ]
+      },
+      "CreateThreadDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Plain text, at most 4000 characters, shown as text and never as HTML. `@[<user id>]` mentions a user who can view the document; a mention of anyone else is removed and reported in `warnings`."
+          },
+          "blockId": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "description": "Id of the block the thread is about (the `id` attribute of the block in the document). Not checked against the stored content, which can be a few seconds behind the editor."
+          }
+        },
+        "required": [
+          "body",
+          "blockId"
+        ]
+      },
+      "MentionWarningResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "MENTION_IGNORED",
+              "MENTION_LIMIT"
+            ],
+            "description": "`MENTION_IGNORED`: the user does not exist or cannot view the document. `MENTION_LIMIT`: more than 20 mentions."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "code",
+          "userId"
+        ]
+      },
+      "ThreadWriteResponse": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/ThreadResponse"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MentionWarningResponse"
+            }
+          }
+        },
+        "required": [
+          "thread",
+          "warnings"
+        ]
+      },
+      "MentionableUserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ]
+      },
+      "CreateCommentDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Plain text, at most 4000 characters, shown as text and never as HTML. `@[<user id>]` mentions a user who can view the document; a mention of anyone else is removed and reported in `warnings`."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "CommentWriteResponse": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "$ref": "#/components/schemas/CommentResponse"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MentionWarningResponse"
+            }
+          }
+        },
+        "required": [
+          "comment",
+          "warnings"
+        ]
+      },
+      "UpdateCommentDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Plain text, at most 4000 characters, shown as text and never as HTML. `@[<user id>]` mentions a user who can view the document; a mention of anyone else is removed and reported in `warnings`."
+          }
+        },
+        "required": [
+          "body"
         ]
       }
     }

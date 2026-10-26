@@ -7,6 +7,7 @@ import {
   parseSnippet,
   tokenizeSearchQuery,
 } from '@collab-docs/shared';
+import { viewableDocumentSql } from '../permissions/document-access-sql';
 import { PrismaService } from '../prisma/prisma.service';
 import { type SearchCursor, decodeCursor, encodeCursor } from './search-cursor';
 import type { SearchQueryDto } from './search.dto';
@@ -107,14 +108,7 @@ export function buildSearchStatement(args: {
         WHERE ds.workspace_id = ${workspaceId}::uuid
           AND ds.tsv @@ ${tsquery}
           AND d.workspace_id = ds.workspace_id
-          AND d.deleted_at IS NULL
-          AND (
-            m.role IN ('OWNER', 'ADMIN')
-            OR d.visibility = 'WORKSPACE'
-            OR EXISTS (
-              SELECT 1 FROM document_shares s WHERE s.document_id = d.id AND s.user_id = ${userId}::uuid
-            )
-          )
+          AND ${viewableDocumentSql(Prisma.sql`${userId}::uuid`)}
       ),
       page AS (
         SELECT * FROM hits ${after} ORDER BY hits.rank DESC, hits.id DESC LIMIT ${limit}

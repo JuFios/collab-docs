@@ -31,3 +31,4 @@ export * from './versions';
 export * from './attachments';
 export * from './public-links';
 export * from './search';
+export * from './comments';

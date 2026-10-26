@@ -1,4 +1,4 @@
-import { escapeHtml } from './html';
+import { escapeHtml, oneLine } from './html';
 
 export interface InviteEmailData {
   workspaceName: string;
@@ -14,9 +14,6 @@ export interface RenderedEmail {
   html: string;
   text: string;
 }
-
-/** Subjects are plain text but still must not carry line breaks (header injection). */
-const oneLine = (value: string) => value.replace(/[\r\n]+/g, ' ').trim();
 
 export function renderInviteEmail(data: InviteEmailData): RenderedEmail {
   const workspace = escapeHtml(data.workspaceName);
