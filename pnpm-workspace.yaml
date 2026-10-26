@@ -11,3 +11,5 @@ onlyBuiltDependencies:
 overrides:
   # next@15 pins postcss 8.4.31, which has published advisories; use the patched release
   'next>postcss': 8.5.31
+  # @nestjs/platform-ws pins ws 8.21.2; collab uses 8.22.0, so keep one copy of the socket library
+  '@nestjs/platform-ws>ws': 8.22.0
