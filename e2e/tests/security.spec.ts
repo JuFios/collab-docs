@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { test as signedInTest, expect as signedInExpect, watchPolicyViolations } from '../fixtures';
+import {
+  test as signedInTest,
+  expect as signedInExpect,
+  loginThroughUi,
+  newUser,
+  watchPolicyViolations,
+} from '../fixtures';
 import { ORIGIN, createDocument, createWorkspace } from '../workspace';
 
 const directive = (policy: string, name: string) =>
@@ -104,6 +110,62 @@ signedInTest.describe('cross-site requests', () => {
         headers: { origin: ORIGIN },
       });
       signedInExpect(fine.status()).toBe(204);
+    },
+  );
+});
+
+signedInTest.describe('static policy and cached pages', () => {
+  signedInTest(
+    'a published page keeps its Content-Security-Policy and is still served from the ISR cache',
+    async ({ signedInPage, request }) => {
+      const workspaceId = await createWorkspace(signedInPage, 'Policy and cache');
+      const documentId = await createDocument(signedInPage, workspaceId, 'Cached page');
+      const link = await signedInPage.request.post(`/api/documents/${documentId}/public-links`, {
+        data: { mode: 'VIEW' },
+        headers: { origin: ORIGIN },
+      });
+      signedInExpect(link.status()).toBe(201);
+      const { slug } = (await link.json()) as { slug: string };
+
+      // the first request may fill the cache; from the second on, the page comes out of it
+      await request.get(`/p/${slug}`);
+      const second = await request.get(`/p/${slug}`);
+      signedInExpect(second.status()).toBe(200);
+      const headers = second.headers();
+      // no nonce to put into the HTML: the policy is the same string for every visitor, so the page stays static
+      signedInExpect(headers['x-nextjs-cache']).toBe('HIT');
+      signedInExpect(headers['content-security-policy']).toContain("default-src 'self'");
+      signedInExpect(headers['content-security-policy']).not.toContain('nonce-');
+      signedInExpect(headers['cache-control']).toContain('s-maxage=');
+    },
+  );
+});
+
+signedInTest.describe('client address behind Server Actions', () => {
+  signedInTest(
+    'a sign-in through the form counts against the same address bucket as a direct api call',
+    async ({ page, request }) => {
+      // The api limits logins per client address. If the Server Action did not pass the visitor's address on, its
+      // attempts would be counted against the web container instead and this bucket would not move.
+      const attempt = async () => {
+        const response = await request.post('/api/auth/login', {
+          data: { email: `nobody-${Date.now()}@example.test`, password: 'irrelevant-password' },
+        });
+        signedInExpect(response.status()).toBe(401);
+        return Number(response.headers()['x-ratelimit-remaining']);
+      };
+      const before = await attempt();
+      const stranger = newUser('stranger');
+      for (let i = 0; i < 3; i += 1) {
+        await loginThroughUi(page, stranger);
+        await page
+          .getByText(/invalid|incorrect|wrong/i)
+          .first()
+          .waitFor();
+      }
+      const after = await attempt();
+      // three form submissions and one more direct call; other tests add to it, none takes away from it
+      signedInExpect(after).toBeLessThanOrEqual(before - 4);
     },
   );
 });
