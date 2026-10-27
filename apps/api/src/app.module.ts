@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PlatformModule } from '@collab-docs/nest';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { CollabModule } from './collab/collab.module';
 import { CommentsModule } from './comments/comments.module';
 import { DocumentsModule } from './documents/documents.module';
@@ -28,6 +29,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     SearchModule,
     InboxModule,
     CommentsModule,
+    BillingModule,
   ],
 })
 export class AppModule {}
