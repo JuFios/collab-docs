@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 
-import { PLAN_CATALOG, type PlanTier } from '@collab-docs/shared';
+import { PLAN_CATALOG, PLAN_TIERS, type PlanTier } from '@collab-docs/shared';
 import { PlanLimitsService, type Tx } from './plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -158,6 +158,49 @@ describe('PlanLimitsService', () => {
       await expect(service.assertCanAddStorage(tx, WORKSPACE, 11)).rejects.toMatchObject({
         code: 'PLAN_LIMIT_EXCEEDED',
         details: { kind: 'storage', limit, current: limit - 10, plan: 'FREE' },
+      });
+    });
+  });
+
+  describe.each(PLAN_TIERS)('on the %s plan', (plan) => {
+    const limits = PLAN_CATALOG[plan];
+
+    it('lets the last member slot be taken and refuses the next', async () => {
+      const { service, tx, db } = await setup(plan);
+      db.workspaceMember.count.mockResolvedValue(limits.maxMembers - 1);
+      await expect(service.assertCanAddMember(tx, WORKSPACE)).resolves.toBeUndefined();
+
+      db.workspaceMember.count.mockResolvedValue(limits.maxMembers);
+      await expect(service.assertCanAddMember(tx, WORKSPACE)).rejects.toMatchObject({
+        code: 'PLAN_LIMIT_EXCEEDED',
+        details: { kind: 'members', limit: limits.maxMembers, current: limits.maxMembers, plan },
+      });
+    });
+
+    it('lets the last document be created and refuses the next, unless the plan has no limit', async () => {
+      const { service, tx, db } = await setup(plan);
+      if (limits.maxDocuments === null) {
+        db.document.count.mockResolvedValue(1_000_000);
+        await expect(service.assertCanAddDocument(tx, WORKSPACE)).resolves.toBeUndefined();
+        return;
+      }
+      db.document.count.mockResolvedValue(limits.maxDocuments - 1);
+      await expect(service.assertCanAddDocument(tx, WORKSPACE)).resolves.toBeUndefined();
+
+      db.document.count.mockResolvedValue(limits.maxDocuments);
+      await expect(service.assertCanAddDocument(tx, WORKSPACE)).rejects.toMatchObject({
+        code: 'PLAN_LIMIT_EXCEEDED',
+        details: { kind: 'documents', limit: limits.maxDocuments, plan },
+      });
+    });
+
+    it('lets the quota be filled exactly and refuses one byte more', async () => {
+      const { service, tx, db } = await setup(plan);
+      db.attachment.aggregate.mockResolvedValue({ _sum: { size: limits.maxStorageBytes - 1 } });
+      await expect(service.assertCanAddStorage(tx, WORKSPACE, 1)).resolves.toBeUndefined();
+      await expect(service.assertCanAddStorage(tx, WORKSPACE, 2)).rejects.toMatchObject({
+        code: 'PLAN_LIMIT_EXCEEDED',
+        details: { kind: 'storage', limit: limits.maxStorageBytes, plan },
       });
     });
   });
