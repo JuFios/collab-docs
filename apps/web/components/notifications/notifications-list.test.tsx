@@ -57,7 +57,9 @@ afterEach(() => {
 });
 
 function mount(initialPage: NotificationPage) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+  });
   render(
     <QueryClientProvider client={client}>
       <NotificationsList initialPage={initialPage} />

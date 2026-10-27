@@ -768,6 +768,12 @@ flowchart LR
 - A failed call (network, timeout 5 s, non-2xx) throws and BullMQ retries with exponential backoff (5 attempts, 1 s
   base). Logs: `revalidate.sent` and `revalidate.failed` with the document, slug, reason and attempt. After the last
   attempt the page waits for its TTL. Enqueue failures are logged and counted, never raised to the editor.
+- A page whose state must change at once is checked after the invalidation: the job asks the web app for `/p/<slug>`
+  and fails, to be retried, unless the answer is 404 for a revoked, expired or deleted page, or 200 for a page that
+  has just been published. Next writes a rendered page to its
+  cache after it has answered, so a visit rendered just before the invalidation can store the old page after it and
+  make it look fresh again; without the check an unpublished page could be served for an hour. The check looks at the
+  status only: for a change of content the retry cannot tell the old page from the new one.
 - Contract of `POST {WEB_INTERNAL_URL}/internal/revalidate`: header `x-revalidate-secret`, body
   `{tags: ["pub:<slug>"]}` (`revalidateRequestSchema` in `@collab-docs/shared`, up to 20 tags).
 - Because the tag is derived from the slug, the web app needs nothing but the slug to cache or invalidate a page.
@@ -1080,44 +1086,50 @@ bundled through npm so builds need no network).
 Server Component is the default: anything that reads data and needs no browser state. A Client Component
 (`"use client"`) exists only where the browser is required, and each one is listed here with the reason:
 
-| Client component                                                                                            | Why                                                                                                                                  |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `components/providers.tsx`                                                                                  | TanStack Query provider and the toast outlet                                                                                         |
-| `components/auth/login-form.tsx`, `register-form.tsx`                                                       | `useActionState` (pending state, field errors) and a zod pass before the round trip                                                  |
-| `components/user-menu.tsx`                                                                                  | Radix menu; the logout Server Action runs from its event handler                                                                     |
-| `components/workspaces/create-workspace-form`, `rename-workspace-form`, `invite-form`, `accept-invite-form` | `useActionState` (pending state, field errors, plan-limit explanation) and a zod pass before the round trip                          |
-| `components/workspaces/members-table.tsx`, `pending-invites.tsx`                                            | Role selects, the remove confirmation and revoke call Server Actions from event handlers                                             |
-| `components/workspaces/leave-workspace-button.tsx`                                                          | Confirmation dialog; the action runs from an event handler, then navigation and refresh                                              |
-| `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                           |
-| `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                               |
-| `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action        |
-| `components/workspaces/workspace-provider.tsx`                                                              | Owns the tab's single SSE connection and hands the workspace role, the initial tree and the connection state to the sidebar          |
-| `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server                  |
-| `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                               |
-| `components/editor/*`, `lib/collab/use-collab-connection.ts`                                                | The block editor, the WebSocket, presence, save status and version history: Yjs, ProseMirror and `navigator.onLine` are browser-only |
-| `components/comments/*`, `lib/comments/*`                                                                   | Thread panel, composer with the `@` menu and optimistic writes (TanStack Query); it works on the live editor instance                |
-| `components/editor/block-comments.ts`                                                                       | ProseMirror plugin: the markers beside blocks, their highlight and the shortcut; browser-only like the rest of the editor            |
-| `components/notifications/*`, `lib/notifications/*`                                                         | The bell (Radix menu, unread badge), the `/notifications` list and the toast for a pushed notification                               |
-| `components/content/content-renderer.tsx` (not a client component)                                          | Stateless render of sanitised JSON; usable from a Server Component (the public page) and from the version preview                    |
-| `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                       |
-| `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                                   |
-| `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                                      |
-| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                         |
-| `app/error.tsx`                                                                                             | Error boundaries must be Client Components                                                                                           |
+| Client component                                                                                            | Why                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/providers.tsx`                                                                                  | TanStack Query provider and the toast outlet                                                                                                 |
+| `components/auth/login-form.tsx`, `register-form.tsx`                                                       | `useActionState` (pending state, field errors) and a zod pass before the round trip                                                          |
+| `components/user-menu.tsx`                                                                                  | Radix menu; the logout Server Action runs from its event handler                                                                             |
+| `components/workspaces/create-workspace-form`, `rename-workspace-form`, `invite-form`, `accept-invite-form` | `useActionState` (pending state, field errors, plan-limit explanation) and a zod pass before the round trip                                  |
+| `components/workspaces/members-table.tsx`, `pending-invites.tsx`                                            | Role selects, the remove confirmation and revoke call Server Actions from event handlers                                                     |
+| `components/workspaces/leave-workspace-button.tsx`                                                          | Confirmation dialog; the action runs from an event handler, then navigation and refresh                                                      |
+| `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                                   |
+| `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                                       |
+| `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action                |
+| `components/workspaces/workspace-provider.tsx`                                                              | Owns the tab's single SSE connection and hands the workspace role, the initial tree and the connection state to the sidebar                  |
+| `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server                          |
+| `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                                       |
+| `components/editor/*`, `lib/collab/use-collab-connection.ts`                                                | The block editor, the WebSocket, presence, save status and version history: Yjs, ProseMirror and `navigator.onLine` are browser-only         |
+| `components/comments/*`, `lib/comments/*`                                                                   | Thread panel, composer with the `@` menu and optimistic writes (TanStack Query); it works on the live editor instance                        |
+| `components/editor/block-comments.ts`                                                                       | ProseMirror plugin: the markers beside blocks, their highlight and the shortcut; browser-only like the rest of the editor                    |
+| `components/notifications/*`, `lib/notifications/*`                                                         | The bell (Radix menu, unread badge), the `/notifications` list and the toast for a pushed notification                                       |
+| `components/content/content-renderer.tsx` (not a client component)                                          | Stateless render of sanitised JSON; usable from a Server Component (the public page) and from the version preview                            |
+| `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                               |
+| `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                                           |
+| `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                                              |
+| `components/billing/checkout-button.tsx`, `cancel-subscription-button.tsx`, `use-action-runner.ts`          | Buttons call Server Actions from event handlers (a plain `<form>` has nothing to submit), then navigate through `useActionFeedback`          |
+| `components/billing/awaiting-confirmation.tsx`                                                              | The only waiting piece of the flow: asks the server for a fresh render every 1.5 s, at most 30 times, until the webhook has changed the plan |
+| `components/billing/plan-limit-dialog.tsx`                                                                  | Listens to the plan-limit window event, so it needs the browser; reads the member's role from the workspace context                          |
+| `components/billing/mock-checkout-form.tsx`                                                                 | The three buttons of the payment page; each runs a Server Action from its handler                                                            |
+| `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                                 |
+| `app/error.tsx`                                                                                             | Error boundaries must be Client Components                                                                                                   |
 
 Screens and where they render (everything not listed as a client island is a Server Component):
 
-| Screen                | Renders in                                  | Why                                                                                                                                                                                                                                                           |
-| --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/w`                  | RSC page + client create form               | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
-| `/w/[id]` (dashboard) | RSC, four async RSC blocks                  | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
-| `/w/[id]/settings`    | RSC page + client forms/tables              | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
-| `/invite/[token]`     | RSC                                         | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
-| `/w/[id]/d/[docId]`   | RSC page + client shell and editor          | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
-| `/w/[id]/trash`       | RSC page + client list                      | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
-| `/notifications`      | RSC page + client list                      | The first page is read on the server and seeds the client query (`initialData`); from there the list is live (the stream, the bell and window focus refresh it) and pages in with a cursor                                                                    |
-| `/shared`             | RSC                                         | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
-| Navbar                | RSC shell + switcher/bell/user-menu islands | The workspace list and the unread count are fetched in the layout and passed down as typed props (the bell asks again itself if the count could not be loaded)                                                                                                |
+| Screen                       | Renders in                                  | Why                                                                                                                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/w`                         | RSC page + client create form               | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
+| `/w/[id]` (dashboard)        | RSC, four async RSC blocks                  | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
+| `/w/[id]/settings`           | RSC page + client forms/tables              | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
+| `/w/[id]/billing`            | RSC page + client buttons                   | Plan, usage, plans and invoices are read on the server (admin-only); upgrade and cancel are Server Actions; one small island polls while a webhook is pending                                                                                                 |
+| `/mock-checkout/[sessionId]` | RSC page + client buttons                   | A public route like a hosted checkout; the session is read with `cache: 'no-store'`, the buttons are Server Actions                                                                                                                                           |
+| `/invite/[token]`            | RSC                                         | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
+| `/w/[id]/d/[docId]`          | RSC page + client shell and editor          | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
+| `/w/[id]/trash`              | RSC page + client list                      | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
+| `/notifications`             | RSC page + client list                      | The first page is read on the server and seeds the client query (`initialData`); from there the list is live (the stream, the bell and window focus refresh it) and pages in with a cursor                                                                    |
+| `/shared`                    | RSC                                         | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
+| Navbar                       | RSC shell + switcher/bell/user-menu islands | The workspace list and the unread count are fetched in the layout and passed down as typed props (the bell asks again itself if the count could not be loaded)                                                                                                |
 
 **Dashboard streaming.** `app/(app)/w/[id]/page.tsx` awaits nothing but the workspace the layout already loaded
 (deduplicated by `React.cache`). The blocks (`components/dashboard/blocks.tsx`: recent documents, members,
@@ -1304,20 +1316,55 @@ Not done: editing and deleting your own comment from the UI (the api has both), 
 document, live updates of other people's replies inside an open panel (they appear on the next refetch: window
 focus, reopening the panel, or any action of your own), and per-user notification settings.
 
+### Billing UX
+
+**Pages.** `/w/[id]/billing` (admin and owner; everyone else gets `ForbiddenState`) is a Server Component. It shows
+the current plan and the end of the paid period, the usage as three meters (amber from 80%, red at the limit,
+no bar for an unlimited figure), the three plans side by side and the invoices. The plan catalogue comes from
+`@collab-docs/shared`, the same table the api enforces, so the numbers on the cards cannot drift from the limits.
+The settings page repeats the meters for a quick look. Banners cover the states of a subscription: waiting for a
+confirmation, a declined payment, a canceled subscription and a workspace that is over the limits of its plan after
+a downgrade. A workspace has no `past_due` state because the mock provider cannot fail a renewal (it has none), so
+there is no banner for it.
+
+**Paying.** Upgrade runs a Server Action that creates the checkout session and returns the payment page the api
+points at; the button then navigates (`useActionFeedback`, see above for why the action does not `redirect`).
+`/mock-checkout/[sessionId]` looks like a small hosted checkout. It is public, like the page of a real provider, and
+the session id is the credential. "Pay" and "Fail payment" call the provider's endpoints from a Server Action, which
+also reads the session again so that the page the user returns to comes from the provider's data. "Pay and re-send
+webhook" pays and then asks the provider to deliver the same event a second time; it shows the idempotency of the
+webhook on screen, is a development aid and is not offered when `APP_ENV=staging`.
+
+**Waiting for the webhook.** The provider answers at once, but the plan changes when the webhook has been applied,
+which goes through two queues and takes a few seconds (longer while a delivery is being retried). The user comes back to
+`/w/[id]/billing?awaiting=PRO`; a small client island calls `router.refresh()` every 1.5 s, at most 30 times, until
+the server renders the expected plan, then toasts and removes the query string. After that it stops and offers
+"Check again" instead of polling forever. Cancelling works the same way, waiting for `FREE`. A declined payment
+comes back as `?payment=declined` and needs no waiting: nothing changes.
+
+**Limits everywhere.** A create that hits a plan limit never shows a generic error. REST mutations (new document,
+restoring from the trash, image upload) reach the shared error handler, Server Actions (invite) return the details in
+`ActionState`; both fire the same window event, and `PlanLimitDialog` (mounted once in the workspace frame) shows the
+limit, the figures and the plan. Admins and owners get "Upgrade plan" (a link to the billing page, hidden on the
+largest plan); everyone else is told to ask an admin. The invitation form also keeps its inline explanation.
+
+Not done: the 80% warning is shown on the meters but nothing warns before the action that would cross it, and the
+dialog does not offer to free space (it only says so).
+
 ### Server Actions vs REST vs WebSocket
 
-| Operation                                                                                       | Channel               | Why                                                                                                                                          |
-| ----------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Create/rename workspace, invite, change role, remove member, revoke/accept invite, login/logout | **Server Actions**    | Forms that work as plain `<form action>`, cookies handled on the server, `revalidatePath` refreshes the Server Components that show the data |
-| Document tree (move/create/rename/delete), comments, sharing, publishing                        | REST + TanStack Query | Interactive, optimistic UI and cache invalidation in the browser                                                                             |
-| Notifications, tree changes                                                                     | SSE                   | One-way push                                                                                                                                 |
-| Document content, presence                                                                      | WebSocket (Yjs)       | Conflict-free merging and awareness                                                                                                          |
+| Operation                                                                                                                      | Channel               | Why                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create/rename workspace, invite, change role, remove member, revoke/accept invite, checkout, cancel subscription, login/logout | **Server Actions**    | Forms that work as plain `<form action>`, cookies handled on the server, `revalidatePath` refreshes the Server Components that show the data |
+| Document tree (move/create/rename/delete), comments, sharing, publishing                                                       | REST + TanStack Query | Interactive, optimistic UI and cache invalidation in the browser                                                                             |
+| Notifications, tree changes                                                                                                    | SSE                   | One-way push                                                                                                                                 |
+| Document content, presence                                                                                                     | WebSocket (Yjs)       | Conflict-free merging and awareness                                                                                                          |
 
 Server Actions call the api through `lib/api/server.ts` (cookies, `x-forwarded-for`, correlation id), validate
 their input with the zod schemas of `@collab-docs/shared` (arguments of actions that are not form posts are
 validated too, since they are public endpoints), and report failures as data (`ActionState`): field errors,
-a plain-language plan-limit explanation (`PLAN_LIMIT_EXCEEDED` also fires the window event the upgrade dialog
-will subscribe to), or a generic message. Forms run the same schema in the browser first, inside the action
+a plain-language plan-limit explanation (`PLAN_LIMIT_EXCEEDED` also fires the window event the limit dialog
+listens to), or a generic message. Forms run the same schema in the browser first, inside the action
 function (`use-validated-action.ts`), so field errors appear without a round trip. Authorization is always the
 api's; hiding admin controls in the UI is convenience only.
 
@@ -1387,14 +1434,14 @@ Every client turns a failed response into one `ApiError` (`status`, `code`, `mes
 `fieldErrors`). Query and mutation failures pass through one handler (`lib/api/error-handler.ts`, wired into the
 TanStack `QueryCache`/`MutationCache`):
 
-| Case                  | Behaviour                                                                     |
-| --------------------- | ----------------------------------------------------------------------------- |
-| 401                   | Client refreshes once and retries; if that fails the user is sent to `/login` |
-| 403 (query)           | No toast: the screen renders `ForbiddenState`                                 |
-| 404 (query)           | No toast: the screen renders its not-found state                              |
-| 403 (mutation)        | Toast "You don't have permission to do that"                                  |
-| `PLAN_LIMIT_EXCEEDED` | `plan-limit-exceeded` window event for the upgrade dialog; no toast           |
-| 429, network, 5xx     | Friendly toast; the correlation id is shown as a reference                    |
+| Case                  | Behaviour                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| 401                   | Client refreshes once and retries; if that fails the user is sent to `/login`      |
+| 403 (query)           | No toast: the screen renders `ForbiddenState`                                      |
+| 404 (query)           | No toast: the screen renders its not-found state                                   |
+| 403 (mutation)        | Toast "You don't have permission to do that"                                       |
+| `PLAN_LIMIT_EXCEEDED` | `plan-limit-exceeded` window event for the limit dialog (see Billing UX); no toast |
+| 429, network, 5xx     | Friendly toast; the correlation id is shown as a reference                         |
 
 `app/error.tsx` and `app/not-found.tsx` cover render-time failures; `EmptyState`, `ErrorState`,
 `ForbiddenState` and `LoadingState` are the shared building blocks.
@@ -1521,6 +1568,7 @@ listed here with the reason, so that a reader does not have to rediscover them.
 | Thread and comment access | Routes under `documents/:id` use `@DocumentAccess`; routes that carry a thread or comment id (`threads/:threadId/…`, `comments/:commentId`) load the row in the service and call `PermissionsService.assertDocumentAccess(…, tx)` on its document, inside the write transaction.                                                                                                                                                                                                 | A guard sees only the route, and the document is not in it; a guard that resolved thread → document would run the same lookups a second time, and the write still has to re-check inside its transaction so a revoked share cannot slip through between the two.                                                        |
 | Webhook signature         | `Mock-Signature: t=…,v1=…` is built and checked in `webhook-signature.ts` with `node:crypto` (HMAC-SHA256, `timingSafeEqual`, a five-minute window); the raw body comes from `rawBody: true`, the Nest way.                                                                                                                                                                                                                                                                      | The provider is a mock, so there is no vendor SDK to call (`stripe.webhooks.constructEvent` does the same thing for Stripe). The format is Stripe's, so replacing the module with the real provider changes the verifier, not the design.                                                                               |
 | Mock payment provider     | A module of its own with its own table (`mock_provider_events`) and its own queue (`billing-delivery`); the billing module sees it through the `BILLING_PROVIDER` token only.                                                                                                                                                                                                                                                                                                    | A real provider keeps its events and delivers them itself; "redeliver" and retries only make sense if the mock does the same, and keeping its state out of `webhook_events` keeps the receiving side identical to what it would be with Stripe.                                                                         |
+| Checkout redirect (web)   | The checkout action returns the payment page and the button navigates, instead of calling `redirect` inside the action: the same reason as for every other action (see "Why actions do not call `revalidatePath` or `redirect`").                                                                                                                                                                                                                                                |
 | Tree cache                | A small service over Redis; the key carries a version that `INCR` bumps.                                                                                                                                                                                                                                                                                                                                                                                                         | `@nestjs/cache-manager` has no atomic increment, so invalidation by version would need the raw client anyway.                                                                                                                                                                                                           |
 | Events between services   | `ioredis` publish/subscribe with JSON payloads (`perm.changed`, `doc.deleted`, `doc.restored`, the realtime bridge).                                                                                                                                                                                                                                                                                                                                                             | These are fire-and-forget broadcasts. The Redis transporter of `@nestjs/microservices` would wrap every message as `{ pattern, data }` and make every subscriber a microservice for the same delivery guarantees. The request/response calls between api and collab do use the microservices TCP transport (see above). |
 | OpenAPI                   | `@ApiProperty` decorators are written by hand, and `docs/openapi.json` is exported and committed.                                                                                                                                                                                                                                                                                                                                                                                | The Nest CLI plugin is optional, saves decorators only, and would change the generated document silently when a type changes.                                                                                                                                                                                           |

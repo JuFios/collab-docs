@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type LimitKind, type PlanTier, PLAN_CATALOG, limitFor } from './plans';
+import { type LimitKind, type PlanTier, PLAN_CATALOG, limitFor, planTierSchema } from './plans';
 
 /** Plans that can be bought; FREE is what a workspace falls back to. */
 export const CHECKOUT_PLANS = ['PRO', 'TEAM'] as const;
@@ -62,12 +62,13 @@ export function planCatalogList(): PlanInfo[] {
 }
 
 /** What a workspace holds against one limit. */
-export interface UsageFigure {
-  kind: LimitKind;
-  current: number;
+export const usageFigureSchema = z.object({
+  kind: z.enum(['members', 'documents', 'storage']),
+  current: z.number(),
   /** `null` = unlimited. */
-  limit: number | null;
-}
+  limit: z.number().nullable(),
+});
+export type UsageFigure = z.infer<typeof usageFigureSchema>;
 
 /**
  * The figures that exceed the limits of `plan`. After a downgrade a workspace may hold more than the new plan
@@ -80,15 +81,43 @@ export function overLimit(plan: PlanTier, current: Record<LimitKind, number>): U
     .filter((figure) => figure.limit !== null && figure.current > figure.limit);
 }
 
-export interface InvoiceInfo {
-  id: string;
-  plan: PlanTier;
-  amountCents: number;
-  createdAt: string;
-}
+export const invoiceInfoSchema = z.object({
+  id: z.uuid(),
+  plan: planTierSchema,
+  amountCents: z.number().int(),
+  createdAt: z.string(),
+});
+export type InvoiceInfo = z.infer<typeof invoiceInfoSchema>;
 
-export interface CheckoutStarted {
-  sessionId: string;
+export const checkoutStartedSchema = z.object({
+  sessionId: z.uuid(),
   /** Path of the page where the payment is made. */
-  checkoutUrl: string;
-}
+  checkoutUrl: z.string().startsWith('/'),
+});
+export type CheckoutStarted = z.infer<typeof checkoutStartedSchema>;
+
+/** `GET /workspaces/:id/billing`. */
+export const billingOverviewSchema = z.object({
+  plan: planTierSchema,
+  status: z.enum(SUBSCRIPTION_STATUSES),
+  currentPeriodEnd: z.string().nullable(),
+  usage: z.array(usageFigureSchema),
+  overLimit: z.array(usageFigureSchema),
+  invoices: z.array(invoiceInfoSchema),
+});
+export type BillingOverviewData = z.infer<typeof billingOverviewSchema>;
+
+export const CHECKOUT_SESSION_STATUSES = ['PENDING', 'COMPLETED', 'FAILED'] as const;
+
+/** The checkout session as the provider's payment page shows it. */
+export const mockCheckoutSessionSchema = z.object({
+  id: z.uuid(),
+  workspaceId: z.uuid(),
+  plan: planTierSchema,
+  amountCents: z.number().int(),
+  status: z.enum(CHECKOUT_SESSION_STATUSES),
+});
+export type MockCheckoutSession = z.infer<typeof mockCheckoutSessionSchema>;
+
+/** Answer of the provider's `complete`, `fail` and `redeliver`: the id of the event it delivers. */
+export const eventIssuedSchema = z.object({ eventId: z.string().regex(BILLING_EVENT_ID_PATTERN) });

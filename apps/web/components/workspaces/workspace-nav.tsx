@@ -28,6 +28,11 @@ export function WorkspaceNav({
             label: 'Settings',
             active: pathname.startsWith(`${base}/settings`),
           },
+          {
+            href: `${base}/billing`,
+            label: 'Billing',
+            active: pathname.startsWith(`${base}/billing`),
+          },
         ]
       : []),
   ];

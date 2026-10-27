@@ -1,6 +1,9 @@
 import { roleAtLeast } from '@collab-docs/shared';
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { UsageMeter } from '@/components/billing/usage-meter';
 import { EmptyState, ForbiddenState } from '@/components/states';
+import { PLAN_LABELS } from '@/lib/billing/format';
 import { InviteForm } from '@/components/workspaces/invite-form';
 import { MembersTable } from '@/components/workspaces/members-table';
 import { PendingInvites } from '@/components/workspaces/pending-invites';
@@ -55,6 +58,30 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
     <div className="grid gap-6">
       <Section id="rename-heading" title="General">
         <RenameWorkspaceForm workspaceId={id} name={workspace.name} />
+      </Section>
+      <Section id="usage-heading" title="Plan and usage">
+        <p className="text-sm text-muted-foreground">
+          This workspace is on the {PLAN_LABELS[usage.plan]} plan.{' '}
+          <Link
+            href={`/w/${id}/billing`}
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            Manage billing
+          </Link>
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <UsageMeter kind="members" current={slots} limit={usage.members.limit} />
+          <UsageMeter
+            kind="documents"
+            current={usage.documents.current}
+            limit={usage.documents.limit}
+          />
+          <UsageMeter
+            kind="storage"
+            current={usage.storage.currentBytes}
+            limit={usage.storage.limitBytes}
+          />
+        </div>
       </Section>
       <Section id="members-heading" title="Members">
         {members.length === 0 ? (
