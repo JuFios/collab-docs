@@ -303,8 +303,9 @@ describe('LeaveWorkspaceButton', () => {
 });
 
 describe('WorkspaceNav', () => {
-  it('hides Settings from editors and viewers', () => {
+  it('hides Settings and Billing from editors and viewers', () => {
     render(<WorkspaceNav workspaceId="abc" canManage={false} />);
+    expect(screen.queryByRole('link', { name: 'Billing' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
   });
@@ -314,5 +315,12 @@ describe('WorkspaceNav', () => {
     render(<WorkspaceNav workspaceId="abc" canManage />);
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('shows Billing to admins and marks it when active', () => {
+    navigation.pathname = '/w/abc/billing';
+    render(<WorkspaceNav workspaceId="abc" canManage />);
+    expect(screen.getByRole('link', { name: 'Billing' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current');
   });
 });

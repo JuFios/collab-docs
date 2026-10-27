@@ -1,6 +1,7 @@
 import { roleAtLeast } from '@collab-docs/shared';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { PlanLimitDialog } from '@/components/billing/plan-limit-dialog';
 import { WorkspaceSidebar } from '@/components/documents/workspace-sidebar';
 import { ForbiddenState } from '@/components/states';
 import { LeaveWorkspaceButton } from '@/components/workspaces/leave-workspace-button';
@@ -28,7 +29,14 @@ export default async function WorkspaceLayout({
     // Not a member: either a stranger or a guest who was given a share. The frame (sidebar, stream) is for members
     // only, so the children render bare and every page decides for itself: the document page checks the share,
     // all others call requireWorkspace() and answer 404.
-    if (isApiError(error) && error.status === 404) return <>{children}</>;
+    if (isApiError(error) && error.status === 404) {
+      return (
+        <>
+          {children}
+          <PlanLimitDialog />
+        </>
+      );
+    }
     if (isApiError(error) && error.status === 403) return <ForbiddenState />;
     throw error;
   }
@@ -60,6 +68,7 @@ export default async function WorkspaceLayout({
           {children}
         </div>
       </div>
+      <PlanLimitDialog />
     </WorkspaceProvider>
   );
 }
