@@ -13,3 +13,6 @@ overrides:
   'next>postcss': 8.5.31
   # @nestjs/platform-ws pins ws 8.21.2; collab uses 8.22.0, so keep one copy of the socket library
   '@nestjs/platform-ws>ws': 8.22.0
+  # advisories in transitive production dependencies of @nestjs: use the patched releases
+  '@nestjs/platform-express>multer': 2.5.0
+  '@nestjs/swagger>js-yaml': 5.5.0
