@@ -14,6 +14,7 @@ import { NODE_NAMES } from '@collab-docs/shared/content';
 import { verifyCollabTicket } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { PrismaService } from '../prisma/prisma.service';
+import { statusOf } from './link-status';
 import { PublishingWorkerModule } from './publishing.module';
 
 const PASSWORD = 'correct-horse-battery';
@@ -67,6 +68,9 @@ describe('publishing', () => {
   /** What the mock web app does with a revalidation request: the status code to answer, in order. */
   const webCalls: WebCall[] = [];
   let webAnswers: number[] = [];
+  /** Answers of the mock page `/p/:slug` that come before the true one: a cache that still holds the old page. */
+  let stalePageAnswers: number[] = [];
+  const pageRequests: string[] = [];
 
   const http$ = () => request(app.getHttpServer());
 
@@ -170,6 +174,25 @@ describe('publishing', () => {
             tags: parsed.tags,
           });
           res.statusCode = webAnswers.shift() ?? 200;
+        } else if (req.method === 'GET' && req.url?.startsWith('/p/')) {
+          // the published page: 200 while the link is live, 404 otherwise, like the real route
+          const slug = decodeURIComponent(req.url.slice('/p/'.length));
+          pageRequests.push(slug);
+          void prisma.publicLink
+            .findFirst({
+              where: { slug },
+              select: {
+                revokedAt: true,
+                expiresAt: true,
+                document: { select: { deletedAt: true } },
+              },
+            })
+            .then((link) => {
+              const live = link && statusOf(link) === 'active' && !link.document.deletedAt;
+              res.statusCode = stalePageAnswers.shift() ?? (live ? 200 : 404);
+              res.end('{}');
+            });
+          return;
         } else {
           res.statusCode = 404;
         }
@@ -190,6 +213,8 @@ describe('publishing', () => {
     flushed.length = 0;
     webCalls.length = 0;
     webAnswers = [];
+    stalePageAnswers = [];
+    pageRequests.length = 0;
     collabSilent = false;
     app.get(ConfigService).set('COLLAB_INTERNAL_URL', collabUrl);
   });
@@ -768,6 +793,32 @@ describe('publishing', () => {
       await as(owner).delete(`/documents/${documentId}`).expect(204);
       await until(() => webCalls.length === 1);
       expect(webCalls[0]!.tags).toEqual([`pub:${link.slug}`]);
+    });
+
+    it('invalidates again while the web app still serves an unpublished page', async () => {
+      const { owner, documentId } = await setup();
+      const link = (await publish(owner, documentId).expect(201)).body;
+      await until(() => webCalls.length === 1);
+      await settleWeb();
+      webCalls.length = 0;
+      pageRequests.length = 0;
+
+      // the cache answers with the old page once, as it does when a render finishes after the invalidation
+      stalePageAnswers = [200];
+      await as(owner).delete(`/documents/${documentId}/public-links/${link.id}`).expect(204);
+      await until(() => webCalls.length >= 2, 12_000);
+      await settleWeb();
+      expect(webCalls).toEqual(Array(2).fill({ secret: SECRET, tags: [`pub:${link.slug}`] }));
+      expect(pageRequests).toEqual([link.slug, link.slug]);
+    });
+
+    it('invalidates again while the web app still serves the cached 404 of a published page', async () => {
+      const { owner, documentId } = await setup();
+      stalePageAnswers = [404];
+      const { slug } = (await publish(owner, documentId).expect(201)).body;
+      await until(() => webCalls.length >= 2, 12_000);
+      await settleWeb();
+      expect(webCalls).toEqual(Array(2).fill({ secret: SECRET, tags: [`pub:${slug}`] }));
     });
 
     it('tries again when the web app fails', async () => {
