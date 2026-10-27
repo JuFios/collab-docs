@@ -60,10 +60,13 @@ test.describe('search', () => {
     }).toPass({ timeout: 15_000 });
     await expect(result).toBeVisible();
 
-    // accents and case do not matter
-    await searchField(page).fill('QUÉTZAL');
-    await searchField(page).press('Enter');
-    await expect(page).toHaveURL(/search\?q=QU%C3%89TZAL$/);
+    // accents and case do not matter. The page of the previous query is still settling after the navigation (the field
+    // is re-rendered with the new query), and a value typed meanwhile is lost: repeat the step as above.
+    await expect(async () => {
+      await searchField(page).fill('QUÉTZAL');
+      await searchField(page).press('Enter');
+      await expect(page).toHaveURL(/search\?q=QU%C3%89TZAL$/, { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
     await expect(result).toBeVisible();
 
     // keyboard: Down enters the list, Enter opens the document, Escape/Up lead back to the field
@@ -88,8 +91,12 @@ test.describe('search', () => {
     await expect(page.getByText('Search this workspace')).toBeVisible();
     await expect(searchField(page)).toBeFocused();
 
-    await searchField(page).fill('nothingmatchesthis');
-    await page.getByRole('button', { name: 'Search' }).click();
+    // a page that has not hydrated yet resets the field and swallows the click: repeat until the query is sent
+    await expect(async () => {
+      await searchField(page).fill('nothingmatchesthis');
+      await page.getByRole('button', { name: 'Search' }).click();
+      await expect(page).toHaveURL(/search\?q=nothingmatchesthis$/, { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
     await expect(page.getByText('No documents match “nothingmatchesthis”')).toBeVisible();
   });
 
