@@ -1,14 +1,15 @@
+# Only what the images build from reaches the daemon; a change anywhere else (tests, docs, workflows) rebuilds nothing.
+*
+!package.json
+!.npmrc
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!apps
+!packages
 **/node_modules
 **/dist
 **/.next
 **/coverage
 **/*.tsbuildinfo
-.git
-.github
-.env
-.env.*
-!.env.example
-!.env.*.example
 **/Dockerfile
-docker-compose*.yml
-README.md

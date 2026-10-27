@@ -10,7 +10,18 @@ FROM base AS fetch
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
 
-FROM fetch AS build
+FROM fetch AS deps
+# manifests only: the install layer is rebuilt when a dependency changes, not when a source file does
+COPY package.json .npmrc ./
+COPY apps/api/package.json apps/api/
+COPY apps/collab/package.json apps/collab/
+COPY apps/web/package.json apps/web/
+COPY packages/db/package.json packages/db/
+COPY packages/nest/package.json packages/nest/
+COPY packages/shared/package.json packages/shared/
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile --filter @collab-docs/web...
+
+FROM deps AS build
 ENV NEXT_TELEMETRY_DISABLED=1
 # Next compiles rewrites and headers into the routes manifest, so the api proxy target is fixed at build time
 ARG API_INTERNAL_URL=http://api:4000
@@ -20,9 +31,11 @@ ARG S3_PUBLIC_ENDPOINT=http://localhost:9000
 ARG COLLAB_PUBLIC_URL=ws://localhost:4001
 ENV S3_PUBLIC_ENDPOINT=$S3_PUBLIC_ENDPOINT
 ENV COLLAB_PUBLIC_URL=$COLLAB_PUBLIC_URL
-COPY . .
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile
-RUN pnpm --filter @collab-docs/shared build && pnpm --filter @collab-docs/web build
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+RUN --mount=type=cache,id=next-cache,target=/repo/apps/web/.next/cache \
+    pnpm --filter @collab-docs/shared build && pnpm --filter @collab-docs/web build
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production

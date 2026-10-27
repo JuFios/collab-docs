@@ -54,6 +54,15 @@ the `mc` client from the last tagged source releases.
 
 Only infrastructure for local development: `docker compose up -d postgres redis minio minio-init mailpit`.
 
+### Image builds
+
+Each image installs only the workspace packages it needs (`pnpm install --filter <app>...`) from the manifests alone, so
+the install layer is rebuilt when a dependency changes and not when a source file does. The libraries (`shared`, `nest`,
+`db`) are built in a layer of their own, before the app. `.dockerignore` lets only the manifests, `apps/` and `packages/`
+into the build context, so a change to tests, docs or workflows rebuilds nothing. `pnpm deploy --legacy` resolves the
+production tree again; its metadata is kept in a build cache mount so that it does not go to the registry every time.
+After a change to the lockfile all images rebuild; after a change to one app only that image does.
+
 ### Staging profile
 
 ```bash
