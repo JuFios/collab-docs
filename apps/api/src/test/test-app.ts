@@ -72,7 +72,10 @@ export async function createTestApp(
     imports: [AppModule, ...imports],
     controllers: extra,
   }).compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    bufferLogs: true,
+    rawBody: true,
+  });
   configureApp(app);
   await app.init();
   return app;

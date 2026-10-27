@@ -59,6 +59,21 @@ enum SubscriptionStatus {
   @@map("subscription_status")
 }
 
+enum CheckoutSessionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+
+  @@map("checkout_session_status")
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+
+  @@map("webhook_event_status")
+}
+
 enum DocumentVersionKind {
   AUTO
   MANUAL
@@ -131,13 +146,15 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  owner        User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  members      WorkspaceMember[]
-  invites      WorkspaceInvite[]
-  subscription Subscription?
-  documents    Document[]
-  attachments  Attachment[]
-  searchRows   DocumentSearch[]
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  members          WorkspaceMember[]
+  invites          WorkspaceInvite[]
+  subscription     Subscription?
+  checkoutSessions CheckoutSession[]
+  invoices         Invoice[]
+  documents        Document[]
+  attachments      Attachment[]
+  searchRows       DocumentSearch[]
 
   @@map("workspaces")
 }
@@ -432,4 +449,71 @@ model Notification {
   @@index([userId, readAt, createdAt])
   @@index([userId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_user_id_list_idx")
   @@map("notifications")
+}
+
+// A payment the provider is asked to collect for a plan change. The provider's outcome arrives as a webhook event and
+// moves PENDING to COMPLETED or FAILED exactly once (the conditional UPDATE is the idempotency anchor).
+model CheckoutSession {
+  id          String                @id @default(uuid(4)) @db.Uuid
+  workspaceId String                @map("workspace_id") @db.Uuid
+  plan        PlanTier
+  // price at the time of the checkout, in US cents
+  amountCents Int                   @map("amount_cents")
+  status      CheckoutSessionStatus @default(PENDING)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  settledAt   DateTime?             @map("settled_at") @db.Timestamptz(6)
+
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  invoice        Invoice?
+  providerEvents MockProviderEvent[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("checkout_sessions")
+}
+
+// Receiving side of the webhook: one row per provider event id, whatever the number of deliveries.
+model WebhookEvent {
+  id          String             @id @default(uuid(7)) @db.Uuid
+  eventId     String             @unique @map("event_id")
+  type        String
+  payload     Json
+  status      WebhookEventStatus @default(RECEIVED)
+  receivedAt  DateTime           @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt DateTime?          @map("processed_at") @db.Timestamptz(6)
+
+  @@map("webhook_events")
+}
+
+// One charge per checkout session: the unique `checkout_session_id` makes a second charge impossible, whatever
+// the number of events delivered for the session.
+model Invoice {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  workspaceId       String   @map("workspace_id") @db.Uuid
+  checkoutSessionId String   @unique @map("checkout_session_id") @db.Uuid
+  eventId           String   @map("event_id")
+  plan              PlanTier
+  amountCents       Int      @map("amount_cents")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  checkoutSession CheckoutSession @relation(fields: [checkoutSessionId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("invoices")
+}
+
+// Sending side of the mock payment provider: the events it has issued, kept so that any of them can be delivered
+// again. Only the mock provider module reads or writes it.
+model MockProviderEvent {
+  id                String   @id
+  type              String
+  checkoutSessionId String?  @map("checkout_session_id") @db.Uuid
+  // the signed body: { id, type, created, data }
+  payload           Json
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  checkoutSession CheckoutSession? @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+
+  @@index([checkoutSessionId])
+  @@map("mock_provider_events")
 }

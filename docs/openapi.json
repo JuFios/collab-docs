@@ -2741,6 +2741,342 @@
           "comments"
         ]
       }
+    },
+    "/api/billing/plans": {
+      "get": {
+        "operationId": "PlansController_plans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanInfoResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The plans, their prices and limits",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/workspaces/{workspaceId}/billing": {
+      "get": {
+        "description": "Owner or admin.",
+        "operationId": "WorkspaceBillingController_overview",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plan, subscription status, usage against the limits, over-limit figures, invoices",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/workspaces/{workspaceId}/billing/checkout": {
+      "post": {
+        "description": "Owner or admin. Returns the page where the payment is made; the plan changes only when the provider confirms the payment with a webhook event.",
+        "operationId": "WorkspaceBillingController_checkout",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutStartedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The workspace is already on that plan"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts a checkout for a paid plan",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/workspaces/{workspaceId}/billing/cancel": {
+      "post": {
+        "description": "Owner or admin. Asks the provider to end the subscription; the workspace returns to FREE when the provider’s webhook event is applied. What exceeds the FREE limits stays, but nothing new can be added.",
+        "operationId": "WorkspaceBillingController_cancel",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelRequestedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The workspace is on the FREE plan"
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancels the paid plan",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/webhooks/mock": {
+      "post": {
+        "description": "The body is signed: `Mock-Signature: t=<unix seconds>,v1=<HMAC-SHA256 of \"<t>.<raw body>\">` with `WEBHOOK_SIGNING_SECRET`, and `t` may differ from the clock by 5 minutes at most. Delivery is at-least-once: an event that was already processed is acknowledged with `{ duplicate: true }` and changes nothing.",
+        "operationId": "WebhookController_receive",
+        "parameters": [
+          {
+            "name": "Mock-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAckResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "WEBHOOK_SIGNATURE_INVALID"
+          }
+        },
+        "summary": "Receives an event of the mock payment provider",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/mock-provider/checkout-sessions/{id}": {
+      "get": {
+        "operationId": "MockProviderController_session",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockCheckoutSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The checkout session shown on the payment page",
+        "tags": [
+          "mock-provider"
+        ]
+      }
+    },
+    "/api/mock-provider/checkout-sessions/{id}/complete": {
+      "post": {
+        "description": "Issues `checkout.session.completed` and delivers it to the webhook through the queue. The plan changes when the webhook has applied the event, not before.",
+        "operationId": "MockProviderController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventIssuedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session was already settled"
+          }
+        },
+        "summary": "Pays the session",
+        "tags": [
+          "mock-provider"
+        ]
+      }
+    },
+    "/api/mock-provider/checkout-sessions/{id}/fail": {
+      "post": {
+        "operationId": "MockProviderController_fail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventIssuedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session was already settled"
+          }
+        },
+        "summary": "Declines the payment (`checkout.session.failed`)",
+        "tags": [
+          "mock-provider"
+        ]
+      }
+    },
+    "/api/mock-provider/events/{id}/redeliver": {
+      "post": {
+        "description": "The receiver treats the repeat as a duplicate: the plan and the invoices stay as they are.",
+        "operationId": "MockProviderController_redeliver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventIssuedResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delivers an event to the webhook again",
+        "tags": [
+          "mock-provider"
+        ]
+      }
     }
   },
   "info": {
@@ -4526,6 +4862,265 @@
         },
         "required": [
           "body"
+        ]
+      },
+      "PlanInfoResponse": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "FREE",
+              "PRO",
+              "TEAM"
+            ]
+          },
+          "priceCents": {
+            "type": "number",
+            "description": "Per month, in US cents"
+          },
+          "maxMembers": {
+            "type": "number"
+          },
+          "maxDocuments": {
+            "type": "number",
+            "nullable": true,
+            "description": "null = unlimited"
+          },
+          "maxStorageBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "plan",
+          "priceCents",
+          "maxMembers",
+          "maxDocuments",
+          "maxStorageBytes"
+        ]
+      },
+      "UsageFigureResponse": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "members",
+              "documents",
+              "storage"
+            ]
+          },
+          "current": {
+            "type": "number",
+            "description": "Bytes for storage"
+          },
+          "limit": {
+            "type": "number",
+            "nullable": true,
+            "description": "null = unlimited"
+          }
+        },
+        "required": [
+          "kind",
+          "current",
+          "limit"
+        ]
+      },
+      "InvoiceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "FREE",
+              "PRO",
+              "TEAM"
+            ]
+          },
+          "amountCents": {
+            "type": "number",
+            "description": "US cents"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "plan",
+          "amountCents",
+          "createdAt"
+        ]
+      },
+      "BillingOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "FREE",
+              "PRO",
+              "TEAM"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "CANCELED"
+            ]
+          },
+          "currentPeriodEnd": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "usage": {
+            "description": "Members (with pending invites), documents, storage",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageFigureResponse"
+            }
+          },
+          "overLimit": {
+            "description": "Figures above the limits of the plan (after a downgrade). Existing content stays; creating more is refused with PLAN_LIMIT_EXCEEDED until the figure is back under the limit.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageFigureResponse"
+            }
+          },
+          "invoices": {
+            "description": "Newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceResponse"
+            }
+          }
+        },
+        "required": [
+          "plan",
+          "status",
+          "currentPeriodEnd",
+          "usage",
+          "overLimit",
+          "invoices"
+        ]
+      },
+      "CreateCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "PRO",
+              "TEAM"
+            ]
+          }
+        },
+        "required": [
+          "plan"
+        ]
+      },
+      "CheckoutStartedResponse": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkoutUrl": {
+            "type": "string",
+            "example": "/mock-checkout/0f0e…",
+            "description": "Path of the page where the payment is made"
+          }
+        },
+        "required": [
+          "sessionId",
+          "checkoutUrl"
+        ]
+      },
+      "CancelRequestedResponse": {
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "boolean",
+            "example": true,
+            "description": "The provider was asked; the plan changes when its webhook event is applied"
+          }
+        },
+        "required": [
+          "requested"
+        ]
+      },
+      "WebhookAckResponse": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "example": true
+          },
+          "duplicate": {
+            "type": "boolean",
+            "example": true,
+            "description": "The event was processed earlier"
+          }
+        }
+      },
+      "MockCheckoutSessionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "FREE",
+              "PRO",
+              "TEAM"
+            ]
+          },
+          "amountCents": {
+            "type": "number",
+            "description": "US cents"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "plan",
+          "amountCents",
+          "status"
+        ]
+      },
+      "EventIssuedResponse": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "example": "evt_0f0e0d0c0b0a09080706050403020100"
+          }
+        },
+        "required": [
+          "eventId"
         ]
       }
     }
