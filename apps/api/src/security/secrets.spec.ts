@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../../..');
@@ -70,35 +71,26 @@ describe('secrets in the repository', () => {
     expect(withDefault).toEqual([]);
   });
 
-  const SKIP = new Set([
-    'node_modules',
-    '.next',
-    'dist',
-    'generated',
-    'coverage',
-    'test-results',
-    'playwright-report',
-    '.git',
-    'graphify-out',
-    '.serena',
-    '.claude',
-  ]);
-  const SELF = path.join(ROOT, 'apps/api/src/security/secrets.spec.ts');
-  function files(dir: string, found: string[] = []): string[] {
-    for (const name of readdirSync(dir)) {
-      if (SKIP.has(name) || name === 'pnpm-lock.yaml') continue;
-      const full = path.join(dir, name);
-      const stat = statSync(full);
-      if (stat.isDirectory()) files(full, found);
-      else if (
-        stat.size < 1_000_000 &&
-        full !== SELF &&
-        !/\.(png|jpe?g|gif|webp|ico|woff2?|zip)$/i.test(name)
-      ) {
-        found.push(full);
-      }
-    }
-    return found;
+  const SELF = 'apps/api/src/security/secrets.spec.ts';
+  /** What a commit would contain: tracked files and untracked ones that are not ignored. */
+  function files(): string[] {
+    const listed = execFileSync(
+      'git',
+      ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+      {
+        cwd: ROOT,
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    );
+    return listed
+      .toString('utf8')
+      .split('\0')
+      .filter((file) => file !== '' && file !== SELF && file !== 'pnpm-lock.yaml')
+      .filter((file) => !/\.(png|jpe?g|gif|webp|ico|woff2?|zip)$/i.test(file))
+      .filter(
+        (file) =>
+          existsSync(path.join(ROOT, file)) && statSync(path.join(ROOT, file)).size < 1_000_000,
+      );
   }
 
   // the shapes of credentials that providers issue; written so that this file does not match itself
@@ -112,7 +104,7 @@ describe('secrets in the repository', () => {
   ];
 
   it('looks at the files it is meant to look at', () => {
-    const all = files(ROOT).map((file) => path.relative(ROOT, file));
+    const all = files();
     expect(all).toEqual(
       expect.arrayContaining(['.env.example', 'docker-compose.yml', 'README.md']),
     );
@@ -120,9 +112,9 @@ describe('secrets in the repository', () => {
   });
 
   it.each(KEY_SHAPES)('has no file that contains %s', (_name, pattern) => {
-    const offenders = files(ROOT)
-      .filter((file) => pattern.test(readFileSync(file, 'utf8')))
-      .map((file) => path.relative(ROOT, file));
+    const offenders = files().filter((file) =>
+      pattern.test(readFileSync(path.join(ROOT, file), 'utf8')),
+    );
     expect(offenders).toEqual([]);
   });
 
