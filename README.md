@@ -141,6 +141,9 @@ erDiagram
   users ||--o{ comments : writes
   users ||--o{ comment_mentions : "mentioned in"
   users ||--o{ notifications : receives
+  workspaces ||--o{ checkout_sessions : "pays through"
+  checkout_sessions ||--o| invoices : "charged once as"
+  checkout_sessions ||--o{ mock_provider_events : "settled by"
 ```
 
 Notes:
@@ -166,6 +169,12 @@ position) WHERE deleted_at IS NULL`; the rest are plain b-tree indexes on foreig
   [Comments & notifications](#comments--notifications). `notifications.dedupe_key` is unique, which is what
   makes creating a notification idempotent. Besides `(user_id, read_at, created_at)` there is an index on
   `(user_id, created_at DESC, id DESC)` that serves the newest-first list.
+- **Billing**: `checkout_sessions` (a payment in progress; `PENDING` becomes `COMPLETED` or `FAILED` once),
+  `webhook_events` (one row per provider event id, `RECEIVED` or `PROCESSED`, unique `event_id`), `invoices`
+  (unique `checkout_session_id`: a session is charged once) and `mock_provider_events` (what the mock provider
+  issued, so any event can be delivered again). `subscriptions.last_event_at` orders events; see
+  [Billing & idempotency](#billing--idempotency). Billing records are `RESTRICT`, so a workspace with a payment
+  history is never deleted implicitly.
 - **Foreign keys**: rows that make no sense without their parent (memberships, refresh tokens, shares,
   public links, the subscription, threads, comment mentions, notifications) cascade; workspace owners, document authors and workspaces that
   still hold documents are `RESTRICT`, so content is never deleted implicitly.
@@ -259,7 +268,7 @@ injection (`@InjectPinoLogger(MyService.name)`), which adds a `context` field; b
 
 ### Queues
 
-BullMQ queues (`search-sync`, `public-revalidate`, `mail`, `billing-webhook`, `link-expiry`, `version-prune`, `attachment-cleanup`)
+BullMQ queues (`search-sync`, `public-revalidate`, `mail`, `billing-webhook`, `billing-delivery`, `link-expiry`, `version-prune`, `attachment-cleanup`)
 are registered once with `@nestjs/bullmq` (`BullModule.registerQueue`), with default retries (5 attempts,
 exponential backoff) and bounded history. Producers inject a queue (`@InjectQueue(name)`) or use `QueueService`;
 either way `addJob` stamps the ambient correlation id into the job. Consumers are `@Processor(name)` classes that
@@ -946,6 +955,121 @@ Not done: mentions in the **body** of a document (the editor has no suggestion m
 `dedupe_key = doc:<documentId>:<userId>` plus a queue on `document.changed` would be the way), per-user email
 settings, digest emails, notifications for replies in a thread the user took part in, and editing a comment as an admin.
 
+## Billing & idempotency
+
+A workspace is on `FREE`, `PRO` or `TEAM` (limits and prices: `GET /api/billing/plans`). Paying is a mock of Stripe
+Checkout: the api asks the provider to collect a payment, the provider answers with a **signed webhook event**, and
+that event is the only thing that changes a plan. The mock provider is a module of its own
+(`apps/api/src/billing/mock-provider`) that talks to the rest of the app only through the webhook and the
+`BILLING_PROVIDER` injection token, so a real provider would replace that module and nothing else.
+
+```mermaid
+sequenceDiagram
+  participant A as Admin (browser)
+  participant API as api
+  participant P as mock provider
+  participant Q as queues (BullMQ)
+  participant W as worker
+  A->>API: POST /workspaces/:id/billing/checkout {plan}
+  API-->>A: 201 { sessionId, checkoutUrl: /mock-checkout/:id }
+  A->>P: POST /mock-provider/checkout-sessions/:id/complete
+  P->>P: store event evt_… (mock_provider_events)
+  P->>Q: billing-delivery job
+  P-->>A: 202 { eventId }
+  Q->>W: deliver (signs again on every attempt, retries with backoff)
+  W->>API: POST /billing/webhooks/mock  Mock-Signature: t=…,v1=…
+  API->>API: verify signature, INSERT webhook_events (RECEIVED)
+  API->>Q: billing-webhook job (jobId = eventId)
+  API-->>W: 200 { received: true }
+  Q->>W: billing-webhook job
+  W->>W: one transaction: session PENDING→COMPLETED, plan, invoice, event PROCESSED
+```
+
+| Route                                                          | Who          | What it does                                                                                                                          |
+| -------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /billing/plans`                                           | signed in    | The plans: price per month in cents, member / document / storage limits (`null` documents = unlimited).                               |
+| `GET /workspaces/:id/billing`                                  | owner, admin | Plan, subscription status, period end, usage against the limits, the figures that are over the limit, invoices (newest first).        |
+| `POST /workspaces/:id/billing/checkout {plan}`                 | owner, admin | Creates a `PENDING` checkout session at the price of `PRO` or `TEAM` and returns `checkoutUrl`. `409` if already on that plan.        |
+| `POST /workspaces/:id/billing/cancel`                          | owner, admin | `202`: asks the provider to end the subscription. `409` on `FREE`. The plan changes when the provider's event is applied.             |
+| `POST /billing/webhooks/mock`                                  | the provider | Public, signed. `200 { received: true }`, or `200 { duplicate: true }`; `401 WEBHOOK_SIGNATURE_INVALID`; `503` if it could not queue. |
+| `GET /mock-provider/checkout-sessions/:id`                     | public       | What the payment page shows (plan, amount, status, workspace).                                                                        |
+| `POST /mock-provider/checkout-sessions/:id/complete`, `…/fail` | public       | The customer pays / the payment is declined. `202 { eventId }`. A session has one outcome; a second call is `409`.                    |
+| `POST /mock-provider/events/:id/redeliver`                     | public       | Delivers an issued event again (the "resend" button of a provider dashboard).                                                         |
+
+The mock provider's routes are public like a hosted checkout page is: the id of a checkout session is a random
+UUID v4 and is all it takes to pay for that session. `BILLING_PROVIDER=mock` (the only value, and the default in
+dev and staging) selects the mock provider.
+
+**Events.** `{ id: 'evt_<32 hex>', type, created, data }`, `created` in epoch milliseconds.
+`checkout.session.completed` and `checkout.session.failed` carry `{ checkoutSessionId }`;
+`customer.subscription.deleted` carries `{ workspaceId }` (what `cancel` produces). An event of another type is
+stored, acknowledged and marked processed without effect.
+
+**Signature.** `Mock-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>">` with
+`WEBHOOK_SIGNING_SECRET`. The receiver recomputes the HMAC over the exact bytes it received (`rawBody: true`, the
+Nest way to get them), compares in constant time (`crypto.timingSafeEqual`) and refuses a timestamp more than five
+minutes away from its clock, so a captured delivery cannot be replayed later. Every delivery attempt signs again,
+so a retry on the fifth minute is not refused as old. A bad signature, a missing header and an old timestamp are
+all `401 WEBHOOK_SIGNATURE_INVALID` with the same message (the reason is only in the log:
+`webhook.signature_rejected`). The route needs no cookie, so the CSRF guard (which only looks at requests
+carrying auth cookies) does not apply to it.
+
+### Why a plan is never charged or changed twice
+
+Deliveries are at-least-once: the queue retries, the provider can resend, and the same event can arrive twice at
+the same moment. Five independent layers make the repeat harmless; any of the last four would be enough for the
+database to stay right if the one before it were missing.
+
+1. **`webhook_events.event_id` is unique.** The handler does `INSERT … ON CONFLICT DO NOTHING`. A new event is
+   queued (`jobId = eventId`). A repeat of an event that is `PROCESSED` is answered `200 { duplicate: true }`, logged
+   as `webhook.duplicate_delivery` and counted in `billing_webhook_deliveries_total{result="duplicate"}`.
+2. **A repeat of an event that is still `RECEIVED`** (the first delivery stored it, but queueing failed or the job
+   failed for good) **queues it again**. If the queue is down the delivery fails with `503` and the provider
+   delivers again, so a paid event is never lost. BullMQ ignores `add` for a job id it still remembers, so a job
+   that used up its attempts is retried with `job.retry()` instead.
+3. **The processor locks the event row** (`SELECT … FOR UPDATE`) at the start of its transaction. Ten workers
+   holding the same event run one after the other, and the nine that wait find it `PROCESSED` and do nothing.
+4. **The session changes state once.** `UPDATE checkout_sessions SET status = 'COMPLETED' WHERE id = ? AND status =
+'PENDING'` touches one row for the first event and none for any later one, whatever its event id. Only the
+   statement that touched a row changes the plan and creates the invoice. This is what protects a session that two
+   different events refer to (a double-click on "Pay" that got past the provider's own check).
+5. **`invoices.checkout_session_id` is unique.** Even a bug in layers 3 and 4 could not charge a session twice;
+   the insert would fail and roll the transaction back.
+
+Everything in the processor (event lock, workspace lock, session update, subscription, invoice, `PROCESSED`) is one
+transaction, so a crash in the middle leaves nothing half-applied and the retry starts clean.
+
+**Ordering.** Deliveries can overtake each other, so each applied event stores its `created` in
+`subscriptions.last_event_at` and an event older than that is ignored (`webhook.ignored`, reason `stale`): an old
+cancellation arriving after a newer upgrade does not undo it. The check and the write happen under the workspace
+row lock (the same `FOR UPDATE` the plan limits use). A payment event that is ignored as stale leaves its session
+`PENDING` and creates no invoice; with a real provider that case needs a reconciliation job, here it only happens if
+a person completes two checkouts of one workspace within the delivery delay.
+
+**One writer.** `SubscriptionService` is the only code that writes `subscriptions` after the row is created with
+the workspace (nothing else issues `UPDATE subscriptions`), and it is only called by the event processor.
+
+### Limits, downgrade, cancellation
+
+`PlanLimitsService` reads the plan from `subscriptions` for the three limits (members, documents, storage), so a
+plan takes effect for the very next request. A downgrade (cancel, or buying a lower plan) never removes anything:
+what exceeds the new limit stays, `GET /workspaces/:id/billing` lists it under `overLimit`, and creating more is
+refused with `403 { code: 'PLAN_LIMIT_EXCEEDED', details: { kind, limit, current, plan } }`, never `500`, until the
+workspace is back under the limit. `cancel` ends in `plan = FREE, status = CANCELED, currentPeriodEnd = null`; a later
+successful checkout makes it `ACTIVE` again. A paid period is 30 days from the event (the mock provider does not
+renew), and `currentPeriodEnd` is informational: nothing downgrades a workspace when it passes.
+
+### Observability
+
+Logs: `plan.changed` (`workspaceId`, `from`, `to`, `eventId`, `checkoutSessionId`), `webhook.duplicate_delivery`,
+`webhook.requeued`, `webhook.ignored` (reason), `webhook.signature_rejected`, `webhook.enqueue_failed`,
+`billing.event_delivered`, `billing.delivery_failed`; all carry the correlation id of the request that started the
+payment, through the job data. Metrics: `billing_webhook_deliveries_total{result="new|requeued|duplicate|rejected"}`
+and the queue metrics of `billing-webhook` and `billing-delivery`.
+
+Not done: renewals, proration, taxes, payment methods, dunning and a reconciliation job for events that were
+ignored as stale; only the mock provider exists.
+
 ## Frontend
 
 `apps/web` is a Next.js 15 App Router application (Tailwind, shadcn/ui primitives on Radix, Geist fonts
@@ -1374,7 +1498,7 @@ listed here with the reason, so that a reader does not have to rediscover them.
   id of the job.
 - **Probes:** `@nestjs/terminus` for `/health` and `/ready`.
 - **Rate limiting:** `@nestjs/throttler` with Redis storage. The per-user limits (collab tickets, public links) are the same throttler with `getTracker` overridden in a route-level guard that runs after authentication.
-- **Outgoing HTTP:** `@nestjs/axios` (`HttpModule`) for the worker's call to the web app's revalidation endpoint.
+- **Outgoing HTTP:** `@nestjs/axios` (`HttpModule`) for the worker's call to the web app's revalidation endpoint and the mock provider's webhook deliveries.
 - **Access tokens:** `@nestjs/jwt` in the api.
 - **Logging:** `nestjs-pino`; classes inject `PinoLogger` (`@InjectPinoLogger`).
 - **Server-sent events:** `@Sse` with an `Observable`, so the heartbeat, the membership check and the cleanup
@@ -1395,6 +1519,8 @@ listed here with the reason, so that a reader does not have to rediscover them.
 | Data access               | The client is a provider, `PrismaService extends PrismaClient`, injected directly; transactions are passed as `tx`, and the "live document" condition lives in one helper (`LIVE_DOCUMENT`).                                                                                                                                                                                                                                                                                     | Prisma Client already is the access layer; a repository on top would repeat its API. The service connects lazily (a database that is down at start is reported by `/ready`, not by a crash) and closes the pool on shutdown, as the collab service does after its rooms have written.                                   |
 | Raw SQL                   | `SELECT … FOR UPDATE` on the workspace row (plan limits) and `SKIP LOCKED` in the attachment sweeper, per-document advisory locks around the CRDT log, `UPDATE`/`DELETE … RETURNING` where a revision bump or a batch delete has to be one atomic statement, the search statement and index upsert, the notification list and the mention checks (always `Prisma.sql`, values bound; the "may this user view this document" rule is one shared fragment, `viewableDocumentSql`). | Prisma's query API has no row or advisory locks and no full-text search (`tsvector`, `to_tsquery`, `ts_headline`).                                                                                                                                                                                                      |
 | Thread and comment access | Routes under `documents/:id` use `@DocumentAccess`; routes that carry a thread or comment id (`threads/:threadId/…`, `comments/:commentId`) load the row in the service and call `PermissionsService.assertDocumentAccess(…, tx)` on its document, inside the write transaction.                                                                                                                                                                                                 | A guard sees only the route, and the document is not in it; a guard that resolved thread → document would run the same lookups a second time, and the write still has to re-check inside its transaction so a revoked share cannot slip through between the two.                                                        |
+| Webhook signature         | `Mock-Signature: t=…,v1=…` is built and checked in `webhook-signature.ts` with `node:crypto` (HMAC-SHA256, `timingSafeEqual`, a five-minute window); the raw body comes from `rawBody: true`, the Nest way.                                                                                                                                                                                                                                                                      | The provider is a mock, so there is no vendor SDK to call (`stripe.webhooks.constructEvent` does the same thing for Stripe). The format is Stripe's, so replacing the module with the real provider changes the verifier, not the design.                                                                               |
+| Mock payment provider     | A module of its own with its own table (`mock_provider_events`) and its own queue (`billing-delivery`); the billing module sees it through the `BILLING_PROVIDER` token only.                                                                                                                                                                                                                                                                                                    | A real provider keeps its events and delivers them itself; "redeliver" and retries only make sense if the mock does the same, and keeping its state out of `webhook_events` keeps the receiving side identical to what it would be with Stripe.                                                                         |
 | Tree cache                | A small service over Redis; the key carries a version that `INCR` bumps.                                                                                                                                                                                                                                                                                                                                                                                                         | `@nestjs/cache-manager` has no atomic increment, so invalidation by version would need the raw client anyway.                                                                                                                                                                                                           |
 | Events between services   | `ioredis` publish/subscribe with JSON payloads (`perm.changed`, `doc.deleted`, `doc.restored`, the realtime bridge).                                                                                                                                                                                                                                                                                                                                                             | These are fire-and-forget broadcasts. The Redis transporter of `@nestjs/microservices` would wrap every message as `{ pattern, data }` and make every subscriber a microservice for the same delivery guarantees. The request/response calls between api and collab do use the microservices TCP transport (see above). |
 | OpenAPI                   | `@ApiProperty` decorators are written by hand, and `docs/openapi.json` is exported and committed.                                                                                                                                                                                                                                                                                                                                                                                | The Nest CLI plugin is optional, saves decorators only, and would change the generated document silently when a type changes.                                                                                                                                                                                           |
