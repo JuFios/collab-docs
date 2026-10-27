@@ -14,20 +14,28 @@ import { getCorrelationId } from './correlation';
 /** Re-exported so apps need no direct nestjs-pino dependency: `PinoAppLogger` is `app.useLogger()`'s target. */
 export { InjectPinoLogger, PinoAppLogger, PinoLogger, getLoggerToken };
 
+/** Field names that hold a credential, wherever they appear in a logged object. */
+const SECRET_FIELDS = [
+  'password',
+  'passwordHash',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'ticket',
+  'secret',
+  'authorization',
+  'cookie',
+] as const;
+
 export const REDACT_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
   'req.headers["x-revalidate-secret"]',
   'req.headers["x-internal-token"]',
   'res.headers["set-cookie"]',
-  '*.password',
-  '*.passwordHash',
-  '*.token',
-  '*.accessToken',
-  '*.refreshToken',
-  '*.secret',
-  '*.authorization',
-  '*.cookie',
+  // `*.name` reaches one level down (`user.password`); pino needs `name` itself for the fields of the line
+  ...SECRET_FIELDS,
+  ...SECRET_FIELDS.map((name) => `*.${name}`),
 ];
 
 export function createRootLogger(level: string, destination?: DestinationStream): Logger {
