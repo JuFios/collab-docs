@@ -768,6 +768,12 @@ flowchart LR
 - A failed call (network, timeout 5 s, non-2xx) throws and BullMQ retries with exponential backoff (5 attempts, 1 s
   base). Logs: `revalidate.sent` and `revalidate.failed` with the document, slug, reason and attempt. After the last
   attempt the page waits for its TTL. Enqueue failures are logged and counted, never raised to the editor.
+- A page whose state must change at once is checked after the invalidation: the job asks the web app for `/p/<slug>`
+  and fails, to be retried, unless the answer is 404 for a revoked, expired or deleted page, or 200 for a page that
+  has just been published. Next writes a rendered page to its
+  cache after it has answered, so a visit rendered just before the invalidation can store the old page after it and
+  make it look fresh again; without the check an unpublished page could be served for an hour. The check looks at the
+  status only: for a change of content the retry cannot tell the old page from the new one.
 - Contract of `POST {WEB_INTERNAL_URL}/internal/revalidate`: header `x-revalidate-secret`, body
   `{tags: ["pub:<slug>"]}` (`revalidateRequestSchema` in `@collab-docs/shared`, up to 20 tags).
 - Because the tag is derived from the slug, the web app needs nothing but the slug to cache or invalidate a page.
