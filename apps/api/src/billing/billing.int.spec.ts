@@ -129,7 +129,10 @@ describe('billing', () => {
     );
 
   async function duplicateDeliveries(): Promise<number> {
-    const metrics = await http$().get('/metrics').expect(200);
+    const metrics = await http$()
+      .get('/metrics')
+      .set('Authorization', `Bearer ${process.env.METRICS_TOKEN}`)
+      .expect(200);
     const line = (metrics.text as string)
       .split('\n')
       .find((l) => l.startsWith('billing_webhook_deliveries_total{result="duplicate"}'));

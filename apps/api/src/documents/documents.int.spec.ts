@@ -600,7 +600,9 @@ describe('documents', () => {
       const team = await setupTeam();
       const versionKey = `tree:ver:${team.workspaceId}`;
       const metric = async (result: string) => {
-        const text = (await http$().get('/metrics')).text;
+        const text = (
+          await http$().get('/metrics').set('Authorization', `Bearer ${process.env.METRICS_TOKEN}`)
+        ).text;
         const line = text
           .split('\n')
           .find((l) => l.startsWith(`tree_cache_lookups_total{result="${result}"`));

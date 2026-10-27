@@ -20,6 +20,7 @@ x-app-env: &app-env
   JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-jwt-access-secret-change-me}
   COLLAB_TICKET_SECRET: ${COLLAB_TICKET_SECRET:-dev-only-collab-ticket-secret-change-me}
   INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-only-internal-api-token-change-me}
+  METRICS_TOKEN: ${METRICS_TOKEN:-dev-only-metrics-token-change-me}
   REVALIDATE_SECRET: ${REVALIDATE_SECRET:-dev-only-revalidate-secret-change-me}
   WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-dev-only-webhook-signing-secret-change-me}
   WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
@@ -184,6 +185,11 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      # compiled into the routes manifest (rewrite target, Content-Security-Policy origins)
+      args:
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
+        S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+        COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:-ws://localhost:4001}
     restart: ${RESTART_POLICY:-no}
     environment:
       APP_ENV: ${APP_ENV:-dev}

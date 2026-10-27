@@ -2,6 +2,7 @@ import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs
 import { type NextRequest, NextResponse } from 'next/server';
 import { jwtAccessSecret } from '@/lib/env';
 import { type SessionState, decideRoute } from '@/lib/auth/route-policy';
+import { STRICT_TRANSPORT_SECURITY } from '@/lib/security-headers';
 import {
   LAST_WORKSPACE_COOKIE,
   LAST_WORKSPACE_MAX_AGE_SECONDS,
@@ -60,5 +61,9 @@ export async function middleware(request: NextRequest) {
     }
   }
   response.headers.set('x-correlation-id', correlationId);
+  // read at request time like the rest of the runtime environment; the TLS-terminating layer sits in front of staging
+  if (process.env.APP_ENV === 'staging') {
+    response.headers.set('Strict-Transport-Security', STRICT_TRANSPORT_SECURITY);
+  }
   return response;
 }

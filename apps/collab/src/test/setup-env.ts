@@ -19,6 +19,7 @@ const defaults: Record<string, string> = {
   JWT_ACCESS_SECRET: 'dev-only-jwt-access-secret-change-me',
   COLLAB_TICKET_SECRET: 'dev-only-collab-ticket-secret-change-me',
   INTERNAL_API_TOKEN: 'dev-only-internal-api-token-change-me',
+  METRICS_TOKEN: 'dev-only-metrics-token-change-me',
   REVALIDATE_SECRET: 'dev-only-revalidate-secret-change-me',
   WEBHOOK_SIGNING_SECRET: 'dev-only-webhook-signing-secret-change-me',
   WEB_ORIGIN: 'http://localhost:3000',

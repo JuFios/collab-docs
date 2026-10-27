@@ -645,12 +645,26 @@ describe('collab gateway', () => {
       await waitFor(() => client.synced, 'sync');
       client.paragraph().insert(0, 'metrics');
       await settle(200);
-      const metrics = await (await fetch(`${collab.httpUrl}/metrics`)).text();
+      const metrics = await (
+        await fetch(`${collab.httpUrl}/metrics`, {
+          headers: { authorization: `Bearer ${process.env.METRICS_TOKEN}` },
+        })
+      ).text();
       expect(metrics).toMatch(/collab_connections \d+/);
       expect(metrics).toMatch(/collab_rooms \d+/);
       expect(metrics).toMatch(/collab_updates_applied_total [1-9]/);
       expect(metrics).toContain('collab_updates_duplicate_total');
       expect(metrics).toContain('collab_ws_close_total');
+    });
+
+    it('hands out metrics only to the holder of the metrics token, on the port that browsers can reach', async () => {
+      for (const authorization of [undefined, 'Bearer wrong', 'Basic x']) {
+        const response = await fetch(`${collab.httpUrl}/metrics`, {
+          headers: authorization ? { authorization } : {},
+        });
+        expect(response.status).toBe(401);
+        expect(await response.text()).not.toContain('collab_connections');
+      }
     });
 
     it('requires the internal token on port 4002', async () => {

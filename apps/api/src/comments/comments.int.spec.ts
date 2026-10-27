@@ -619,7 +619,10 @@ describe('comments and notifications', () => {
       expect(await rowsFor(team.editor.id)).toEqual([]);
       expect(await rowsFor(team.owner.id)).toEqual([]);
 
-      const metrics = await http$().get('/metrics').expect(200);
+      const metrics = await http$()
+        .get('/metrics')
+        .set('Authorization', `Bearer ${process.env.METRICS_TOKEN}`)
+        .expect(200);
       expect(metrics.text).toMatch(/notifications_created_total\{type="MENTION"\} [1-9]/);
     });
 

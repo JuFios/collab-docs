@@ -44,8 +44,9 @@ export class PublicLinksController {
   }
 
   @Post()
-  @RateLimit.user('publicLink')
   @DocumentAccess('EDIT', { param: 'id' })
+  // below the access decorator on purpose: guards run bottom-up, and a probe of somebody else's id must count
+  @RateLimit.user('publicLink')
   @ApiOperation({
     summary: 'Publish the page (VIEW) or enable editing by link (EDIT)',
     description:

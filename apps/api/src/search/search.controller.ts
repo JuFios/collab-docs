@@ -22,8 +22,9 @@ export class SearchController {
   constructor(private readonly search: SearchService) {}
 
   @Get('workspaces/:workspaceId/search')
-  @RateLimit.user('search')
   @WorkspaceRole('VIEWER')
+  // below the access decorator on purpose: guards run bottom-up, and a probe of somebody else's id must count
+  @RateLimit.user('search')
   @ApiOperation({
     summary: 'Full-text search in a workspace',
     description:

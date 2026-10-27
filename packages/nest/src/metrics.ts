@@ -1,6 +1,20 @@
-import { Controller, Get, Global, Injectable, Module, Res } from '@nestjs/common';
+import { timingSafeEqual } from 'node:crypto';
+import {
+  type CanActivate,
+  Controller,
+  type ExecutionContext,
+  Get,
+  Global,
+  Injectable,
+  Module,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import type { AppConfig } from './config';
+import { AppException } from './exceptions';
 import { Public } from './public';
 import type { NextFunction, Request, Response } from 'express';
 import { collectDefaultMetrics, Histogram, Registry } from 'prom-client';
@@ -36,8 +50,26 @@ export class MetricsService {
   }
 }
 
+/**
+ * `/metrics` is not behind the session guard (Prometheus has no session) and, on collab, shares the port that browsers
+ * open WebSockets on. It answers only to the bearer token (`METRICS_TOKEN`), compared in constant time.
+ */
+@Injectable()
+export class MetricsTokenGuard implements CanActivate {
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const header = context.switchToHttp().getRequest<Request>().headers.authorization ?? '';
+    const given = Buffer.from(/^Bearer (.+)$/i.exec(header)?.[1] ?? '');
+    const expected = Buffer.from(this.config.get('METRICS_TOKEN', { infer: true }));
+    if (given.length === expected.length && timingSafeEqual(given, expected)) return true;
+    throw new AppException('UNAUTHENTICATED', 'Metrics token required');
+  }
+}
+
 @ApiExcludeController()
 @Public()
+@UseGuards(MetricsTokenGuard)
 @SkipThrottle()
 @Controller()
 export class MetricsController {

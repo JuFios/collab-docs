@@ -38,9 +38,28 @@ describe('api platform', () => {
         details: { redis: { status: 'up' }, postgres: { status: 'up' } },
       });
 
-      const metrics = await http().get('/metrics').expect(200);
+      const metrics = await http()
+        .get('/metrics')
+        .set('Authorization', `Bearer ${process.env.METRICS_TOKEN}`)
+        .expect(200);
       expect(metrics.headers['content-type']).toContain('text/plain');
       expect(metrics.text).toContain('process_cpu_user_seconds_total');
+    });
+
+    it('hands out /metrics only to the holder of the metrics token', async () => {
+      const refused = await http().get('/metrics').expect(401);
+      expect(refused.body).toMatchObject({ statusCode: 401, code: 'UNAUTHENTICATED' });
+      expect(refused.text).not.toContain('process_cpu_user_seconds_total');
+      await http().get('/metrics').set('Authorization', 'Bearer wrong').expect(401);
+      await http()
+        .get('/metrics')
+        .set('Authorization', `Bearer ${process.env.METRICS_TOKEN}x`)
+        .expect(401);
+      // the session token that opens the rest of the api is not the key to it
+      await http()
+        .get('/metrics')
+        .set('Authorization', `Basic ${process.env.METRICS_TOKEN}`)
+        .expect(401);
     });
 
     it('answers /ready with 503 and the same body shape when a dependency is down or too slow', async () => {
@@ -75,7 +94,10 @@ describe('api platform', () => {
     it('records request duration by route pattern, method and status', async () => {
       const id = '0190b1c2-0000-7000-8000-000000000001';
       await http().get(`/api/test/items/${id}`).expect(200);
-      const { text } = await http().get('/metrics').expect(200);
+      const { text } = await http()
+        .get('/metrics')
+        .set('Authorization', `Bearer ${process.env.METRICS_TOKEN}`)
+        .expect(200);
       expect(text).toMatch(
         /http_request_duration_seconds_count\{route="\/api\/test\/items\/:id",method="GET",status="200"\} 1/,
       );

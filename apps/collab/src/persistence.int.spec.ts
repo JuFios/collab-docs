@@ -230,7 +230,11 @@ describe('document persistence', () => {
       const client = await connect(editor, documentId);
       await waitFor(() => client.synced, 'sync');
       expect(client.doc.getXmlFragment('content').toString()).toContain('from the log');
-      const metrics = await (await fetch(`${collab.httpUrl}/metrics`)).text();
+      const metrics = await (
+        await fetch(`${collab.httpUrl}/metrics`, {
+          headers: { authorization: `Bearer ${process.env.METRICS_TOKEN}` },
+        })
+      ).text();
       expect(metrics).toMatch(/collab_bad_log_rows_total [1-9]/);
 
       // the room keeps working

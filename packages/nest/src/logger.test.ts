@@ -34,6 +34,39 @@ describe('root logger', () => {
     expect(text).toContain('a@example.test');
   });
 
+  it('redacts a credential whether it is a field of the line or of an object inside it', () => {
+    const { lines, logger } = capture();
+    logger.info(
+      {
+        event: 'sample.event',
+        password: 'top-password',
+        token: 'top-token',
+        ticket: 'top-ticket',
+        inner: { secret: 'inner-secret', accessToken: 'inner-access' },
+        req: {
+          headers: {
+            'x-revalidate-secret': 'value-of-the-rv-header',
+            'x-internal-token': 'value-of-the-internal-header',
+          },
+        },
+      },
+      'sample',
+    );
+    const text = JSON.stringify(lines[0]);
+    for (const leaked of [
+      'top-password',
+      'top-token',
+      'top-ticket',
+      'inner-secret',
+      'inner-access',
+      'value-of-the-rv-header',
+      'value-of-the-internal-header',
+    ]) {
+      expect(text).not.toContain(leaked);
+    }
+    expect(lines[0]).toMatchObject({ event: 'sample.event' });
+  });
+
   it('adds the ambient correlation id to every line', () => {
     const { lines, logger } = capture();
     runWithCorrelationId('corr-log-0001', () => logger.info('inside'));
