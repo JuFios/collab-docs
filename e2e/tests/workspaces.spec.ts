@@ -198,6 +198,13 @@ test.describe('workspaces', () => {
     );
 
     await invite(owner, workspaceId, 'three@example.test');
+    // the limit also opens the dialog every plan limit ends in; an admin is offered the plans
+    const dialog = owner.getByRole('dialog', { name: 'Limit reached' });
+    await expect(dialog).toContainText('Members: 3 of 3 used on the Free plan.');
+    await expect(dialog.getByRole('link', { name: 'Upgrade plan' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Not now' }).click();
+    await expect(dialog).toBeHidden();
+
     const alert = owner.locator('form [role="alert"]');
     await expect(alert).toContainText('The Free plan allows 3 members');
     await expect(alert).toContainText('pending invitations count too');
