@@ -48,8 +48,9 @@ export class CommentsController {
   }
 
   @Post('documents/:id/threads')
-  @RateLimit.user('comment')
   @DocumentAccess('COMMENT', { param: 'id' })
+  // below the access decorator on purpose: guards run bottom-up, and a probe of somebody else's id must count
+  @RateLimit.user('comment')
   @ApiOperation({
     summary: 'Start a thread on a block',
     description:

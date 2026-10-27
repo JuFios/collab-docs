@@ -79,7 +79,8 @@ type PresetOf<S extends RateScope> = {
   [P in RatePreset]: (typeof PRESETS)[P]['scope'] extends S ? P : never;
 }[RatePreset];
 
-const RATE_LIMIT_PRESET = 'rate-limit:preset';
+/** Metadata key of a route's preset (read by the guards, and by the audit of which routes are limited). */
+export const RATE_LIMIT_PRESET = 'rate-limit:preset';
 
 /**
  * Keys the counter by the real client IP (`req.ip` honours `trust proxy` = TRUSTED_PROXY_CIDRS only). Runs
