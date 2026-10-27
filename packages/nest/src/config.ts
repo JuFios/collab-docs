@@ -32,6 +32,8 @@ export const envSchema = z.object({
   JWT_ACCESS_SECRET: secret,
   COLLAB_TICKET_SECRET: secret,
   INTERNAL_API_TOKEN: secret,
+  /** Bearer token that Prometheus presents to `GET /metrics` (api and collab). */
+  METRICS_TOKEN: secret,
   REVALIDATE_SECRET: secret,
   WEBHOOK_SIGNING_SECRET: secret,
 

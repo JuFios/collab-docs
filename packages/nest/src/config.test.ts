@@ -15,6 +15,7 @@ const validEnv: Record<string, string> = {
   JWT_ACCESS_SECRET: 'jwt-secret-jwt-secret',
   COLLAB_TICKET_SECRET: 'ticket-secret-ticket',
   INTERNAL_API_TOKEN: 'internal-token-internal',
+  METRICS_TOKEN: 'metrics-token-metrics',
   REVALIDATE_SECRET: 'revalidate-secret-1',
   WEBHOOK_SIGNING_SECRET: 'webhook-secret-1234',
   WEB_ORIGIN: 'http://localhost:3000',

@@ -23,6 +23,7 @@ describe('http config helpers', () => {
       JWT_ACCESS_SECRET: 'a-long-enough-secret',
       COLLAB_TICKET_SECRET: 'a-long-enough-secret',
       INTERNAL_API_TOKEN: 'a-long-enough-secret',
+      METRICS_TOKEN: 'a-long-enough-secret',
       REVALIDATE_SECRET: 'a-long-enough-secret',
       WEBHOOK_SIGNING_SECRET: 'a-long-enough-secret',
       WEB_ORIGIN: 'https://app.example.test',
