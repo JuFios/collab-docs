@@ -71,10 +71,48 @@ export default tseslint.config(
     files: ['**/*.config.js'],
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
+  {
+    // SQL goes to the database as bound parameters (tagged templates, Prisma.sql); markup is never built by hand
+    files: ['apps/**/*.{ts,tsx}', 'packages/**/*.ts'],
+    // generated code, and test fixtures (a test may TRUNCATE tables by name or build a DOM from a string)
+    ignores: ['**/generated/**', '**/*.{test,spec}.{ts,tsx}', 'packages/db/src/testing/**'],
+    rules: {
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'MemberExpression[property.name=/^\\$(query|execute)RawUnsafe$/]',
+          message: 'Unsafe raw queries splice text into SQL. Use a tagged $queryRaw / Prisma.sql.',
+        },
+        {
+          selector: "MemberExpression[object.name='Prisma'][property.name='raw']",
+          message:
+            'Prisma.raw splices text into SQL. Pass the value as a ${parameter} of Prisma.sql.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^\\$(query|execute)Raw$/][arguments.0.type=/^(Literal|TemplateLiteral|BinaryExpression)$/]',
+          message: 'Call $queryRaw / $executeRaw as a tagged template, so that values are bound.',
+        },
+        {
+          selector: 'AssignmentExpression[left.property.name=/^(innerHTML|outerHTML)$/]',
+          message: 'Assigning HTML is an XSS sink. Render with the framework, or sanitise first.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(insertAdjacentHTML|write|writeln)$/][callee.object.name=/^(document|[a-z]+Element)$/]',
+          message: 'Writing HTML is an XSS sink. Render with the framework, or sanitise first.',
+        },
+      ],
+    },
+  },
   ...webConfigs,
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     rules: {
+      'react/no-danger': 'error',
       'no-restricted-imports': [
         'error',
         {
