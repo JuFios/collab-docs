@@ -6,6 +6,33 @@ const editorOf = (page: Page) => page.getByRole('textbox', { name: 'Document con
 const saveStatus = (page: Page) => page.locator('[data-testid="save-status"]:visible');
 const panelOf = (page: Page) => page.getByRole('complementary', { name: 'Comments' });
 
+const THREADS_API =
+  /^\/api\/(documents\/[0-9a-f-]{36}\/threads|threads\/[0-9a-f-]{36}\/(comments|resolve|reopen))$/;
+
+/**
+ * Runs a write on a thread and waits until the api has answered it and the panel has read the threads again. The
+ * panel applies a write optimistically and then refetches; a step taken before that refetch lands can be overtaken by
+ * a read that started before the write was stored, which only shows up on a slow machine.
+ */
+async function written(page: Page, action: () => Promise<void>): Promise<void> {
+  let stored = false;
+  const answered = page.waitForResponse((response) => {
+    const match =
+      response.request().method() === 'POST' && THREADS_API.test(new URL(response.url()).pathname);
+    if (match) stored = true;
+    return match;
+  });
+  const refetched = page.waitForResponse(
+    (response) =>
+      stored &&
+      response.request().method() === 'GET' &&
+      /\/documents\/[0-9a-f-]{36}\/threads$/.test(new URL(response.url()).pathname),
+  );
+  await action();
+  await answered;
+  await refetched;
+}
+
 async function openEditable(page: Page, workspaceId: string, documentId: string): Promise<void> {
   await page.goto(`/w/${workspaceId}/d/${documentId}`);
   await expect(editorOf(page)).toHaveAttribute('contenteditable', 'true');
@@ -169,16 +196,16 @@ test.describe('comments', () => {
 
     const thread = panelOf(author).getByTestId('comment-thread');
     await author.getByRole('combobox', { name: /Reply/ }).fill('Done, see below');
-    await author.keyboard.press('Control+Enter');
+    await written(author, () => author.keyboard.press('Control+Enter'));
     await expect(thread).toContainText('Done, see below');
 
-    await author.getByRole('button', { name: /Resolve/ }).click();
+    await written(author, () => author.getByRole('button', { name: /Resolve/ }).click());
     await expect(thread).toHaveCount(0);
     await expect(author.getByRole('button', { name: /open comment thread/ })).toHaveCount(0);
 
     await author.getByLabel('Show resolved threads').check();
     await expect(thread).toHaveAttribute('data-resolved', 'true');
-    await author.getByRole('button', { name: /Reopen/ }).click();
+    await written(author, () => author.getByRole('button', { name: /Reopen/ }).click());
     await expect(thread).not.toHaveAttribute('data-resolved', 'true');
     await expect(author.getByRole('button', { name: /1 open comment thread/ })).toBeVisible();
 
