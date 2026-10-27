@@ -14,6 +14,7 @@ export const QUEUE_NAMES = {
   publicRevalidate: 'public-revalidate',
   mail: 'mail',
   billingWebhook: 'billing-webhook',
+  billingDelivery: 'billing-delivery',
   linkExpiry: 'link-expiry',
   versionPrune: 'version-prune',
   attachmentCleanup: 'attachment-cleanup',
