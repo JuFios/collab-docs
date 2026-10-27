@@ -184,6 +184,11 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      # compiled into the routes manifest (rewrite target, Content-Security-Policy origins)
+      args:
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
+        S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+        COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:-ws://localhost:4001}
     restart: ${RESTART_POLICY:-no}
     environment:
       APP_ENV: ${APP_ENV:-dev}

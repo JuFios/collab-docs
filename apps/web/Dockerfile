@@ -12,9 +12,14 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
 
 FROM fetch AS build
 ENV NEXT_TELEMETRY_DISABLED=1
-# Next compiles rewrites into the routes manifest, so the api proxy target is fixed at build time
+# Next compiles rewrites and headers into the routes manifest, so the api proxy target is fixed at build time
 ARG API_INTERNAL_URL=http://api:4000
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
+# ... and so are the origins of the Content-Security-Policy: object storage (images, uploads) and collab (WebSocket)
+ARG S3_PUBLIC_ENDPOINT=http://localhost:9000
+ARG COLLAB_PUBLIC_URL=ws://localhost:4001
+ENV S3_PUBLIC_ENDPOINT=$S3_PUBLIC_ENDPOINT
+ENV COLLAB_PUBLIC_URL=$COLLAB_PUBLIC_URL
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile
 RUN pnpm --filter @collab-docs/shared build && pnpm --filter @collab-docs/web build

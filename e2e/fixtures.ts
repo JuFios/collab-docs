@@ -42,6 +42,20 @@ interface Fixtures {
   signedInPage: Page;
 }
 
+/** What the browser logs when the Content-Security-Policy stops something. */
+export const CSP_MESSAGE = /Content[- ]Security[- ]Policy/i;
+
+/** Records every console error that comes from the policy, so a page that breaks under it cannot pass unnoticed. */
+export function watchPolicyViolations(page: Page): string[] {
+  const violations: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && CSP_MESSAGE.test(message.text())) {
+      violations.push(message.text());
+    }
+  });
+  return violations;
+}
+
 export const test = base.extend<Fixtures>({
   user: async ({ request }, use) => {
     await use(await registerViaApi(request));
@@ -52,8 +66,11 @@ export const test = base.extend<Fixtures>({
       data: { email: user.email, password: user.password },
     });
     expect(login.status(), await login.text()).toBe(200);
-    await use(await context.newPage());
+    const page = await context.newPage();
+    const violations = watchPolicyViolations(page);
+    await use(page);
     await context.close();
+    expect(violations, 'the Content-Security-Policy blocked something').toEqual([]);
   },
 });
 

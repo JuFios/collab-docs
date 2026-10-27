@@ -29,6 +29,24 @@ describe('middleware', () => {
     expect(response.headers.get('x-correlation-id')).toBe('abc');
   });
 
+  it('asks browsers to stay on HTTPS in staging only', async () => {
+    const original = process.env.APP_ENV;
+    try {
+      process.env.APP_ENV = 'staging';
+      const staging = await middleware(request('/login'));
+      expect(staging.headers.get('strict-transport-security')).toBe(
+        'max-age=31536000; includeSubDomains',
+      );
+      process.env.APP_ENV = 'dev';
+      expect(
+        (await middleware(request('/login'))).headers.get('strict-transport-security'),
+      ).toBeNull();
+    } finally {
+      if (original === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = original;
+    }
+  });
+
   it('passes valid sessions through', async () => {
     const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
     const response = await middleware(request('/w', `cd_at=${token}`));
