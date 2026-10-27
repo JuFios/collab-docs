@@ -1,6 +1,5 @@
 import '../test/security-env';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Redis } from 'ioredis';
 import request from 'supertest';
 import * as Y from 'yjs';
 import { DocumentStateWriter, type PrismaClient } from '@collab-docs/db';
@@ -126,9 +125,6 @@ describe('hostile content through every path that shows it to somebody else', ()
   }
 
   beforeAll(async () => {
-    const flush = new Redis(process.env.REDIS_URL as string);
-    await flush.flushdb();
-    flush.disconnect();
     app = await createTestApp([], [SearchWorkerModule]);
     prisma = app.get(PrismaService, { strict: false });
     writer = new DocumentStateWriter(prisma);

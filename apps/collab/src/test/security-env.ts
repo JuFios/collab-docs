@@ -1,8 +1,6 @@
-// First import of the security suite. Redis database 1 keeps it away from the other collab suites (database 9),
-// which run in parallel and flush theirs. Small limits make the abuse cases cheap to provoke.
-const redisUrl = new URL(process.env.REDIS_URL ?? 'redis://localhost:6379');
-redisUrl.pathname = '/1';
-process.env.REDIS_URL = redisUrl.toString();
+// First import of the security suite. Small limits make the abuse cases cheap to provoke; they apply to this suite only
+// (every spec file runs in a process of its own). Redis is shared with the other collab suites, so this one never
+// flushes it: its documents, users and rooms are new for every test.
 process.env.COLLAB_MAX_MESSAGES_PER_10S = '40';
 process.env.COLLAB_MAX_DOCUMENT_BYTES = '20000';
 process.env.COLLAB_MAX_AWARENESS_BYTES = '512';

@@ -1,5 +1,5 @@
 // Must be the first import of the rate-limit suite: AppModule parses the environment when it is imported.
-// Redis database 1 (the other api suites use 2-15; the collab suites run against their own databases).
+// Redis database 1 (the other api suites use 2-15), flushed by this suite alone.
 const redisUrl = new URL(process.env.REDIS_URL as string);
 redisUrl.pathname = '/1';
 process.env.REDIS_URL = redisUrl.toString();

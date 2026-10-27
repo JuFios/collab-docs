@@ -4,7 +4,6 @@ import { createServer, type AddressInfo } from 'node:net';
 import { ConfigService } from '@nestjs/config';
 import { ServerTCP } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Redis } from 'ioredis';
 import { of } from 'rxjs';
 import { COLLAB_INTERNAL } from '@collab-docs/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -44,10 +43,6 @@ describe('IDOR matrix', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    const flush = new Redis(process.env.REDIS_URL as string);
-    await flush.flushdb();
-    flush.disconnect();
-
     // versions are written by the collab service; any answer will do for the authorisation question
     const port = await freePort();
     collab = new ServerTCP({ host: '127.0.0.1', port });

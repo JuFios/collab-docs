@@ -1,6 +1,7 @@
 // Must be the first import of the security suites: AppModule parses the environment when it is imported.
 // Redis database 2 (billing: 3, comments: 4, search: 5, publishing: 6, attachments: 7, versions: 8, collab: 10,
-// documents: 11, workspaces: 12, auth: 13, queue: 14, platform: 15) because the suites run in parallel.
+// documents: 11, workspaces: 12, auth: 13, queue: 14, platform: 15) because the suites run in parallel. The security
+// suites share this database and never flush it: everything they create is new.
 const redisUrl = new URL(process.env.REDIS_URL as string);
 redisUrl.pathname = '/2';
 process.env.REDIS_URL = redisUrl.toString();

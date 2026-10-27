@@ -9,8 +9,7 @@ import * as Y from 'yjs';
 import WebSocket from 'ws';
 import { DocumentStateReader, type PrismaClient } from '@collab-docs/db';
 import { COLLAB_CLOSE, COLLAB_MESSAGE } from '@collab-docs/shared';
-import { REDIS_CLIENT, parseConfig, signCollabTicket } from '@collab-docs/nest';
-import type { Redis } from 'ioredis';
+import { parseConfig, signCollabTicket } from '@collab-docs/nest';
 import { PrismaService } from './prisma/prisma.service';
 import { type RunningCollab, startCollab } from './test/collab-app';
 
@@ -87,7 +86,6 @@ class RawSocket {
 describe('collab security', () => {
   let collab: RunningCollab;
   let prisma: PrismaClient;
-  let redis: Redis;
   let reader: DocumentStateReader;
   const sockets: RawSocket[] = [];
 
@@ -169,9 +167,7 @@ describe('collab security', () => {
   beforeAll(async () => {
     collab = await startCollab();
     prisma = collab.app.get(PrismaService);
-    redis = collab.app.get(REDIS_CLIENT);
     reader = collab.app.get(DocumentStateReader);
-    await redis.flushdb();
   });
 
   afterEach(() => {
