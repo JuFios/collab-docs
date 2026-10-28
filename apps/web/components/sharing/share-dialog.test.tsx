@@ -80,7 +80,9 @@ describe('PublishSection', () => {
         origin="http://localhost:3000"
       />,
     );
-    expect(screen.getByLabelText('Public link')).toHaveValue('http://localhost:3000/p/plan-3fa9c1');
+    expect(screen.getByLabelText('Public link')).toHaveValue(
+      'http://localhost:3000/published/plan-3fa9c1',
+    );
     expect(screen.getByRole('button', { name: 'Unpublish' })).toBeEnabled();
   });
 });

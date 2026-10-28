@@ -3,20 +3,22 @@ import { decideRoute, isPublicPath } from './route-policy';
 
 describe('decideRoute', () => {
   it('lets signed-in users reach private pages', () => {
-    expect(decideRoute({ pathname: '/w', search: '', session: 'valid' })).toEqual({ type: 'next' });
+    expect(decideRoute({ pathname: '/workspaces', search: '', session: 'valid' })).toEqual({
+      type: 'next',
+    });
   });
 
   it.each(['expired', 'none'] as const)(
     'routes a %s session through the api refresh endpoint and keeps the target',
     (session) => {
-      expect(decideRoute({ pathname: '/w/abc', search: '?tab=1', session })).toEqual({
+      expect(decideRoute({ pathname: '/workspaces/abc', search: '?tab=1', session })).toEqual({
         type: 'refresh',
-        next: '/w/abc?tab=1',
+        next: '/workspaces/abc?tab=1',
       });
     },
   );
 
-  it.each(['/', '/p/some-slug', '/e/token', '/invite/abc', '/mock-checkout/1'])(
+  it.each(['/', '/published/some-slug', '/edit-link/token', '/invite/abc', '/mock-checkout/1'])(
     'keeps %s public',
     (pathname) => {
       for (const session of ['valid', 'expired', 'none'] as const) {
@@ -28,13 +30,13 @@ describe('decideRoute', () => {
   it('bounces signed-in users away from the guest-only pages', () => {
     expect(decideRoute({ pathname: '/login', search: '', session: 'valid' })).toEqual({
       type: 'redirect',
-      location: '/w',
+      location: '/workspaces',
     });
     expect(
-      decideRoute({ pathname: '/register', search: '?next=/w/abc', session: 'valid' }),
+      decideRoute({ pathname: '/register', search: '?next=/workspaces/abc', session: 'valid' }),
     ).toEqual({
       type: 'redirect',
-      location: '/w/abc',
+      location: '/workspaces/abc',
     });
   });
 
@@ -56,14 +58,14 @@ describe('decideRoute', () => {
           search: `?next=${encodeURIComponent(next)}`,
           session: 'valid',
         }),
-      ).toEqual({ type: 'redirect', location: '/w' });
+      ).toEqual({ type: 'redirect', location: '/workspaces' });
     },
   );
 });
 
 describe('isPublicPath', () => {
   it('treats app routes as private', () => {
-    for (const path of ['/w', '/w/1/d/2', '/shared', '/notifications'])
+    for (const path of ['/workspaces', '/workspaces/1/documents/2', '/shared', '/notifications'])
       expect(isPublicPath(path)).toBe(false);
   });
 });

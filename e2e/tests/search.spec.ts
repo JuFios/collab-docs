@@ -11,7 +11,7 @@ const resultLinks = (page: Page) =>
 
 /** Opens a document, types `text` into it and waits until the server confirms it is stored. */
 async function write(page: Page, workspaceId: string, documentId: string, text: string) {
-  await page.goto(`/w/${workspaceId}/d/${documentId}`);
+  await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
   await expect(editorOf(page)).toHaveAttribute('contenteditable', 'true');
   await expect(saveStatus(page)).toHaveText('Saved');
   await editorOf(page).click();
@@ -30,7 +30,7 @@ async function searchUntil(
   expectation: () => Promise<void>,
 ) {
   await expect(async () => {
-    await page.goto(`/w/${workspaceId}/search?q=${encodeURIComponent(q)}`);
+    await page.goto(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(q)}`);
     await expectation();
   }).toPass({ timeout: 30_000, intervals: [1_000] });
 }
@@ -80,14 +80,14 @@ test.describe('search', () => {
     await page.keyboard.press('ArrowDown');
     await expect(result).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/d/${documentId}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/documents/${documentId}$`));
   });
 
   test('says when nothing matches and invites to search when there is no query', async ({
     signedInPage: page,
   }) => {
     const workspaceId = await createWorkspace(page, 'Empty search');
-    await page.goto(`/w/${workspaceId}/search`);
+    await page.goto(`/workspaces/${workspaceId}/search`);
     await expect(page.getByText('Search this workspace')).toBeVisible();
     await expect(searchField(page)).toBeFocused();
 
@@ -146,7 +146,7 @@ test.describe('search', () => {
       }),
     );
 
-    await viewer.goto(`/w/${workspaceId}/search?q=okapi`);
+    await viewer.goto(`/workspaces/${workspaceId}/search?q=okapi`);
     const results = viewer.getByRole('list', { name: 'Search results' }).getByRole('link');
     await expect(results).toHaveCount(1);
     await expect(results).toContainText('Okapi open');

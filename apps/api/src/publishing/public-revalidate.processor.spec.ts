@@ -71,7 +71,7 @@ describe('PublicRevalidateProcessor', () => {
     const { http, run } = setup(link(overrides), 404);
     await run('unpublish');
     expect(http.get).toHaveBeenCalledWith(
-      `${WEB}/p/plan-3fa9c1`,
+      `${WEB}/published/plan-3fa9c1`,
       expect.objectContaining({ timeout: 5000 }),
     );
   });

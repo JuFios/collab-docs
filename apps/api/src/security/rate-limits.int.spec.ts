@@ -1,4 +1,4 @@
-import '../test/rate-limits-env';
+import '../test/env/rate-limits';
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';

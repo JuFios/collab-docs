@@ -1,4 +1,4 @@
-import '../test/search-env';
+import '../test/env/search';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';

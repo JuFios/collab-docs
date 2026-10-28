@@ -60,16 +60,16 @@ for (const viewport of VIEWPORTS) {
         await check(`public ${path}`, visitor);
       }
 
-      await page.goto('/w');
+      await page.goto('/workspaces');
       await check('workspaces (empty)');
       const workspaceId = await createWorkspace(page, 'Accessibility');
       const documentId = await createDocument(page, workspaceId, 'Quarterly plan');
       await createDocument(page, workspaceId, 'Child page', documentId);
 
-      await page.goto(`/w/${workspaceId}`);
+      await page.goto(`/workspaces/${workspaceId}`);
       await check('dashboard');
 
-      await page.goto(`/w/${workspaceId}/d/${documentId}`);
+      await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
       const editor = page.getByRole('textbox', { name: 'Document content' });
       await expect(editor).toHaveAttribute('contenteditable', 'true');
       await editor.click();
@@ -85,7 +85,7 @@ for (const viewport of VIEWPORTS) {
         ['search', 'search?q=plan'],
         ['trash', 'trash'],
       ] as const) {
-        await page.goto(`/w/${workspaceId}/${path}`);
+        await page.goto(`/workspaces/${workspaceId}/${path}`);
         await check(screen);
       }
       await page.goto('/notifications');
@@ -99,9 +99,11 @@ for (const viewport of VIEWPORTS) {
       });
       const { slug } = (await link.json()) as { slug: string };
       await expect
-        .poll(async () => (await visitor.request.get(`/p/${slug}`)).status(), { timeout: 20_000 })
+        .poll(async () => (await visitor.request.get(`/published/${slug}`)).status(), {
+          timeout: 20_000,
+        })
         .toBe(200);
-      await visitor.goto(`/p/${slug}`);
+      await visitor.goto(`/published/${slug}`);
       await check('published page', visitor);
 
       expect(problems, problems.join('\n')).toEqual([]);

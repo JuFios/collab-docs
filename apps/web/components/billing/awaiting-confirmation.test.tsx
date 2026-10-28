@@ -9,7 +9,7 @@ vi.mock('sonner', () => ({ toast }));
 
 import { AwaitingConfirmation, MAX_POLLS, POLL_INTERVAL_MS } from './awaiting-confirmation';
 
-const PATH = '/w/abc/billing';
+const PATH = '/workspaces/abc/billing';
 
 beforeEach(() => {
   vi.useFakeTimers();

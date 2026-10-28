@@ -65,7 +65,7 @@ test.describe('middleware is not the security boundary', () => {
   }) => {
     for (const value of SKIP_MIDDLEWARE) {
       const headers = { 'x-middleware-subrequest': value };
-      const page = await request.get('/w', { headers, maxRedirects: 0 });
+      const page = await request.get('/workspaces', { headers, maxRedirects: 0 });
       const body = await page.text();
       // a redirect to sign in; and if middleware were skipped, the page must still not contain a workspace
       expect([200, 307, 308, 401, 403, 404]).toContain(page.status());
@@ -77,7 +77,7 @@ test.describe('middleware is not the security boundary', () => {
   });
 
   test('a private page without a session sends the visitor to sign in', async ({ request }) => {
-    const response = await request.get('/w', { maxRedirects: 0 });
+    const response = await request.get('/workspaces', { maxRedirects: 0 });
     expect(response.status()).toBe(307);
     expect(response.headers().location).toContain('/api/auth/refresh');
   });
@@ -128,8 +128,8 @@ signedInTest.describe('static policy and cached pages', () => {
       const { slug } = (await link.json()) as { slug: string };
 
       // the first request may fill the cache; from the second on, the page comes out of it
-      await request.get(`/p/${slug}`);
-      const second = await request.get(`/p/${slug}`);
+      await request.get(`/published/${slug}`);
+      const second = await request.get(`/published/${slug}`);
       signedInExpect(second.status()).toBe(200);
       const headers = second.headers();
       // no nonce to put into the HTML: the policy is the same string for every visitor, so the page stays static

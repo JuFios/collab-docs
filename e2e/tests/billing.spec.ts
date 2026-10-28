@@ -26,7 +26,7 @@ async function fillToLimit(page: Page, workspaceId: string): Promise<void> {
 }
 
 async function openCheckout(page: Page, workspaceId: string, plan: 'Pro' | 'Team'): Promise<void> {
-  await page.goto(`/w/${workspaceId}/billing`);
+  await page.goto(`/workspaces/${workspaceId}/billing`);
   await page.getByRole('button', { name: `Upgrade to ${plan}` }).click();
   await expect(page).toHaveURL(/\/mock-checkout\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: `Collab Docs ${plan}` })).toBeVisible();
@@ -38,16 +38,16 @@ test.describe('billing', () => {
   }) => {
     const workspaceId = await createWorkspace(page, 'Limits');
     await fillToLimit(page, workspaceId);
-    await page.goto(`/w/${workspaceId}`);
+    await page.goto(`/workspaces/${workspaceId}`);
 
     await page.getByRole('button', { name: 'New document' }).click();
     const dialog = page.getByRole('dialog', { name: 'Limit reached' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Documents: 20 of 20 used on the Free plan.');
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
 
     await dialog.getByRole('link', { name: 'Upgrade plan' }).click();
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/billing$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/billing$`));
     await expect(page.getByRole('progressbar', { name: 'Documents used' })).toHaveAttribute(
       'aria-valuenow',
       String(FREE_DOCUMENT_LIMIT),
@@ -57,13 +57,13 @@ test.describe('billing', () => {
     await expect(page).toHaveURL(/\/mock-checkout\/[0-9a-f-]{36}$/);
     await page.getByRole('button', { name: 'Pay $12.00' }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/billing`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/billing`));
     await expect(page.getByText(/Paid through/)).toBeVisible({ timeout: CONFIRMATION_TIMEOUT });
     await expect(page.getByRole('region', { name: 'Invoices' })).toContainText('$12.00');
 
-    await page.goto(`/w/${workspaceId}`);
+    await page.goto(`/workspaces/${workspaceId}`);
     await page.getByRole('button', { name: 'New document' }).click();
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/d/[0-9a-f-]{36}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/documents/[0-9a-f-]{36}$`));
   });
 
   test('a webhook delivered twice changes the plan and the invoices once', async ({
@@ -135,7 +135,7 @@ test.describe('billing', () => {
     await openCheckout(page, workspaceId, 'Team');
     await page.getByRole('button', { name: 'Fail payment' }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/billing`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/billing`));
     await expect(
       page.getByRole('alert').filter({ hasText: 'The payment was declined' }),
     ).toBeVisible();

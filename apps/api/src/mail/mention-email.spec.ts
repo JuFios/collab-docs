@@ -4,7 +4,7 @@ const data = {
   actorName: 'Ada',
   documentTitle: 'Plan',
   excerpt: 'Can you look at this, @Grace?',
-  link: 'http://localhost:3000/w/1/d/2?thread=3',
+  link: 'http://localhost:3000/workspaces/1/documents/2?thread=3',
 };
 
 describe('renderMentionEmail', () => {
@@ -15,7 +15,7 @@ describe('renderMentionEmail', () => {
       expect(body).toContain('Ada');
       expect(body).toContain('Plan');
       expect(body).toContain('Can you look at this, @Grace?');
-      expect(body).toContain('http://localhost:3000/w/1/d/2?thread=3');
+      expect(body).toContain('http://localhost:3000/workspaces/1/documents/2?thread=3');
     }
   });
 

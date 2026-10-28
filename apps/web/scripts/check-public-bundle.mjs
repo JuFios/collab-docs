@@ -1,5 +1,5 @@
 // Reads the output of `next build` and fails when the published page stopped being a cheap, cacheable page:
-//   - /p/[slug] has to be prerendered or ISR-capable (a `force-dynamic`, cookies() or headers() use removes it
+//   - /published/[slug] has to be prerendered or ISR-capable (a `force-dynamic`, cookies() or headers() use removes it
 //     from the prerender manifest), and
 //   - none of the JavaScript the browser downloads for it may contain the editor, the CRDT or the query client.
 // The editor route is scanned for the same markers first, so a renamed marker cannot make the check pass silently.
@@ -9,8 +9,8 @@ import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)), '.next');
-const PUBLISHED = '/(public)/p/[slug]';
-const EDITOR = '/(app)/w/[id]/d/[docId]';
+const PUBLISHED = '/(public)/published/[slug]';
+const EDITOR = '/(app)/workspaces/[workspaceId]/documents/[documentId]';
 // Strings that only exist in the code of the named library (they come from its error messages and class names).
 const MARKERS = {
   ProseMirror: 'ProseMirror',
@@ -70,9 +70,9 @@ if (page.bytes > MAX_ROUTE_JS_GZIP_BYTES) {
 }
 
 const prerender = read('prerender-manifest.json');
-if (!prerender.dynamicRoutes['/p/[slug]']) {
+if (!prerender.dynamicRoutes['/published/[slug]']) {
   failures.push(
-    '/p/[slug] is not in the prerender manifest: it renders dynamically on every request (no ISR)',
+    '/published/[slug] is not in the prerender manifest: it renders dynamically on every request (no ISR)',
   );
 }
 
@@ -81,5 +81,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 process.stdout.write(
-  `✓ /p/[slug] is ISR-capable and ships ${(page.bytes / 1024).toFixed(0)} kB of gzipped JavaScript, without ${Object.keys(MARKERS).join(', ')}\n`,
+  `✓ /published/[slug] is ISR-capable and ships ${(page.bytes / 1024).toFixed(0)} kB of gzipped JavaScript, without ${Object.keys(MARKERS).join(', ')}\n`,
 );

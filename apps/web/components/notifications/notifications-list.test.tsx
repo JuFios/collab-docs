@@ -79,7 +79,7 @@ describe('NotificationsList', () => {
     );
     expect(screen.getByRole('link', { name: /Doc 1/ })).toHaveAttribute(
       'href',
-      `/w/${WS}/d/${DOC}?thread=${THREAD}`,
+      `/workspaces/${WS}/documents/${DOC}?thread=${THREAD}`,
     );
   });
 

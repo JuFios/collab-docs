@@ -99,7 +99,7 @@ export class PublicRevalidateProcessor extends QueueProcessor<RevalidateJob> {
     const response = await firstValueFrom(
       this.http.get(
         new URL(
-          `/p/${encodeURIComponent(slug)}`,
+          `/published/${encodeURIComponent(slug)}`,
           this.config.get('WEB_INTERNAL_URL', { infer: true }),
         ).href,
         { timeout: REQUEST_TIMEOUT_MS, validateStatus: () => true, responseType: 'text' },

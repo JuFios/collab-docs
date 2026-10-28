@@ -1,11 +1,11 @@
 import { expect, loginThroughUi, newUser, test } from '../fixtures';
 
 test.describe('authentication', () => {
-  test('an anonymous visit to /w redirects to the login page and remembers the target', async ({
+  test('an anonymous visit to /workspaces redirects to the login page and remembers the target', async ({
     page,
   }) => {
-    await page.goto('/w');
-    await expect(page).toHaveURL(/\/login\?next=%2Fw$/);
+    await page.goto('/workspaces');
+    await expect(page).toHaveURL(/\/login\?next=%2Fworkspaces$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   });
 
@@ -13,8 +13,8 @@ test.describe('authentication', () => {
     page,
     user,
   }) => {
-    await loginThroughUi(page, user, '/login?next=/w');
-    await expect(page).toHaveURL(/\/w$/);
+    await loginThroughUi(page, user, '/login?next=/workspaces');
+    await expect(page).toHaveURL(/\/workspaces$/);
     await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
   });
 
@@ -31,26 +31,26 @@ test.describe('authentication', () => {
     await page.getByLabel('Email').fill(user.email);
     await page.getByLabel('Password').fill(user.password);
     await page.getByRole('button', { name: 'Create account' }).click();
-    await expect(page).toHaveURL(/\/w$/);
+    await expect(page).toHaveURL(/\/workspaces$/);
   });
 
   test('unsafe next values are ignored after signing in', async ({ page, user }) => {
     await loginThroughUi(page, user, `/login?next=${encodeURIComponent('https://evil.example')}`);
-    await expect(page).toHaveURL(/\/w$/);
+    await expect(page).toHaveURL(/\/workspaces$/);
   });
 
   test('signed-in users are bounced away from /login', async ({ signedInPage }) => {
     await signedInPage.goto('/login');
-    await expect(signedInPage).toHaveURL(/\/w$/);
+    await expect(signedInPage).toHaveURL(/\/workspaces$/);
   });
 
   test('logging out ends the session', async ({ signedInPage }) => {
-    await signedInPage.goto('/w');
+    await signedInPage.goto('/workspaces');
     await signedInPage.getByRole('button', { name: 'User menu' }).click();
     await signedInPage.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(signedInPage).toHaveURL(/\/login$/);
-    await signedInPage.goto('/w');
-    await expect(signedInPage).toHaveURL(/\/login\?next=%2Fw$/);
+    await signedInPage.goto('/workspaces');
+    await expect(signedInPage).toHaveURL(/\/login\?next=%2Fworkspaces$/);
   });
 
   test('an expired access token is renewed transparently', async ({ signedInPage }) => {
@@ -59,8 +59,8 @@ test.describe('authentication', () => {
     const cookies = await context.cookies();
     await context.clearCookies({ name: 'cd_at' });
     expect(cookies.some((c) => c.name === 'cd_rt')).toBe(true);
-    await signedInPage.goto('/w');
-    await expect(signedInPage).toHaveURL(/\/w$/);
+    await signedInPage.goto('/workspaces');
+    await expect(signedInPage).toHaveURL(/\/workspaces$/);
     await expect(
       signedInPage.getByRole('heading', { name: 'Workspaces', exact: true }),
     ).toBeVisible();

@@ -33,14 +33,14 @@ describe('LoginForm', () => {
 
   it('submits valid credentials to the action with the next path', async () => {
     const user = userEvent.setup();
-    render(<LoginForm next="/w/abc" />);
+    render(<LoginForm next="/workspaces/abc" />);
     await user.type(screen.getByLabelText('Email'), 'ada@example.com');
     await user.type(screen.getByLabelText('Password'), 'secret-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     await waitFor(() => expect(loginAction).toHaveBeenCalledTimes(1));
     const formData = (loginAction.mock.calls[0] as unknown as [unknown, FormData])[1];
     expect(formData.get('email')).toBe('ada@example.com');
-    expect(formData.get('next')).toBe('/w/abc');
+    expect(formData.get('next')).toBe('/workspaces/abc');
   });
 });
 

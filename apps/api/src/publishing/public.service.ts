@@ -73,7 +73,7 @@ export class PublicService {
     });
   }
 
-  /** What `/e/<token>` needs to decide between the editor and an explanation. */
+  /** What `/edit-link/<token>` needs to decide between the editor and an explanation. */
   async editLink(token: string): Promise<EditLinkState> {
     const link = await this.liveEditLink(token);
     return {

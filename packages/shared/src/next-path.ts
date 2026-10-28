@@ -1,4 +1,4 @@
-export const DEFAULT_NEXT_PATH = '/w';
+export const DEFAULT_NEXT_PATH = '/workspaces';
 
 /**
  * Returns `value` when it is a same-origin relative path that is safe to redirect to, else `fallback`.

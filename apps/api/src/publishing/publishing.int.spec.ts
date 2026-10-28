@@ -1,4 +1,4 @@
-import '../test/publishing-env';
+import '../test/env/publishing';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import { createServer, type AddressInfo } from 'node:net';
 import { ConfigService } from '@nestjs/config';
@@ -68,7 +68,7 @@ describe('publishing', () => {
   /** What the mock web app does with a revalidation request: the status code to answer, in order. */
   const webCalls: WebCall[] = [];
   let webAnswers: number[] = [];
-  /** Answers of the mock page `/p/:slug` that come before the true one: a cache that still holds the old page. */
+  /** Answers of the mock page `/published/:slug` that come before the true one: a cache that still holds the old page. */
   let stalePageAnswers: number[] = [];
   const pageRequests: string[] = [];
 
@@ -174,9 +174,9 @@ describe('publishing', () => {
             tags: parsed.tags,
           });
           res.statusCode = webAnswers.shift() ?? 200;
-        } else if (req.method === 'GET' && req.url?.startsWith('/p/')) {
+        } else if (req.method === 'GET' && req.url?.startsWith('/published/')) {
           // the published page: 200 while the link is live, 404 otherwise, like the real route
-          const slug = decodeURIComponent(req.url.slice('/p/'.length));
+          const slug = decodeURIComponent(req.url.slice('/published/'.length));
           pageRequests.push(slug);
           void prisma.publicLink
             .findFirst({

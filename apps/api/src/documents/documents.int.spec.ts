@@ -1,4 +1,4 @@
-import '../test/documents-env';
+import '../test/env/documents';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';

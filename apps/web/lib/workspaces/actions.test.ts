@@ -100,7 +100,11 @@ describe('createWorkspaceAction', () => {
       createdAt: '2026-10-23T00:00:00Z',
     });
     const state = await createWorkspaceAction({}, form({ name: ' Acme ' }));
-    expect(state).toEqual({ ok: true, notice: 'Workspace created.', redirectTo: `/w/${WS}` });
+    expect(state).toEqual({
+      ok: true,
+      notice: 'Workspace created.',
+      redirectTo: `/workspaces/${WS}`,
+    });
     // navigation and refresh are the caller's job: a server-side redirect/revalidate stalled the form
     expect(redirect).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
@@ -186,7 +190,7 @@ describe('acceptInviteAction', () => {
     expect(state).toEqual({
       ok: true,
       notice: 'You joined the workspace.',
-      redirectTo: `/w/${WS}`,
+      redirectTo: `/workspaces/${WS}`,
     });
     expect(apiServer).toHaveBeenCalledWith(
       '/invites/tok_123/accept',

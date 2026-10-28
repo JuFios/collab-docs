@@ -17,15 +17,15 @@ async function signedIn(
 }
 
 async function createWorkspace(page: Page, name: string): Promise<string> {
-  await page.goto('/w');
+  await page.goto('/workspaces');
   await page.getByLabel('Workspace name').fill(name);
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/workspaces\/[0-9a-f-]{36}$/);
   return new URL(page.url()).pathname.split('/')[2]!;
 }
 
 async function invite(page: Page, workspaceId: string, email: string, role = 'Editor') {
-  await page.goto(`/w/${workspaceId}/settings`);
+  await page.goto(`/workspaces/${workspaceId}/settings`);
   // role queries skip the hidden copy that streaming leaves in the DOM until the boundary is revealed
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByRole('combobox', { name: 'Role' }).selectOption({ label: role });
@@ -36,7 +36,7 @@ test.describe('workspaces', () => {
   test('a new user sees the empty state, creates a workspace and lands on its dashboard', async ({
     signedInPage: page,
   }) => {
-    await page.goto('/w');
+    await page.goto('/workspaces');
     await expect(page.getByText('No workspaces yet')).toBeVisible();
 
     await page.getByRole('button', { name: 'Create workspace' }).click();
@@ -44,7 +44,7 @@ test.describe('workspaces', () => {
 
     await page.getByLabel('Workspace name').fill('Acme Docs');
     await page.getByRole('button', { name: 'Create workspace' }).click();
-    await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/workspaces\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { name: 'Acme Docs', level: 1 })).toBeVisible();
     // every block settles on its own
     await expect(page.getByRole('heading', { name: 'Recent documents' })).toBeVisible();
@@ -55,21 +55,21 @@ test.describe('workspaces', () => {
     ).toBeVisible();
   });
 
-  test('/w returns to the last opened workspace unless the full list is requested', async ({
+  test('/workspaces returns to the last opened workspace unless the full list is requested', async ({
     signedInPage: page,
   }) => {
     const first = await createWorkspace(page, 'First');
-    await page.goto('/w');
-    await expect(page).toHaveURL(new RegExp(`/w/${first}$`));
+    await page.goto('/workspaces');
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${first}$`));
 
-    await page.goto('/w?all=1');
+    await page.goto('/workspaces?all=1');
     await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: /First/ })).toBeVisible();
   });
 
   test('the switcher moves between workspaces', async ({ signedInPage: page }) => {
     await createWorkspace(page, 'Alpha');
-    await page.goto('/w?all=1');
+    await page.goto('/workspaces?all=1');
     await page.getByLabel('Workspace name').fill('Beta');
     await page.getByRole('button', { name: 'Create workspace' }).click();
     await expect(page.getByRole('heading', { name: 'Beta', level: 1 })).toBeVisible();
@@ -100,7 +100,7 @@ test.describe('workspaces', () => {
     await second.goto(new URL(link).pathname);
     await expect(second.getByRole('heading', { name: 'Join Team Space' })).toBeVisible();
     await second.getByRole('button', { name: 'Accept invitation' }).click();
-    await expect(second).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+    await expect(second).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
     await expect(second.getByRole('heading', { name: 'Team Space', level: 1 })).toBeVisible();
     // an editor does not get the admin tab
     await expect(second.getByRole('link', { name: 'Settings' })).toHaveCount(0);
@@ -134,7 +134,7 @@ test.describe('workspaces', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(new RegExp(`${path}$`));
     await page.getByRole('button', { name: 'Accept invitation' }).click();
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
   });
 
   test('an invitation for another account cannot be accepted', async ({
@@ -176,7 +176,7 @@ test.describe('workspaces', () => {
 
   test('renaming the workspace updates the header', async ({ signedInPage: owner }) => {
     const workspaceId = await createWorkspace(owner, 'Old name');
-    await owner.goto(`/w/${workspaceId}/settings`);
+    await owner.goto(`/workspaces/${workspaceId}/settings`);
     const input = owner.getByRole('textbox', { name: 'Workspace name' });
     await input.fill('New name');
     await owner.getByRole('button', { name: 'Save' }).click();
@@ -230,15 +230,15 @@ test.describe('workspaces', () => {
     const viewerPage = await signedIn(browser, baseURL, viewer);
     await viewerPage.goto(new URL(await inviteLinkFor(viewer.email)).pathname);
     await viewerPage.getByRole('button', { name: 'Accept invitation' }).click();
-    await expect(viewerPage).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+    await expect(viewerPage).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
 
-    await viewerPage.goto(`/w/${workspaceId}/settings`);
+    await viewerPage.goto(`/workspaces/${workspaceId}/settings`);
     await expect(viewerPage.getByRole('heading', { name: 'Access denied' })).toBeVisible();
 
     const outsider = await signedIn(browser, baseURL, stranger);
-    await outsider.goto(`/w/${workspaceId}`);
+    await outsider.goto(`/workspaces/${workspaceId}`);
     await expect(outsider.getByText('Page not found')).toBeVisible();
-    await outsider.goto('/w/not-a-uuid');
+    await outsider.goto('/workspaces/not-a-uuid');
     await expect(outsider.getByText('Page not found')).toBeVisible();
   });
 
@@ -263,16 +263,16 @@ test.describe('workspaces', () => {
     const member = await signedIn(browser, baseURL, guest);
     await member.goto(new URL(await inviteLinkFor(guest.email)).pathname);
     await member.getByRole('button', { name: 'Accept invitation' }).click();
-    await expect(member).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+    await expect(member).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
 
     await member.getByRole('button', { name: 'Leave workspace' }).click();
     await member.getByRole('dialog').getByRole('button', { name: 'Leave workspace' }).click();
-    await expect(member).toHaveURL(/\/w\?all=1$/);
+    await expect(member).toHaveURL(/\/workspaces\?all=1$/);
     await expect(member.getByText('No workspaces yet')).toBeVisible();
-    await member.goto(`/w/${workspaceId}`);
+    await member.goto(`/workspaces/${workspaceId}`);
     await expect(member.getByText('Page not found')).toBeVisible();
 
-    await owner.goto(`/w/${workspaceId}/settings`);
+    await owner.goto(`/workspaces/${workspaceId}/settings`);
     await expect(owner.getByRole('table', { name: 'Workspace members' })).not.toContainText(
       guest.email,
     );

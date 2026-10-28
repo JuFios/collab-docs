@@ -18,7 +18,7 @@ import { formatExpiry, toExpiresAt, toLocalInput } from './expiry';
 export type PublishBlock = string | null;
 
 /**
- * "Publish to web": the page at `/p/<slug>`. Publishing reads the document as the server stored it, so it waits
+ * "Publish to web": the page at `/published/<slug>`. Publishing reads the document as the server stored it, so it waits
  * until everything typed here has been acknowledged (otherwise the page would silently miss the last words).
  */
 export function PublishSection({
@@ -63,7 +63,7 @@ export function PublishSection({
           <p className="text-sm text-muted-foreground">
             Anyone with the link can read this page. {formatExpiry(live.expiresAt)}.
           </p>
-          <CopyField label="Public link" value={`${origin}/p/${live.slug}`} />
+          <CopyField label="Public link" value={`${origin}/published/${live.slug}`} />
           <div className="flex flex-wrap items-end gap-2">
             <div className="grid gap-1">
               <Label htmlFor="publish-expiry">Expires</Label>

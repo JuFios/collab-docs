@@ -11,7 +11,7 @@ export interface BillingReturn {
 }
 
 export function billingPath(workspaceId: string): string {
-  return `/w/${encodeURIComponent(workspaceId)}/billing`;
+  return `/workspaces/${encodeURIComponent(workspaceId)}/billing`;
 }
 
 export function billingReturnUrl(workspaceId: string, result: BillingReturn): string {

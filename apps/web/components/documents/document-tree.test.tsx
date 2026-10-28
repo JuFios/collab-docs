@@ -8,11 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api/client', () => ({ apiClient: { request, refresh: vi.fn() } }));
 vi.mock('@/lib/realtime/use-workspace-events', () => ({ useWorkspaceEvents: () => 'open' }));
-const navigation = vi.hoisted(() => ({ docId: undefined as string | undefined, push: vi.fn() }));
+const navigation = vi.hoisted(() => ({
+  documentId: undefined as string | undefined,
+  push: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ docId: navigation.docId }),
+  useParams: () => ({ documentId: navigation.documentId }),
   useRouter: () => ({ push: navigation.push, refresh: vi.fn() }),
-  usePathname: () => '/w/ws',
+  usePathname: () => '/workspaces/ws',
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -59,7 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  navigation.docId = undefined;
+  navigation.documentId = undefined;
 });
 
 const item = (name: string) => screen.getByRole('treeitem', { name });
@@ -77,7 +80,7 @@ describe('DocumentTree', () => {
   });
 
   it('opens the ancestors of the open document', () => {
-    navigation.docId = id(2);
+    navigation.documentId = id(2);
     renderTree(nodes);
     expect(item('Doc 2')).toHaveAttribute('aria-level', '2');
     expect(item('Doc 2')).toHaveAttribute('aria-current', 'page');

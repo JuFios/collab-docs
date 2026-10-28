@@ -49,7 +49,10 @@ describe('cancelSubscriptionAction', () => {
     apiServer.mockResolvedValue(undefined);
     const state = await cancelSubscriptionAction({ workspaceId: WS });
     expect(apiServer).toHaveBeenCalledWith(`/workspaces/${WS}/billing/cancel`, { method: 'POST' });
-    expect(state).toMatchObject({ ok: true, redirectTo: `/w/${WS}/billing?awaiting=FREE` });
+    expect(state).toMatchObject({
+      ok: true,
+      redirectTo: `/workspaces/${WS}/billing?awaiting=FREE`,
+    });
   });
 });
 
@@ -77,14 +80,17 @@ describe('settleCheckoutAction', () => {
     answers(pending);
     const state = await settleCheckoutAction({ sessionId: SESSION, outcome: 'pay' });
     expect(posted()).toEqual([`/mock-provider/checkout-sessions/${SESSION}/complete`]);
-    expect(state).toMatchObject({ ok: true, redirectTo: `/w/${WS}/billing?awaiting=TEAM` });
+    expect(state).toMatchObject({
+      ok: true,
+      redirectTo: `/workspaces/${WS}/billing?awaiting=TEAM`,
+    });
   });
 
   it('declines the payment and says so on the billing page', async () => {
     answers(pending);
     const state = await settleCheckoutAction({ sessionId: SESSION, outcome: 'fail' });
     expect(posted()).toEqual([`/mock-provider/checkout-sessions/${SESSION}/fail`]);
-    expect(state).toEqual({ ok: true, redirectTo: `/w/${WS}/billing?payment=declined` });
+    expect(state).toEqual({ ok: true, redirectTo: `/workspaces/${WS}/billing?payment=declined` });
   });
 
   it('pays and delivers the same event a second time', async () => {

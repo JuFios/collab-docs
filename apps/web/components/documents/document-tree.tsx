@@ -46,8 +46,8 @@ const ALT_MOVES: Record<string, KeyboardMove> = {
  */
 export function DocumentTree() {
   const { workspaceId, role } = useWorkspace();
-  const params = useParams<{ docId?: string }>();
-  const activeId = params.docId;
+  const params = useParams<{ documentId?: string }>();
+  const activeId = params.documentId;
   const router = useRouter();
   const tree = useTree();
   const nodes = tree.data;
@@ -164,7 +164,7 @@ export function DocumentTree() {
         break;
       case 'Enter':
         event.preventDefault();
-        router.push(`/w/${workspaceId}/d/${node.id}`);
+        router.push(`/workspaces/${workspaceId}/documents/${node.id}`);
         break;
       case 'F2':
         event.preventDefault();

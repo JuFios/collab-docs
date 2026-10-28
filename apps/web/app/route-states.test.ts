@@ -9,14 +9,14 @@ const APP_DIR = import.meta.dirname;
  * data to wait for, so the audit fails when one of them starts fetching.
  */
 const WITHOUT_LOADING: Record<string, string> = {
-  '(public)/(site)/page.tsx': 'static landing page',
-  '(public)/(site)/login/page.tsx': 'a form; only reads the `next` search parameter',
-  '(public)/(site)/register/page.tsx': 'a form; only reads the `next` search parameter',
-  '(public)/p/[slug]/page.tsx': 'ISR page served from the cache; nothing streams',
+  '(public)/(interactive)/page.tsx': 'static landing page',
+  '(public)/(interactive)/login/page.tsx': 'a form; only reads the `next` search parameter',
+  '(public)/(interactive)/register/page.tsx': 'a form; only reads the `next` search parameter',
+  '(public)/published/[slug]/page.tsx': 'ISR page served from the cache; nothing streams',
 };
 
 /** Exempt pages that do read data, because the cache answers instead of a request the user waits for. */
-const CACHED = new Set(['(public)/p/[slug]/page.tsx']);
+const CACHED = new Set(['(public)/published/[slug]/page.tsx']);
 
 function pagesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

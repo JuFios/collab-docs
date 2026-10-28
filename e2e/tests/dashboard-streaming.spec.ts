@@ -23,7 +23,7 @@ test('the dashboard streams: skeletons are flushed before the blocks have their 
     .map((entry) => `${entry.name}=${entry.value}`)
     .join('; ');
   const startedAt = Date.now();
-  const response = await fetch(new URL(`/w/${id}`, origin), { headers: { cookie } });
+  const response = await fetch(new URL(`/workspaces/${id}`, origin), { headers: { cookie } });
   expect(response.status).toBe(200);
 
   const reader = response.body!.getReader();

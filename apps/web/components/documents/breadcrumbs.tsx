@@ -17,7 +17,10 @@ export function Breadcrumbs({
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm text-muted-foreground">
       <ol className="flex min-w-0 flex-wrap items-center gap-1">
         <li>
-          <Link className="hover:text-foreground hover:underline" href={`/w/${workspaceId}`}>
+          <Link
+            className="hover:text-foreground hover:underline"
+            href={`/workspaces/${workspaceId}`}
+          >
             Overview
           </Link>
         </li>
@@ -26,7 +29,7 @@ export function Breadcrumbs({
             <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <Link
               className="max-w-40 truncate hover:text-foreground hover:underline"
-              href={`/w/${workspaceId}/d/${node.id}`}
+              href={`/workspaces/${workspaceId}/documents/${node.id}`}
             >
               {node.title || 'Untitled'}
             </Link>

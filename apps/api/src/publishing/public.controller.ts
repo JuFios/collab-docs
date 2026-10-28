@@ -29,7 +29,7 @@ import {
 import { EditTokenPipe, PublicSlugPipe } from './public-params.pipe';
 import { PublicService } from './public.service';
 
-/** Anonymous endpoints behind `/p/<slug>` and `/e/<token>`. No cookies, no user: nothing here depends on who asks. */
+/** Anonymous endpoints behind `/published/<slug>` and `/edit-link/<token>`. No cookies, no user: nothing here depends on who asks. */
 @ApiTags('public')
 @Public()
 @Controller('public')
@@ -73,7 +73,7 @@ export class PublicController {
   @ApiOperation({
     summary: 'State of an edit link',
     description:
-      'For `/e/<token>`. 404 for an unknown or replaced secret, 410 `LINK_EXPIRED` for an expired or revoked ' +
+      'For `/edit-link/<token>`. 404 for an unknown or replaced secret, 410 `LINK_EXPIRED` for an expired or revoked ' +
       'link and 410 `DOCUMENT_DELETED` for a deleted document.',
   })
   @ApiParam({ name: 'token', type: String })

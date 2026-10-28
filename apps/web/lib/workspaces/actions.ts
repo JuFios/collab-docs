@@ -41,7 +41,7 @@ export async function createWorkspaceAction(
   } catch (error) {
     return failureState(error, values);
   }
-  return { ok: true, notice: 'Workspace created.', redirectTo: `/w/${workspaceId}` };
+  return { ok: true, notice: 'Workspace created.', redirectTo: `/workspaces/${workspaceId}` };
 }
 
 export async function renameWorkspaceAction(
@@ -170,5 +170,9 @@ export async function acceptInviteAction(
   } catch (error) {
     return failureState(error);
   }
-  return { ok: true, notice: 'You joined the workspace.', redirectTo: `/w/${workspaceId}` };
+  return {
+    ok: true,
+    notice: 'You joined the workspace.',
+    redirectTo: `/workspaces/${workspaceId}`,
+  };
 }

@@ -19,10 +19,10 @@ export async function signedIn(
 }
 
 export async function createWorkspace(page: Page, name: string): Promise<string> {
-  await page.goto('/w');
+  await page.goto('/workspaces');
   await page.getByLabel('Workspace name').fill(name);
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/workspaces\/[0-9a-f-]{36}$/);
   return new URL(page.url()).pathname.split('/')[2] as string;
 }
 
@@ -58,13 +58,13 @@ export async function invitedMember(
     (await browser.newContext({ baseURL })).request,
     newUser(role.toLowerCase()),
   );
-  await owner.goto(`/w/${workspaceId}/settings`);
+  await owner.goto(`/workspaces/${workspaceId}/settings`);
   await owner.getByRole('textbox', { name: 'Email' }).fill(member.email);
   await owner.getByRole('combobox', { name: 'Role' }).selectOption({ label: role });
   await owner.getByRole('button', { name: 'Send invitation' }).click();
   const { page, context } = await signedIn(browser, baseURL, member);
   await page.goto(new URL(await inviteLinkFor(member.email)).pathname);
   await page.getByRole('button', { name: 'Accept invitation' }).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+  await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
   return { page, context, name: member.name };
 }

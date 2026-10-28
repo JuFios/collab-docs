@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const actions = vi.hoisted(() => ({
   settleCheckoutAction: vi.fn(async (...args: unknown[]): Promise<Record<string, unknown>> => ({
     ok: args.length > 0,
-    redirectTo: '/w/abc/billing?awaiting=PRO',
+    redirectTo: '/workspaces/abc/billing?awaiting=PRO',
   })),
 }));
 vi.mock('@/lib/billing/mock-checkout-actions', () => actions);
@@ -33,7 +33,9 @@ describe('MockCheckoutForm', () => {
         outcome: 'pay',
       }),
     );
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/w/abc/billing?awaiting=PRO'));
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith('/workspaces/abc/billing?awaiting=PRO'),
+    );
   });
 
   it('fails the payment', async () => {

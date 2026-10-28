@@ -1,4 +1,4 @@
-import '../test/workspaces-env';
+import '../test/env/workspaces';
 import { Controller, Get, Param, Post, Req } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request } from 'express';

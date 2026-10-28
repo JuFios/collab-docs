@@ -2,7 +2,7 @@ import { EDIT_TOKEN_PATTERN, type EditLinkState, editLinkStateSchema } from '@co
 import { isApiError } from '@/lib/api/errors';
 import { apiPublic } from '@/lib/api/public';
 
-/** What `/e/<token>` shows: the editor, or an explanation of why there is none. */
+/** What `/edit-link/<token>` shows: the editor, or an explanation of why there is none. */
 export type EditLinkLookup =
   | { status: 'live'; link: EditLinkState }
   | { status: 'expired' }

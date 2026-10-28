@@ -13,7 +13,7 @@ import { descendantIds } from '@/lib/documents/tree';
 export function useDocumentActions(onCreated?: (parentId: string) => void) {
   const { workspaceId } = useWorkspace();
   const router = useRouter();
-  const params = useParams<{ docId?: string }>();
+  const params = useParams<{ documentId?: string }>();
   const { data: nodes } = useTree();
   const create = useCreateDocument(workspaceId);
   const remove = useDeleteDocument(workspaceId);
@@ -24,7 +24,7 @@ export function useDocumentActions(onCreated?: (parentId: string) => void) {
       if (!document) return; // the global handler already told the user why
       if (parentId) onCreated?.(parentId);
       requestTitleFocus(document.id);
-      router.push(`/w/${workspaceId}/d/${document.id}`);
+      router.push(`/workspaces/${workspaceId}/documents/${document.id}`);
     },
     [create, onCreated, router, workspaceId],
   );
@@ -38,12 +38,16 @@ export function useDocumentActions(onCreated?: (parentId: string) => void) {
       );
       if (!ok) return false;
       toast.success('Moved to trash', {
-        action: { label: 'Open trash', onClick: () => router.push(`/w/${workspaceId}/trash`) },
+        action: {
+          label: 'Open trash',
+          onClick: () => router.push(`/workspaces/${workspaceId}/trash`),
+        },
       });
-      if (params.docId && gone.has(params.docId)) router.push(`/w/${workspaceId}`);
+      if (params.documentId && gone.has(params.documentId))
+        router.push(`/workspaces/${workspaceId}`);
       return true;
     },
-    [nodes, params.docId, remove, router, workspaceId],
+    [nodes, params.documentId, remove, router, workspaceId],
   );
 
   return {

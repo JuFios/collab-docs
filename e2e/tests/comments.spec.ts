@@ -34,7 +34,7 @@ async function written(page: Page, action: () => Promise<void>): Promise<void> {
 }
 
 async function openEditable(page: Page, workspaceId: string, documentId: string): Promise<void> {
-  await page.goto(`/w/${workspaceId}/d/${documentId}`);
+  await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
   await expect(editorOf(page)).toHaveAttribute('contenteditable', 'true');
   await expect(saveStatus(page)).toHaveText('Saved');
 }
@@ -77,7 +77,7 @@ test.describe('comments', () => {
     } = await invitedMember(browser, baseURL, author, workspaceId, 'Editor');
 
     // the person to be mentioned is online in the workspace, on a page that has nothing to do with the document
-    await reader.goto(`/w/${workspaceId}`);
+    await reader.goto(`/workspaces/${workspaceId}`);
     await expect(reader.getByTestId('notifications-bell')).toBeVisible();
     await expect(reader.getByTestId('unread-badge')).toHaveCount(0);
     await reader.evaluate(() => {
@@ -108,7 +108,7 @@ test.describe('comments', () => {
     await reader.getByTestId('notifications-bell').click();
     await reader.getByRole('menuitem', { name: /Review me/ }).click();
 
-    await expect(reader).toHaveURL(/\/d\/[0-9a-f-]{36}\?thread=[0-9a-f-]{36}/);
+    await expect(reader).toHaveURL(/\/documents\/[0-9a-f-]{36}\?thread=[0-9a-f-]{36}/);
     const opened = panelOf(reader).getByTestId('comment-thread');
     await expect(opened).toContainText('Could you check this');
     await expect(opened).toHaveAttribute('data-thread-id', /.+/);
@@ -144,7 +144,7 @@ test.describe('comments', () => {
       workspaceId,
       'Viewer',
     );
-    await viewer.goto(`/w/${workspaceId}/d/${documentId}`);
+    await viewer.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
     await expect(editorOf(viewer)).toContainText('A claim that needs a source');
     // the marker shows that the block has a thread, and opens it
     await viewer.getByRole('button', { name: /1 open comment thread/ }).click();

@@ -13,7 +13,7 @@ export function WorkspaceNav({
   canManage: boolean;
 }) {
   const pathname = usePathname();
-  const base = `/w/${workspaceId}`;
+  const base = `/workspaces/${workspaceId}`;
   const links = [
     { href: base, label: 'Overview', active: pathname === base },
     {

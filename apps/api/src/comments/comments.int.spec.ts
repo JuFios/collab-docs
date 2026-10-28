@@ -1,4 +1,4 @@
-import '../test/comments-env';
+import '../test/env/comments';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import request from 'supertest';
@@ -1008,7 +1008,7 @@ describe('comments and notifications', () => {
       expect(message!.html).toContain(`@${team.viewer.name}`);
       expect(message!.text).toContain('<img src=x onerror=alert(1)>');
       const thread = await prisma.commentThread.findFirstOrThrow({ where: { documentId } });
-      const link = `http://localhost:3000/w/${team.workspaceId}/d/${documentId}?thread=${thread.id}`;
+      const link = `http://localhost:3000/workspaces/${team.workspaceId}/documents/${documentId}?thread=${thread.id}`;
       expect(message!.text).toContain(link);
       expect(message!.html).toContain(link);
     });

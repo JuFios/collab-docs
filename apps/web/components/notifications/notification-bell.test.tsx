@@ -164,7 +164,7 @@ describe('NotificationBell', () => {
     mount(1);
     await user.click(screen.getByRole('button', { name: 'Notifications, 1 unread' }));
     const link = await screen.findByRole('menuitem', { name: /Launch plan/ });
-    expect(link).toHaveAttribute('href', `/w/${WS}/d/${DOC}?thread=${THREAD}`);
+    expect(link).toHaveAttribute('href', `/workspaces/${WS}/documents/${DOC}?thread=${THREAD}`);
     expect(link).toHaveTextContent('Unread');
     expect(screen.getByRole('menuitem', { name: /Old doc/ })).not.toHaveTextContent('Unread');
     await user.click(link);

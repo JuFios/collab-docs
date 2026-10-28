@@ -151,7 +151,7 @@ export function TreeRowItem(props: TreeRowProps) {
         />
       ) : (
         <Link
-          href={`/w/${workspaceId}/d/${node.id}`}
+          href={`/workspaces/${workspaceId}/documents/${node.id}`}
           tabIndex={-1}
           draggable={false}
           className="min-w-0 flex-1 truncate py-1"

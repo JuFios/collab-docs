@@ -14,10 +14,10 @@ describe('middleware', () => {
   });
 
   it('sends anonymous users through the api refresh endpoint and stamps a correlation id', async () => {
-    const response = await middleware(request('/w'));
+    const response = await middleware(request('/workspaces'));
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/api/auth/refresh?next=%2Fw',
+      'http://localhost:3000/api/auth/refresh?next=%2Fworkspaces',
     );
     expect(response.headers.get('x-correlation-id')).toMatch(/^[0-9a-f-]{36}$/);
   });
@@ -49,24 +49,24 @@ describe('middleware', () => {
 
   it('passes valid sessions through', async () => {
     const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
-    const response = await middleware(request('/w', `cd_at=${token}`));
+    const response = await middleware(request('/workspaces', `cd_at=${token}`));
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
   it('remembers the workspace being viewed and does not rewrite an unchanged cookie', async () => {
     const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
     const id = '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
-    const first = await middleware(request(`/w/${id}/settings`, `cd_at=${token}`));
+    const first = await middleware(request(`/workspaces/${id}/settings`, `cd_at=${token}`));
     expect(first.cookies.get('cd_ws')).toMatchObject({
       value: id,
       httpOnly: true,
       sameSite: 'lax',
     });
 
-    const again = await middleware(request(`/w/${id}`, `cd_at=${token}; cd_ws=${id}`));
+    const again = await middleware(request(`/workspaces/${id}`, `cd_at=${token}; cd_ws=${id}`));
     expect(again.cookies.get('cd_ws')).toBeUndefined();
 
-    const elsewhere = await middleware(request('/w', `cd_at=${token}`));
+    const elsewhere = await middleware(request('/workspaces', `cd_at=${token}`));
     expect(elsewhere.cookies.get('cd_ws')).toBeUndefined();
   });
 
@@ -74,9 +74,9 @@ describe('middleware', () => {
     const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d', {
       now: new Date(Date.now() - 3_600_000),
     });
-    const response = await middleware(request('/w/abc', `cd_at=${token}`));
+    const response = await middleware(request('/workspaces/abc', `cd_at=${token}`));
     expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/api/auth/refresh?next=%2Fw%2Fabc',
+      'http://localhost:3000/api/auth/refresh?next=%2Fworkspaces%2Fabc',
     );
   });
 
@@ -85,7 +85,7 @@ describe('middleware', () => {
       'another-secret-another-secret-123456',
       '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d',
     );
-    const response = await middleware(request('/w', `cd_at=${token}`));
+    const response = await middleware(request('/workspaces', `cd_at=${token}`));
     expect(response.headers.get('location')).toContain('/api/auth/refresh?next=');
   });
 
@@ -101,7 +101,13 @@ describe('middleware', () => {
     ]) {
       expect(regex.test(path)).toBe(false);
     }
-    for (const path of ['/', '/w', '/w/1/d/2', '/login', '/p/slug'])
+    for (const path of [
+      '/',
+      '/workspaces',
+      '/workspaces/1/documents/2',
+      '/login',
+      '/published/slug',
+    ])
       expect(regex.test(path)).toBe(true);
   });
 });

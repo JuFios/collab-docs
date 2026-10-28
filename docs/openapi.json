@@ -3006,7 +3006,7 @@
     },
     "/api/public/links/{token}": {
       "get": {
-        "description": "For `/e/<token>`. 404 for an unknown or replaced secret, 410 `LINK_EXPIRED` for an expired or revoked link and 410 `DOCUMENT_DELETED` for a deleted document.",
+        "description": "For `/edit-link/<token>`. 404 for an unknown or replaced secret, 410 `LINK_EXPIRED` for an expired or revoked link and 410 `DOCUMENT_DELETED` for a deleted document.",
         "operationId": "PublicController_editLink",
         "parameters": [
           {
@@ -5537,7 +5537,7 @@
           "slug": {
             "type": "object",
             "nullable": true,
-            "description": "VIEW links: the stable address /p/<slug>"
+            "description": "VIEW links: the stable address /published/<slug>"
           },
           "status": {
             "type": "string",
@@ -5578,7 +5578,7 @@
               "VIEW",
               "EDIT"
             ],
-            "description": "VIEW publishes the page at /p/<slug>; EDIT lets anyone with the secret URL edit the document as a guest"
+            "description": "VIEW publishes the page at /published/<slug>; EDIT lets anyone with the secret URL edit the document as a guest"
           },
           "expiresAt": {
             "type": "object",
@@ -5608,7 +5608,7 @@
           "slug": {
             "type": "object",
             "nullable": true,
-            "description": "VIEW links: the stable address /p/<slug>"
+            "description": "VIEW links: the stable address /published/<slug>"
           },
           "status": {
             "type": "string",
@@ -5632,7 +5632,7 @@
           "token": {
             "type": "object",
             "nullable": true,
-            "description": "EDIT links: the secret that goes into /e/<token>. Shown once, only its hash is stored."
+            "description": "EDIT links: the secret that goes into /edit-link/<token>. Shown once, only its hash is stored."
           },
           "flushed": {
             "type": "object",

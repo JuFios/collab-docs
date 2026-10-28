@@ -772,10 +772,10 @@ attachments; purging them is not done (see [Not done](#not-done)).
 A document can be shared outside the workspace in two ways, both through a row in `public_links` (one per
 document and mode, see [Data model](#data-model)):
 
-| Mode   | Address      | Grants                                                    | Identified by                                |
-| ------ | ------------ | --------------------------------------------------------- | -------------------------------------------- |
-| `VIEW` | `/p/<slug>`  | anonymous reading of the sanitised page (SSR/ISR)         | `slug`: title words and 6 hex digits, public |
-| `EDIT` | `/e/<token>` | `EDIT` on that one document, as a guest, without comments | a 256-bit secret; only its SHA-256 is stored |
+| Mode   | Address              | Grants                                                    | Identified by                                |
+| ------ | -------------------- | --------------------------------------------------------- | -------------------------------------------- |
+| `VIEW` | `/published/<slug>`  | anonymous reading of the sanitised page (SSR/ISR)         | `slug`: title words and 6 hex digits, public |
+| `EDIT` | `/edit-link/<token>` | `EDIT` on that one document, as a guest, without comments | a 256-bit secret; only its SHA-256 is stored |
 
 Both can have an optional expiry (at most five years ahead). Managing links needs `MANAGE`, or `EDIT` as the
 document's author, like sharing. Everything below is API; the pages that use it are described with the frontend.
@@ -788,7 +788,7 @@ document's author, like sharing. Everything below is API; the pages that use it 
 | `DELETE /documents/:id/public-links/:linkId` | revokes (`revoked_at`); revoking again is a no-op                                                                                                                           |
 | `GET /public/documents/:slug`                | `{title, description, content, updatedAt}`; **one `404`** for never published, unpublished, expired and deleted                                                             |
 | `GET /public/media/:attachmentId?slug=`      | `302` to a presigned URL (5 min) when the image belongs to the document the slug publishes                                                                                  |
-| `GET /public/links/:token`                   | state of an EDIT link for `/e/<token>`: `404` unknown or replaced, `410 LINK_EXPIRED` expired or revoked, `410 DOCUMENT_DELETED`                                            |
+| `GET /public/links/:token`                   | state of an EDIT link for `/edit-link/<token>`: `404` unknown or replaced, `410 LINK_EXPIRED` expired or revoked, `410 DOCUMENT_DELETED`                                    |
 | `POST /public/links/:token/ticket`           | collab ticket for a guest (`{docId, linkId}`, no user); **30 per minute per IP** (`RATE_GUEST_TICKET_PER_MIN_IP`)                                                           |
 
 **Life cycle of a link.** The `VIEW` slug is created once and never changes: unpublishing sets `revoked_at`,
@@ -844,7 +844,7 @@ flowchart LR
 - A failed call (network, timeout 5 s, non-2xx) throws and BullMQ retries with exponential backoff (5 attempts, 1 s
   base). Logs: `revalidate.sent` and `revalidate.failed` with the document, slug, reason and attempt. After the last
   attempt the page waits for its TTL. Enqueue failures are logged and counted, never raised to the editor.
-- A page whose state must change at once is checked after the invalidation: the job asks the web app for `/p/<slug>`
+- A page whose state must change at once is checked after the invalidation: the job asks the web app for `/published/<slug>`
   and fails, to be retried, unless the answer is 404 for a revoked, expired or deleted page, or 200 for a page that
   has just been published. Next writes a rendered page to its
   cache after it has answered, so a visit rendered just before the invalidation can store the old page after it and
@@ -861,7 +861,7 @@ different `expiresAt` and does nothing. The authority is always the database: `G
 `revoked_at` and `expires_at` on every request, so a failure of the job only delays the cleanup (page TTL, 60 s
 socket check).
 
-**Guests.** `/e/<token>` asks `GET /public/links/:token` and, for a live link, `POST …/ticket`. The ticket carries
+**Guests.** `/edit-link/<token>` asks `GET /public/links/:token` and, for a live link, `POST …/ticket`. The ticket carries
 `{docId, linkId}` and no user. Collab resolves the link from the database when the socket opens and on every
 re-evaluation, gives the guest `EDIT` (never comments), and names them `Guest 1`, `Guest 2`, … in the presence list
 in order of arrival. Revoking, replacing or expiring the link closes their sockets with `4403`.
@@ -879,7 +879,7 @@ whether a link is live are strongly consistent (read from Postgres on every requ
 for members only (a guest with a share gets `404`, like for every other workspace route), limited per user
 (`RATE_SEARCH_PER_MIN_USER`, 60 a minute by default) and returns
 `{ items: [{ id, title, snippet: [{ text, match }], updatedAt }], nextCursor }`, best match first. The web page is
-`/w/:id/search?q=`: a Server Component behind a plain GET form, snippets drawn as text and `<mark>` elements
+`/workspaces/[workspaceId]/search?q=`: a Server Component behind a plain GET form, snippets drawn as text and `<mark>` elements
 (never HTML), loading, empty and error states, and arrow-key navigation between the field and the results.
 
 **Why Postgres full-text search and not Meilisearch.** The data is already in Postgres, the volume is a few
@@ -1013,7 +1013,7 @@ the count or the list, which is where the access rules apply.
 id is never reused, unlike a per-document id). The worker renders the email when it runs, from the stored
 notification: a notification that was deleted meanwhile, or whose recipient lost access to the document, sends
 nothing. Names, title and excerpt are HTML-escaped in the HTML part and the subject cannot carry line breaks. It
-links to `/w/<workspace>/d/<document>?thread=<thread>`. SMTP failures retry with the queue's backoff; sending
+links to `/workspaces/<workspace>/documents/<document>?thread=<thread>`. SMTP failures retry with the queue's backoff; sending
 is at-least-once, so a crash between SMTP and the acknowledgement can repeat an email. There is no per-user "do
 not email me" setting. A job that could not be queued is logged (`mail.enqueue_failed`) and counted in
 `queue_enqueue_failures_total`; the notification itself is stored and listed regardless.
@@ -1162,11 +1162,11 @@ each one protects against and where its test is.
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | Authorisation on the object | every route resolves access from the database for the id it was given (no caching, see [Permission model](#permission-model)) | `apps/api/src/security/idor.int.spec.ts`            |
 | CSRF                        | `Origin` must equal `WEB_ORIGIN` for cookie-authenticated unsafe requests (`CSRF_REJECTED`, 403)                              | `e2e/tests/security.spec.ts`, auth suite            |
-| Content-Security-Policy     | one static policy for every page, see below                                                                                   | `apps/web/lib/security-headers.test.ts`, e2e        |
+| Content-Security-Policy     | one static policy for every page, see below                                                                                   | `apps/web/lib/security/headers.test.ts`, e2e        |
 | Sanitiser and escaping      | content is reduced to an allowlist before it is shown, emails escape what users wrote                                         | `apps/api/src/security/xss.int.spec.ts`             |
 | Injection guards            | no string-built SQL, no HTML sinks; lint rules plus a scan of the sources                                                     | `eslint.config.mjs`, `source-audit.spec.ts`         |
 | Rate limits                 | per address and per user, counted before the access check                                                                     | `apps/api/src/security/rate-limits.int.spec.ts`     |
-| Collab limits               | message rate, update size, document size, connections, awareness                                                              | `apps/collab/src/security.int.spec.ts`              |
+| Collab limits               | message rate, update size, document size, connections, awareness                                                              | `apps/collab/src/ws/security.int.spec.ts`           |
 | Dependencies and secrets    | `pnpm audit --prod` in CI, placeholders only in templates, redacted logs                                                      | CI job `audit`, `secrets.spec.ts`, `logger.test.ts` |
 
 ### Who may call what: the IDOR matrix
@@ -1184,7 +1184,7 @@ invite of another workspace used through a path of one's own) and expects 404 ev
 
 ### Content-Security-Policy and headers
 
-`next.config.ts` sends the same headers on every response (built in `lib/security-headers.ts`):
+`next.config.ts` sends the same headers on every response (built in `lib/security/headers.ts`):
 
 ```
 default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
@@ -1199,7 +1199,7 @@ middleware adds `Strict-Transport-Security` (browsers ignore it over plain HTTP)
 rewrite they are build arguments of the web image (compose passes them on).
 
 **Why not a nonce.** A nonce policy needs a fresh value in every response and in the `<script>` tags of that response,
-which makes each page dynamic. The published pages (`/p/[slug]`) are ISR: they are rendered once and served from the
+which makes each page dynamic. The published pages (`/published/[slug]`) are ISR: they are rendered once and served from the
 cache to everyone, and a per-request nonce would turn them back into server-rendered pages (the e2e suite checks that
 the second request is still an `x-nextjs-cache: HIT` and that the header carries no nonce). The price of the static
 policy is `'unsafe-inline'` for scripts, which Next's hydration data needs. What carries the weight instead: no
@@ -1268,7 +1268,7 @@ the access decorator on those routes (with a comment: the order is the behaviour
 | connections per document | 100                         | close `4429` for the extra one        |
 | awareness payload        | 4 KiB                       | dropped                               |
 
-`apps/collab/src/security.int.spec.ts` provokes each of them with raw sockets (the limits are lowered by the suite's
+`apps/collab/src/ws/security.int.spec.ts` provokes each of them with raw sockets (the limits are lowered by the suite's
 environment), and checks that presence cannot be spoken for another client or carry an identity the server did
 not assign, that every close reason is one of a fixed list of texts (no parser or JWT message ever reaches a client),
 and that a socket without write access, fed hundreds of valid and mutated sync, step-2 and awareness frames, changes
@@ -1339,7 +1339,7 @@ Server Component is the default: anything that reads data and needs no browser s
 | `components/content/content-renderer.tsx` (not a client component)                                          | Stateless render of sanitised JSON; usable from a Server Component (the public page) and from the version preview                            |
 | `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                               |
 | `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                                           |
-| `app/(app)/w/[id]/error.tsx`                                                                                | Error boundary of the workspace segment (keeps the navbar and workspace header)                                                              |
+| `app/(app)/workspaces/[workspaceId]/error.tsx`                                                              | Error boundary of the workspace segment (keeps the navbar and workspace header)                                                              |
 | `components/billing/checkout-button.tsx`, `cancel-subscription-button.tsx`, `use-action-runner.ts`          | Buttons call Server Actions from event handlers (a plain `<form>` has nothing to submit), then navigate through `useActionFeedback`          |
 | `components/billing/awaiting-confirmation.tsx`                                                              | The only waiting piece of the flow: asks the server for a fresh render every 1.5 s, at most 30 times, until the webhook has changed the plan |
 | `components/billing/plan-limit-dialog.tsx`                                                                  | Listens to the plan-limit window event, so it needs the browser; reads the member's role from the workspace context                          |
@@ -1349,21 +1349,21 @@ Server Component is the default: anything that reads data and needs no browser s
 
 Screens and where they render (everything not listed as a client island is a Server Component):
 
-| Screen                       | Renders in                                  | Why                                                                                                                                                                                                                                                           |
-| ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/w`                         | RSC page + client create form               | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
-| `/w/[id]` (dashboard)        | RSC, four async RSC blocks                  | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
-| `/w/[id]/settings`           | RSC page + client forms/tables              | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
-| `/w/[id]/billing`            | RSC page + client buttons                   | Plan, usage, plans and invoices are read on the server (admin-only); upgrade and cancel are Server Actions; one small island polls while a webhook is pending                                                                                                 |
-| `/mock-checkout/[sessionId]` | RSC page + client buttons                   | A public route like a hosted checkout; the session is read with `cache: 'no-store'`, the buttons are Server Actions                                                                                                                                           |
-| `/invite/[token]`            | RSC                                         | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
-| `/w/[id]/d/[docId]`          | RSC page + client shell and editor          | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
-| `/w/[id]/trash`              | RSC page + client list                      | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
-| `/notifications`             | RSC page + client list                      | The first page is read on the server and seeds the client query (`initialData`); from there the list is live (the stream, the bell and window focus refresh it) and pages in with a cursor                                                                    |
-| `/shared`                    | RSC                                         | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
-| Navbar                       | RSC shell + switcher/bell/user-menu islands | The workspace list and the unread count are fetched in the layout and passed down as typed props (the bell asks again itself if the count could not be loaded)                                                                                                |
+| Screen                                             | Renders in                                  | Why                                                                                                                                                                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/workspaces`                                      | RSC page + client create form               | The list is a plain read; the form needs pending state and field errors. Redirects to the last opened workspace (`cd_ws` cookie, set by the middleware) unless `?all` is present                                                                              |
+| `/workspaces/[workspaceId]` (dashboard)            | RSC, four async RSC blocks                  | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
+| `/workspaces/[workspaceId]/settings`               | RSC page + client forms/tables              | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
+| `/workspaces/[workspaceId]/billing`                | RSC page + client buttons                   | Plan, usage, plans and invoices are read on the server (admin-only); upgrade and cancel are Server Actions; one small island polls while a webhook is pending                                                                                                 |
+| `/mock-checkout/[sessionId]`                       | RSC page + client buttons                   | A public route like a hosted checkout; the session is read with `cache: 'no-store'`, the buttons are Server Actions                                                                                                                                           |
+| `/invite/[token]`                                  | RSC                                         | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
+| `/workspaces/[workspaceId]/documents/[documentId]` | RSC page + client shell and editor          | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
+| `/workspaces/[workspaceId]/trash`                  | RSC page + client list                      | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
+| `/notifications`                                   | RSC page + client list                      | The first page is read on the server and seeds the client query (`initialData`); from there the list is live (the stream, the bell and window focus refresh it) and pages in with a cursor                                                                    |
+| `/shared`                                          | RSC                                         | Documents shared with the caller in any workspace; a guest opens one without the workspace frame                                                                                                                                                              |
+| Navbar                                             | RSC shell + switcher/bell/user-menu islands | The workspace list and the unread count are fetched in the layout and passed down as typed props (the bell asks again itself if the count could not be loaded)                                                                                                |
 
-**Dashboard streaming.** `app/(app)/w/[id]/page.tsx` awaits nothing but the workspace the layout already loaded
+**Dashboard streaming.** `app/(app)/workspaces/[workspaceId]/page.tsx` awaits nothing but the workspace the layout already loaded
 (deduplicated by `React.cache`). The blocks (`components/dashboard/blocks.tsx`: recent documents, members,
 plan and usage, shared with me) are async Server Components under their own `<Suspense>`, so a slow or failing
 block never holds back the others. The e2e suite asserts this on the raw response: with
@@ -1372,7 +1372,7 @@ the data, and the data arrives later in the same response.
 
 ### Document tree and live updates
 
-The sidebar of every `/w/[id]/…` page is a Client Component fed by a Server Component: the layout fetches the flat
+The sidebar of every `/workspaces/[workspaceId]/…` page is a Client Component fed by a Server Component: the layout fetches the flat
 tree (`GET /workspaces/:id/documents/tree`) next to the workspace and passes it as `initialData` of the TanStack
 Query that owns it, so the first paint already has the tree and no skeleton flashes. If only that fetch fails,
 the sidebar loads the tree itself (skeleton, then a retry button). Everything else is the same query: the
@@ -1412,7 +1412,7 @@ document page reads breadcrumbs from it, and mutations update it.
 - **Deleted and unavailable documents.** The api answers 404 for both. A member's trash lists what they may
   restore, so the document page and the open shell look the id up there: found means "This document was
   deleted" with Restore, otherwise "no longer available". A guest (a user with a share but no membership)
-  opens `/w/[id]/d/[docId]` without the workspace frame: the layout renders its children bare when the user is
+  opens `/workspaces/[workspaceId]/documents/[documentId]` without the workspace frame: the layout renders its children bare when the user is
   not a member, and every other page of the segment answers 404 through `requireWorkspace`.
 
 ### Editor & real-time client
@@ -1531,7 +1531,7 @@ is displayed literally; a unit test and an e2e test pin that down.
   unconfirmed thread has an id starting with `pending:` and cannot be replied to. If the api refuses a comment the
   cache is rolled back and the composer gets its text back, so nothing typed is lost. Mentions the api dropped
   (the person cannot open the document) come back as `warnings` and are reported in a toast.
-- **Links.** `/w/:ws/d/:doc?thread=:id` (in notifications and emails) is read by the document page on the server
+- **Links.** `/workspaces/:workspaceId/documents/:documentId?thread=:id` (in notifications and emails) is read by the document page on the server
   (validated as a uuid) and handed to the shell, which opens the panel, selects the thread and scrolls to its
   block once the editor is ready. A thread written after the page loaded is looked for with one extra fetch before
   the page says it is gone.
@@ -1542,7 +1542,7 @@ is displayed literally; a unit test and an e2e test pin that down.
 - **Bell and list.** The unread count is read in the app layout and passed to the bell as `initialData`, so the
   badge is right in the first paint. A `notification.created` event arrives on the workspace stream that
   `WorkspaceProvider` already owns (there is no second connection): the provider refreshes the badge and any list
-  on screen and shows a toast with the author, the document and an Open action. Outside a workspace (`/w`,
+  on screen and shows a toast with the author, the document and an Open action. Outside a workspace (`/workspaces`,
   `/shared`, `/notifications`) no stream is open, because the api requires a workspace for it; there the badge is
   refreshed when the window gets focus and by a 60-second poll, which also covers anything the stream missed. The
   menu shows the newest eight; `/notifications` pages through all of them with the api's cursor. Using a
@@ -1554,7 +1554,7 @@ focus, reopening the panel, or any action of your own), and per-user notificatio
 
 ### Billing UX
 
-**Pages.** `/w/[id]/billing` (admin and owner; everyone else gets `ForbiddenState`) is a Server Component. It shows
+**Pages.** `/workspaces/[workspaceId]/billing` (admin and owner; everyone else gets `ForbiddenState`) is a Server Component. It shows
 the current plan and the end of the paid period, the usage as three meters (amber from 80%, red at the limit,
 no bar for an unlimited figure), the three plans side by side and the invoices. The plan catalogue comes from
 `@collab-docs/shared`, the same table the api enforces, so the numbers on the cards cannot drift from the limits.
@@ -1573,7 +1573,7 @@ webhook on screen, is a development aid and is not offered when `APP_ENV=staging
 
 **Waiting for the webhook.** The provider answers at once, but the plan changes when the webhook has been applied,
 which goes through two queues and takes a few seconds (longer while a delivery is being retried). The user comes back to
-`/w/[id]/billing?awaiting=PRO`; a small client island calls `router.refresh()` every 1.5 s, at most 30 times, until
+`/workspaces/[workspaceId]/billing?awaiting=PRO`; a small client island calls `router.refresh()` every 1.5 s, at most 30 times, until
 the server renders the expected plan, then toasts and removes the query string. After that it stops and offers
 "Check again" instead of polling forever. Cancelling works the same way, waiting for `FREE`. A declined payment
 comes back as `?payment=declined` and needs no waiting: nothing changes.
@@ -1610,7 +1610,7 @@ data cache to purge; what a mutation needs is a fresh render of the current page
 React 19.2) forms that did so intermittently stayed pending or never showed the result, with or without the nginx
 proxy in front. Two things were measured: a `loading.tsx` above the workspace layouts made it much worse (6 of 16
 submits of the invite form stalled, against 0 of 78 once the skeletons were scoped to their own segments, which
-is why the list skeleton lives in the `app/(app)/w/(list)` route group), but revalidating actions still flaked
+is why the list skeleton lives in the `app/(app)/workspaces/(list)` route group), but revalidating actions still flaked
 in the parallel e2e run (create and rename, 2 of 4 runs). So an action only returns data (`ActionState`, including
 `redirectTo` after creating a workspace or accepting an invite) and the component finishes the job in
 `useActionFeedback`: toast, `router.push` when asked, and `router.refresh()`, a separate GET that also re-renders the
@@ -1619,8 +1619,8 @@ select, remove, revoke) refresh the same way. The root cause inside Next/React i
 
 Route groups keep the rendering mode of each area separate:
 
-- `app/(public)` — landing, `/login`, `/register`, `/invite/[token]` (later `/p/[slug]`, `/e/[token]`).
-- `app/(app)` — everything behind a session (`/w`, `/w/[id]`, `/w/[id]/settings`, later documents and billing).
+- `app/(public)` — landing, `/login`, `/register`, `/invite/[token]` (later `/published/[slug]`, `/edit-link/[token]`).
+- `app/(app)` — everything behind a session (`/workspaces`, `/workspaces/[workspaceId]`, `/workspaces/[workspaceId]/settings`, later documents and billing).
 - The root `app/layout.tsx` is static: it never calls `cookies()` or `headers()`. Only `(app)/layout.tsx`
   reads the session, so public pages stay statically renderable (the build output marks `/` as static).
 
@@ -1721,7 +1721,7 @@ same time, with one of them offline and with both offline; publishing blocked wh
 changes; a document deleted while it is open; the plan limit, the upgrade and a webhook delivered twice; search
 that respects access; a mention that reaches its addressee; and the error state of every panel that reads its own
 data (`states.spec.ts`). The same two-client scenarios run without a browser in
-`apps/collab/src/collab.int.spec.ts` (two `y-websocket` clients, a duplicated update, both clients disconnected).
+`apps/collab/src/ws/collab.int.spec.ts` (two `y-websocket` clients, a duplicated update, both clients disconnected).
 `apps/web/app/route-states.test.ts` fails when a page is added without a loading state or an error boundary.
 
 Streaming leaves a hidden copy of a boundary's content in the DOM until React reveals it, and a strict
@@ -1731,7 +1731,7 @@ retrying. Specs therefore use role-based locators (hidden elements are excluded)
 
 ### Public pages: why ISR + on-demand revalidation
 
-`/p/<slug>` is a page that many people may open and that changes rarely, so it is rendered once and served from
+`/published/<slug>` is a page that many people may open and that changes rarely, so it is rendered once and served from
 Next's cache (incremental static regeneration) instead of on every visit. Three alternatives were weighed:
 
 | Option                             | Why not                                                                                                                                 |
@@ -1743,7 +1743,7 @@ Next's cache (incremental static regeneration) instead of on every visit. Three 
 
 How it fits together:
 
-- **Route.** `app/(public)/p/[slug]/page.tsx` is made of Server Components only and reads no `cookies()` or
+- **Route.** `app/(public)/published/[slug]/page.tsx` is made of Server Components only and reads no `cookies()` or
   `headers()`; either would turn the route dynamic and the cache would be gone. `revalidate = 3600` and an empty
   `generateStaticParams` make every slug render on first visit and then be cached. The data comes from
   `GET /public/documents/:slug` through the anonymous client `lib/api/public.ts`, with the cache tag `pub:<slug>`
@@ -1763,9 +1763,9 @@ How it fits together:
   redirects, so a visitor never needs an account or a storage address.
 - **Cost for the reader.** Client providers (TanStack Query, the toaster) live in the layouts of the route groups
   that need them, not in the root layout, so the published page downloads React and Next and nothing else.
-  `pnpm --filter @collab-docs/web check:bundle` (a CI job) reads the build output and fails if `/p/[slug]` stops
+  `pnpm --filter @collab-docs/web check:bundle` (a CI job) reads the build output and fails if `/published/[slug]` stops
   being ISR-capable or if the editor, Yjs or the query client appear in its JavaScript.
-- **Edit links** (`/e/<token>`) are the opposite case: personal, never cached, not indexed, `Referrer-Policy:
+- **Edit links** (`/edit-link/<token>`) are the opposite case: personal, never cached, not indexed, `Referrer-Policy:
 no-referrer`. The server shell checks the link and shows the expired, replaced or deleted state; the editor is the
   one from the app, with a ticket issued for the link, and without images (the attachments api needs a signed-in
   user).

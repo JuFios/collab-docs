@@ -3,7 +3,7 @@ import type { NotificationResponse } from '@collab-docs/shared';
 /** Where a notification leads: the document, with the thread opened (`?thread=` is read by the document page). */
 export function notificationHref({ payload }: Pick<NotificationResponse, 'payload'>): string {
   const { workspaceId, documentId, threadId } = payload;
-  return `/w/${workspaceId}/d/${documentId}?thread=${threadId}`;
+  return `/workspaces/${workspaceId}/documents/${documentId}?thread=${threadId}`;
 }
 
 export function notificationTitle({ payload }: Pick<NotificationResponse, 'payload'>): string {

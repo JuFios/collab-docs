@@ -14,7 +14,7 @@ export function WorkspaceSidebar() {
   const { workspaceId } = useWorkspace();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const trashHref = `/w/${workspaceId}/trash`;
+  const trashHref = `/workspaces/${workspaceId}/trash`;
 
   return (
     <aside aria-label="Workspace navigation" className="min-w-0">
