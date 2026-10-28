@@ -337,6 +337,24 @@ describe('collab security', () => {
       }
     });
 
+    it('answers a malformed path with 4404 instead of rejecting in the background', async () => {
+      const rejections: unknown[] = [];
+      const onRejection = (reason: unknown) => void rejections.push(reason);
+      process.on('unhandledRejection', onRejection);
+      try {
+        const socket = new RawSocket(`${collab.wsUrl}/%`);
+        sockets.push(socket);
+        await waitFor(() => socket.closed !== null, 'the refusal');
+        expect(socket.closed).toEqual({
+          code: COLLAB_CLOSE.notFound,
+          reason: 'document not found',
+        });
+        expect(rejections).toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onRejection);
+      }
+    });
+
     it('stay free of error details when the client sends garbage', async () => {
       const { editor, documentId } = await setup();
       const socket = await open(documentId, { sub: editor.id });
