@@ -50,7 +50,7 @@ function setup(initial: Access = 'EDIT') {
     { accessChanged: jest.fn() } as unknown as CollabMetrics,
     { warn: jest.fn() } as unknown as PinoLogger,
   );
-  return { reevaluator, access, level, setAccess, kick, conn };
+  return { reevaluator, access, level, setAccess, kick, conn, session };
 }
 
 describe('AccessReevaluator', () => {
@@ -62,9 +62,9 @@ describe('AccessReevaluator', () => {
 
     const first = reevaluator.reevaluate({});
     const second = reevaluator.reevaluate({});
-    fresh.resolve({ status: 'ok', access: 'VIEW', workspaceId: 'workspace-1' });
+    fresh.resolve({ status: 'ok', access: 'VIEW', workspaceId: 'workspace-1', expiresAt: null });
     await second;
-    stale.resolve({ status: 'ok', access: 'EDIT', workspaceId: 'workspace-1' });
+    stale.resolve({ status: 'ok', access: 'EDIT', workspaceId: 'workspace-1', expiresAt: null });
     await first;
 
     expect(level()).toBe('VIEW');
@@ -79,12 +79,62 @@ describe('AccessReevaluator', () => {
 
     const first = reevaluator.reevaluate({});
     const second = reevaluator.reevaluate({});
-    fresh.resolve({ status: 'ok', access: 'EDIT', workspaceId: 'workspace-1' });
+    fresh.resolve({ status: 'ok', access: 'EDIT', workspaceId: 'workspace-1', expiresAt: null });
     await second;
     stale.resolve({ status: 'forbidden' });
     await first;
 
     expect(level()).toBe('EDIT');
     expect(kick).not.toHaveBeenCalled();
+  });
+
+  describe('guest expiry', () => {
+    beforeEach(() => jest.useFakeTimers({ now: new Date('2030-01-01T00:00:00Z') }));
+    afterEach(() => jest.useRealTimers());
+
+    const flush = () => Promise.resolve().then(() => Promise.resolve());
+
+    it('checks the guest again when the link expires, and closes the socket if it no longer works', async () => {
+      const { reevaluator, access, kick, session } = setup();
+      access.resolve.mockResolvedValue({ status: 'forbidden' });
+
+      reevaluator.watchExpiry(session, Date.now() + 10_000);
+      await jest.advanceTimersByTimeAsync(9_999);
+      expect(access.resolve).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(10);
+      await flush();
+      expect(access.resolve).toHaveBeenCalledTimes(1);
+      expect(kick).toHaveBeenCalledTimes(1);
+    });
+
+    it('follows a link whose expiry was moved: the newer answer replaces the timer', async () => {
+      const { reevaluator, access, kick, session } = setup();
+      access.resolve.mockResolvedValue({ status: 'forbidden' });
+
+      reevaluator.watchExpiry(session, Date.now() + 10_000);
+      reevaluator.watchExpiry(session, Date.now() + 60_000);
+      await jest.advanceTimersByTimeAsync(30_000);
+      expect(access.resolve).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(31_000);
+      await flush();
+      expect(kick).toHaveBeenCalledTimes(1);
+    });
+
+    it('sets no timer for a link without an expiry, and removes the old one', async () => {
+      const { reevaluator, access, session } = setup();
+      reevaluator.watchExpiry(session, Date.now() + 10_000);
+      reevaluator.watchExpiry(session, null);
+      expect(session.expiryTimer).toBeUndefined();
+      await jest.advanceTimersByTimeAsync(20_000);
+      expect(access.resolve).not.toHaveBeenCalled();
+    });
+
+    it('leaves an expiry too far away for setTimeout to the periodic check', () => {
+      const { reevaluator, session } = setup();
+      reevaluator.watchExpiry(session, Date.now() + 2 ** 31 + 1000);
+      expect(session.expiryTimer).toBeUndefined();
+    });
   });
 });

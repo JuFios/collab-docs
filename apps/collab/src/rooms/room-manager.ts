@@ -14,6 +14,8 @@ export interface Session {
   readonly documentId: string;
   readonly identity: Identity;
   workspaceId: string;
+  /** Fires when a guest's link expires; owned by the access re-evaluator, cleared when the connection leaves. */
+  expiryTimer?: NodeJS.Timeout;
 }
 
 interface Entry {
@@ -111,6 +113,7 @@ export class RoomManager implements BeforeApplicationShutdown {
     const session = this.sessions.get(conn.id);
     if (!session) return;
     this.sessions.delete(conn.id);
+    clearTimeout(session.expiryTimer);
     session.room.disconnect(conn);
   }
 

@@ -10,6 +10,7 @@ import {
   InjectPinoLogger,
   PinoLogger,
 } from '@collab-docs/nest';
+import { AccessReevaluator } from '../access/access-reevaluator.service';
 import { AccessService, type Identity } from '../access/access.service';
 import { CollabMetrics } from '../metrics/collab-metrics.service';
 import type { DocRoom } from '../rooms/doc-room';
@@ -42,6 +43,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
   constructor(
     private readonly config: ConfigService<AppConfig, true>,
     private readonly access: AccessService,
+    private readonly reevaluator: AccessReevaluator,
     private readonly rooms: RoomManager,
     private readonly metrics: CollabMetrics,
     @InjectPinoLogger(ConnectionService.name) private readonly logger: PinoLogger,
@@ -180,7 +182,9 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
       );
       if (!room.connect(conn, latest.access)) return;
       state.conn = conn;
-      this.rooms.attach({ conn, room, documentId, identity, workspaceId: latest.workspaceId });
+      const session = { conn, room, documentId, identity, workspaceId: latest.workspaceId };
+      this.rooms.attach(session);
+      this.reevaluator.watchExpiry(session, latest.expiresAt);
       log.info(
         { event: 'collab.connected', connectionId: conn.id, access: latest.access },
         'collab connected',

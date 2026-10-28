@@ -7,11 +7,16 @@ import { type Session, RoomManager } from '../rooms/room-manager';
 import { AccessService } from './access.service';
 
 const BATCH_SIZE = 25;
+/** The longest delay `setTimeout` accepts; a link that expires later is picked up by a later periodic check. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+/** Node can fire a timer a millisecond early; the check compares with the clock, so it must not run before it. */
+const EXPIRY_MARGIN_MS = 5;
 
 /**
  * Applies changed permissions to open sockets: read-only on a downgrade, upgraded again on a grant, closed
- * (4403/4404/4410) when access is gone. Triggered by Redis events and by a timer that is the safety net for
- * lost events and the only thing that notices an expired guest link.
+ * (4403/4404/4410) when access is gone. Triggered by Redis events, by a timer that is the safety net for lost
+ * events and, for a guest, by a timer set for the moment their link expires, so that the cut-off does not wait for
+ * the next periodic check.
  */
 @Injectable()
 export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
@@ -39,6 +44,20 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
     if (this.timer) clearInterval(this.timer);
   }
 
+  /**
+   * Makes sure a guest is checked again at the moment their link expires. Call it with every answer that carries
+   * `expiresAt`; a later answer replaces the timer, so a link whose expiry was moved is followed.
+   */
+  watchExpiry(session: Session, expiresAt: number | null): void {
+    clearTimeout(session.expiryTimer);
+    session.expiryTimer = undefined;
+    if (expiresAt === null) return;
+    const delay = Math.max(0, expiresAt - Date.now()) + EXPIRY_MARGIN_MS;
+    if (delay > MAX_TIMER_MS) return;
+    session.expiryTimer = setTimeout(() => void this.check(session), delay);
+    session.expiryTimer.unref();
+  }
+
   /** Re-reads the permissions of every open socket matching `filter` (all of them for `{}`). */
   async reevaluate(filter: {
     documentIds?: readonly string[];
@@ -62,6 +81,7 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
       switch (outcome.status) {
         case 'ok': {
           session.workspaceId = outcome.workspaceId;
+          this.watchExpiry(session, outcome.expiresAt);
           const before = room.accessOf(conn);
           room.setAccess(conn, outcome.access);
           this.metrics.accessChanged(
