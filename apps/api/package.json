@@ -45,7 +45,6 @@
     "@nestjs/testing": "^11.2.7",
     "@swc/core": "1.16.20",
     "@swc/jest": "0.2.39",
-    "@types/cookie-parser": "1.4.10",
     "@types/express": "5.0.6",
     "@types/jest": "^30.0.0",
     "@types/nodemailer": "8.0.2",

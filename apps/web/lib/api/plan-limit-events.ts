@@ -1,5 +1,5 @@
 /** Raised when a mutation fails with `PLAN_LIMIT_EXCEEDED`; the upgrade dialog (billing UI) subscribes to it. */
-export const PLAN_LIMIT_EVENT = 'collab-docs:plan-limit-exceeded';
+const PLAN_LIMIT_EVENT = 'collab-docs:plan-limit-exceeded';
 
 export interface PlanLimitDetail {
   message: string;

@@ -1,4 +1,4 @@
-export interface ParsedCookie {
+interface ParsedCookie {
   name: string;
   value: string;
   httpOnly?: boolean;

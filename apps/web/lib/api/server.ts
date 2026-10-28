@@ -3,14 +3,14 @@ import type { z } from 'zod';
 import { apiInternalUrl, webOrigin } from '../env';
 import { readJson, safeFetch } from './fetch-json';
 
-export interface ServerRequestInit<T> {
+interface ServerRequestInit<T> {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   schema?: z.ZodType<T>;
 }
 
 /** Headers every server-side call to the api carries: the user's cookies, client IP and correlation id. */
-export async function serverHeaders(): Promise<Headers> {
+async function serverHeaders(): Promise<Headers> {
   const [cookieStore, incoming] = await Promise.all([cookies(), headers()]);
   const out = new Headers({
     'x-correlation-id': incoming.get('x-correlation-id') ?? crypto.randomUUID(),

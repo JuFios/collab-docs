@@ -13,11 +13,11 @@ import {
 } from 'rxjs';
 import type { RealtimeEnvelope } from '@collab-docs/shared';
 
-export const HEARTBEAT_MS = 25_000;
+const HEARTBEAT_MS = 25_000;
 /** How long the browser waits before it reconnects a dropped stream. */
-export const RECONNECT_MS = 3_000;
+const RECONNECT_MS = 3_000;
 
-export interface EventStreamSource {
+interface EventStreamSource {
   envelopes: Observable<RealtimeEnvelope>;
   /** Whether the caller still belongs to the workspace; asked on every heartbeat. */
   isMember: () => Promise<boolean>;

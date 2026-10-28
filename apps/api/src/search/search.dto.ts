@@ -65,12 +65,12 @@ export class SearchQueryDto {
   cursor?: string;
 }
 
-export class SnippetPartResponse {
+class SnippetPartResponse {
   @ApiProperty() text!: string;
   @ApiProperty({ description: 'The part matches the query (to be highlighted)' }) match!: boolean;
 }
 
-export class SearchResultResponse {
+class SearchResultResponse {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() title!: string;
   @ApiProperty({ type: [SnippetPartResponse], description: 'Plain text parts, never markup' })

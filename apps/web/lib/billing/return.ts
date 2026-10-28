@@ -5,7 +5,7 @@ import { type PlanTier, planTierSchema } from '@collab-docs/shared';
  * asked to cancel): the plan the webhook is about to set, or a declined payment. The plan only changes when the
  * webhook has been applied, which takes a few seconds after the provider has answered.
  */
-export interface BillingReturn {
+interface BillingReturn {
   awaiting?: PlanTier;
   declined?: boolean;
 }

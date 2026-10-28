@@ -1,7 +1,7 @@
 import { escapeHtml, oneLine } from './html';
 import type { RenderedEmail } from './invite-email';
 
-export interface MentionEmailData {
+interface MentionEmailData {
   actorName: string;
   documentTitle: string;
   /** Plain text start of the comment. */

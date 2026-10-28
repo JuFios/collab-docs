@@ -21,7 +21,7 @@ class CreateThingDto {
 
 @Public()
 @Controller('test')
-export class TestController {
+class TestController {
   @Get('ok')
   ok(): { ok: true } {
     return { ok: true };

@@ -135,8 +135,8 @@ export class TreeNodeResponse {
   @ApiProperty({ enum: ACCESS_LEVELS }) myAccess!: (typeof ACCESS_LEVELS)[number];
 }
 
-export const RECENT_DEFAULT_LIMIT = 8;
-export const RECENT_MAX_LIMIT = 20;
+const RECENT_DEFAULT_LIMIT = 8;
+const RECENT_MAX_LIMIT = 20;
 
 export class RecentDocumentsQueryDto {
   @ApiPropertyOptional({

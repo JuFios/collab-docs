@@ -113,7 +113,7 @@ class MentionActorResponse {
   @ApiProperty() name!: string;
 }
 
-export class NotificationPayloadResponse {
+class NotificationPayloadResponse {
   @ApiProperty({ format: 'uuid' }) workspaceId!: string;
   @ApiProperty({ format: 'uuid' }) documentId!: string;
   @ApiProperty({ description: 'The title when the notification was created' })
@@ -124,7 +124,7 @@ export class NotificationPayloadResponse {
   @ApiProperty({ description: 'Start of the comment as plain text (never HTML)' }) excerpt!: string;
 }
 
-export class NotificationResponse {
+class NotificationResponse {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ enum: NOTIFICATION_TYPES }) type!: (typeof NOTIFICATION_TYPES)[number];
   @ApiProperty({ type: NotificationPayloadResponse }) payload!: NotificationPayloadResponse;

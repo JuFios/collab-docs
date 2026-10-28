@@ -15,7 +15,7 @@ import { CodeBlockWithLanguage } from './code-block-extension';
 import { ImageBlock } from './image-extension';
 import { SlashCommand } from './slash-command';
 
-export interface EditorExtensionOptions {
+interface EditorExtensionOptions {
   ydoc: Y.Doc;
   provider: WebsocketProvider;
   /** Omitted where images cannot be uploaded (guests): the slash menu then has no Image entry. */

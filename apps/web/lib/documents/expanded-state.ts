@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const keyOf = (workspaceId: string) => `cd:tree-expanded:${workspaceId}`;
 
-export function readExpanded(workspaceId: string): string[] {
+function readExpanded(workspaceId: string): string[] {
   try {
     const raw = window.localStorage.getItem(keyOf(workspaceId));
     const parsed: unknown = raw ? JSON.parse(raw) : [];

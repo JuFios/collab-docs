@@ -22,7 +22,7 @@ export interface Viewer {
   name: string;
 }
 
-export const threadsKey = (documentId: string) => ['threads', documentId] as const;
+const threadsKey = (documentId: string) => ['threads', documentId] as const;
 const mentionableKey = (documentId: string, q: string) => ['mentionable', documentId, q] as const;
 
 /** Every thread of the document, open and resolved; the panel filters, so toggling the filter is instant. */

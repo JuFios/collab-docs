@@ -162,9 +162,6 @@ importers:
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.16.20)
-      '@types/cookie-parser':
-        specifier: 1.4.10
-        version: 1.4.10(@types/express@5.0.6)
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -271,9 +268,6 @@ importers:
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.16.20)
-      '@types/express':
-        specifier: 5.0.6
-        version: 5.0.6
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
@@ -462,9 +456,6 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
-      dotenv:
-        specifier: 18.0.9
-        version: 18.0.9
       jest:
         specifier: 30.5.2
         version: 30.5.2(@types/node@22.20.5)
@@ -556,9 +547,6 @@ importers:
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
-      '@types/supertest':
-        specifier: 7.2.1
-        version: 7.2.1
       '@vitest/coverage-v8':
         specifier: 4.1.12
         version: 4.1.12(vitest@4.1.12)
@@ -568,9 +556,6 @@ importers:
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
-      supertest:
-        specifier: 7.3.1
-        version: 7.3.1
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -586,9 +571,6 @@ importers:
       jose:
         specifier: 6.2.13
         version: 6.2.13
-      lib0:
-        specifier: 0.2.119
-        version: 0.2.119
       prosemirror-model:
         specifier: 1.25.12
         version: 1.25.12
@@ -4752,11 +4734,6 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
-
-  dotenv@18.0.9:
-    resolution: {integrity: sha512-3fVOW4cB02R066PUSwn8O4TJyz9NckQl7F81blIbaq9jKBm2tSmOKky7ZHIXzGvkVPXCSn6jkpziBPZdGFs8Tw==}
-    engines: {node: '>=12'}
-    hasBin: true
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -11780,8 +11757,6 @@ snapshots:
   dotenv@17.4.1: {}
 
   dotenv@17.4.2: {}
-
-  dotenv@18.0.9: {}
 
   dunder-proto@1.0.1:
     dependencies:

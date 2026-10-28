@@ -9,7 +9,7 @@ import type { DocRoom, RoomConnection } from '../rooms/doc-room';
 let counter = 0;
 const live = new Set<TestClient>();
 
-export interface TestClientOptions {
+interface TestClientOptions {
   userId?: string | null;
   name?: string;
   color?: string;

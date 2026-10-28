@@ -41,7 +41,7 @@ const present = (row: AttachmentRow): Attachment => ({
 const unprocessable = (reason: string, message: string) =>
   new AppException('VALIDATION_FAILED', message, { status: 422, details: { reason } });
 
-export const attachmentKey = (workspaceId: string, documentId: string): string =>
+const attachmentKey = (workspaceId: string, documentId: string): string =>
   `ws/${workspaceId}/doc/${documentId}/${randomUUID()}`;
 
 /**

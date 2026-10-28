@@ -16,7 +16,7 @@ export interface CollabError {
 }
 
 /** What to do about a WebSocket close or a failed ticket request. */
-export type RecoveryDecision =
+type RecoveryDecision =
   | { action: 'stop'; error: CollabError }
   /** The ticket is no longer valid: fetch a fresh one and connect again. */
   | { action: 'new-ticket' }

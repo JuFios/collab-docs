@@ -21,7 +21,7 @@ interface PlanChange {
   checkoutSessionId?: string;
 }
 
-export type EventOutcome =
+type EventOutcome =
   | { result: 'applied'; change?: PlanChange }
   | { result: 'ignored'; reason: string }
   | { result: 'already_processed' }

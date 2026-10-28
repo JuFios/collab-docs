@@ -38,14 +38,14 @@ export class CheckoutStartedResponse implements CheckoutStarted {
   checkoutUrl!: string;
 }
 
-export class InvoiceResponse implements InvoiceInfo {
+class InvoiceResponse implements InvoiceInfo {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ enum: PLAN_TIERS }) plan!: PlanTier;
   @ApiProperty({ description: 'US cents' }) amountCents!: number;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
 }
 
-export class UsageFigureResponse implements UsageFigure {
+class UsageFigureResponse implements UsageFigure {
   @ApiProperty({ enum: ['members', 'documents', 'storage'] }) kind!: LimitKind;
   @ApiProperty({ description: 'Bytes for storage' }) current!: number;
   @ApiProperty({ nullable: true, type: Number, description: 'null = unlimited' })

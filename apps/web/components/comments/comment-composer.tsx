@@ -25,7 +25,7 @@ import {
 import { useMentionable } from '@/lib/comments/queries';
 import { cn } from '@/lib/utils';
 
-export interface ComposerValue {
+interface ComposerValue {
   /** The body as the api stores it: names picked from the autocomplete are `@[user id]` tokens. */
   body: string;
   mentions: PickedMention[];

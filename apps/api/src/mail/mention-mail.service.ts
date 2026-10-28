@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from './mailer.service';
 import { renderMentionEmail } from './mention-email';
 
-export type MentionMailOutcome = 'sent' | 'skipped';
+type MentionMailOutcome = 'sent' | 'skipped';
 
 /**
  * Sends the email of a mention notification. Everything is read when the job runs: a notification that was

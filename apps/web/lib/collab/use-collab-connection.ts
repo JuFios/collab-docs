@@ -30,18 +30,18 @@ import {
  */
 export type CollabStatus = 'connecting' | 'connected' | 'disconnected' | 'closed';
 
-export interface DowngradeNotice {
+interface DowngradeNotice {
   /** Local edits the server had not stored and that were dropped with the old `Y.Doc`. */
   discardedChanges: boolean;
 }
 
-export interface CollabConnectionOptions {
+interface CollabConnectionOptions {
   onDowngrade?: (notice: DowngradeNotice) => void;
   /** Where a ticket comes from; the default is the signed-in user's `collab-ticket`. Guests pass their link's. */
   fetchTicket?: (signal: AbortSignal) => Promise<CollabTicket>;
 }
 
-export interface CollabConnection {
+interface CollabConnection {
   /** Null until the first ticket arrived; both are replaced together when the session is recreated. */
   ydoc: Y.Doc | null;
   provider: WebsocketProvider | null;

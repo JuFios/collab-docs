@@ -1,4 +1,4 @@
-export type FocusTarget = 'input' | number | null;
+type FocusTarget = 'input' | number | null;
 
 /**
  * Where the arrow keys move the focus on the search page: from the field to the first result, between results,

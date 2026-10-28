@@ -1,6 +1,6 @@
 import { type APIRequestContext, type Page, expect, test as base } from '@playwright/test';
 
-export const PASSWORD = 'e2e-correct-horse-battery';
+const PASSWORD = 'e2e-correct-horse-battery';
 
 export interface TestUser {
   name: string;
@@ -43,7 +43,7 @@ interface Fixtures {
 }
 
 /** What the browser logs when the Content-Security-Policy stops something. */
-export const CSP_MESSAGE = /Content[- ]Security[- ]Policy/i;
+const CSP_MESSAGE = /Content[- ]Security[- ]Policy/i;
 
 /** Records every console error that comes from the policy, so a page that breaks under it cannot pass unnoticed. */
 export function watchPolicyViolations(page: Page): string[] {

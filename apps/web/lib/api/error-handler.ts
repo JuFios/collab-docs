@@ -1,6 +1,6 @@
 import { ApiError, isApiError } from './errors';
 
-export interface ErrorHandlerDeps {
+interface ErrorHandlerDeps {
   toastError: (message: string, description?: string) => void;
   onPlanLimit: (detail: { message: string; correlationId?: string; details?: unknown }) => void;
 }

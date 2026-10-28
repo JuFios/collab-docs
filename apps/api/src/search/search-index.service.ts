@@ -20,14 +20,14 @@ export const MAX_INDEXED_BODY_CHARS = 200_000;
 
 const REINDEX_BATCH = 200;
 
-export type IndexOutcome = 'indexed' | 'unchanged' | 'removed';
+type IndexOutcome = 'indexed' | 'unchanged' | 'removed';
 
-export interface IndexOptions {
+interface IndexOptions {
   /** Rewrite a row of the same revision too (reindexing after the extraction changed), not only a newer one. */
   force?: boolean;
 }
 
-export interface ReindexSummary {
+interface ReindexSummary {
   documents: number;
   indexed: number;
   removed: number;

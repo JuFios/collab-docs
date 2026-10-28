@@ -8,7 +8,7 @@ import {
 import { apiClient } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
 
-export const IMAGE_TYPES_LABEL = 'PNG, JPEG, WebP or GIF';
+const IMAGE_TYPES_LABEL = 'PNG, JPEG, WebP or GIF';
 
 /** Checks a file before any request; the server and the bucket enforce the same rules again. */
 export function validateImageFile(file: File): AttachmentMime {

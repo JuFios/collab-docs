@@ -5,7 +5,7 @@ import type { Editor } from '@tiptap/core';
 import { useCallback, useState } from 'react';
 import { uploadAttachment } from '@/lib/attachments/upload';
 
-export interface UploadProgress {
+interface UploadProgress {
   id: string;
   name: string;
   /** 0..1 */

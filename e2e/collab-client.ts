@@ -8,7 +8,7 @@ import { ORIGIN } from './workspace';
 
 const MESSAGE_SYNC = 0;
 
-export interface RawCollabClient {
+interface RawCollabClient {
   doc: Y.Doc;
   /** Resolves once the server's state has been merged into `doc`. */
   synced: Promise<void>;

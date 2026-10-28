@@ -3,7 +3,7 @@ import { DEFAULT_NEXT_PATH, sanitizeNextPath } from '@collab-docs/shared';
 /** `expired`/`none` are handled alike for routing; the distinction is kept for logging and tests. */
 export type SessionState = 'valid' | 'expired' | 'none';
 
-export type RouteDecision =
+type RouteDecision =
   | { type: 'next' }
   /** Send the browser through `GET /api/auth/refresh` (the only path that receives the refresh cookie). */
   | { type: 'refresh'; next: string }
@@ -22,7 +22,7 @@ export function isPublicPath(pathname: string): boolean {
   );
 }
 
-export interface RouteInput {
+interface RouteInput {
   pathname: string;
   search: string;
   session: SessionState;

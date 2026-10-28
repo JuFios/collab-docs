@@ -19,7 +19,7 @@ import { PeopleSection } from './people-section';
 import { type PublishBlock, PublishSection } from './publish-section';
 
 /** What the editor knows about the state of its own changes; publishing needs all of them stored. */
-export interface DocumentSyncState {
+interface DocumentSyncState {
   online: boolean;
   synced: boolean;
   hasUnsyncedChanges: boolean;

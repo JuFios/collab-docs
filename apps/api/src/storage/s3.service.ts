@@ -12,12 +12,12 @@ import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { type AppConfig } from '@collab-docs/nest';
 
-export interface ObjectInfo {
+interface ObjectInfo {
   size: number;
   contentType: string | undefined;
 }
 
-export interface PresignedPost {
+interface PresignedPost {
   url: string;
   fields: Record<string, string>;
 }

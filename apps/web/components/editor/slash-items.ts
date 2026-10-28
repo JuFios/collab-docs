@@ -12,7 +12,7 @@ const block =
   ({ editor, range }: { editor: Editor; range: Range }) =>
     apply(editor.chain().focus().deleteRange(range)).run();
 
-export const SLASH_ITEMS: readonly SlashItem[] = [
+const SLASH_ITEMS: readonly SlashItem[] = [
   {
     id: 'text',
     title: 'Text',

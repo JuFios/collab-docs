@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BlockErrorBoundary } from './block-boundary';
 import { Suspense } from 'react';
 
-export function BlockSkeleton({ label, rows = 3 }: { label: string; rows?: number }) {
+function BlockSkeleton({ label, rows = 3 }: { label: string; rows?: number }) {
   return (
     <div role="status" aria-busy="true" aria-label={label} className="grid gap-2">
       {Array.from({ length: rows }, (_, index) => (

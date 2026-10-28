@@ -5,7 +5,7 @@ import Suggestion, { type SuggestionProps } from '@tiptap/suggestion';
 import { SlashMenu, type SlashMenuHandle, type SlashMenuProps } from './slash-menu';
 import { type SlashItem, filterSlashItems } from './slash-items';
 
-export interface SlashCommandOptions {
+interface SlashCommandOptions {
   pickImage?: () => void;
 }
 

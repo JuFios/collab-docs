@@ -29,7 +29,7 @@ export interface DocumentAccessResult {
 }
 
 /** Either the client or an open transaction, so callers can re-check permissions inside their transaction. */
-export type Db = PrismaClient | Prisma.TransactionClient;
+type Db = PrismaClient | Prisma.TransactionClient;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
