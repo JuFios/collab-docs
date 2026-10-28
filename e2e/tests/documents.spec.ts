@@ -115,12 +115,17 @@ test.describe('document tree', () => {
     await expect.poll(() => rows(page)).toEqual(['Two@1', 'One@1']);
     await expect(page.getByRole('treeitem', { name: 'Two' })).toBeFocused();
 
+    // each key goes to the row that has focus, so the next one waits until the row has it back
+    const two = page.getByRole('treeitem', { name: 'Two' });
     await page.keyboard.press('Alt+ArrowDown');
     await expect.poll(() => rows(page)).toEqual(['One@1', 'Two@1']);
+    await expect(two).toBeFocused();
     await page.keyboard.press('Alt+ArrowRight');
     await expect.poll(() => rows(page)).toEqual(['One@1', 'Two@2']);
+    await expect(two).toBeFocused();
     await page.keyboard.press('Alt+ArrowLeft');
     await expect.poll(() => rows(page)).toEqual(['One@1', 'Two@1']);
+    await expect(two).toBeFocused();
 
     await page.keyboard.press('F2');
     await page.keyboard.press('ControlOrMeta+a');
@@ -130,7 +135,7 @@ test.describe('document tree', () => {
     );
     await expect(page.getByRole('treeitem', { name: 'Second' })).toBeVisible();
     await page.reload();
-    expect(await rows(page)).toEqual(['One@1', 'Second@1']);
+    await expect.poll(() => rows(page)).toEqual(['One@1', 'Second@1']);
   });
 
   test('Rename in the row menu edits the title in place and keeps the field open', async ({

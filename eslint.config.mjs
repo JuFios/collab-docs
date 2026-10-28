@@ -49,6 +49,9 @@ export default tseslint.config(
       '**/src/generated/**',
       '**/.next/**',
       '**/coverage/**',
+      // written by a failed e2e run, minified
+      '**/playwright-report/**',
+      '**/test-results/**',
       '**/next-env.d.ts',
     ],
   },

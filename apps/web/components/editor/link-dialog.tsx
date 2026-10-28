@@ -33,12 +33,15 @@ export function LinkDialog({
   onOpenChange,
   onSubmit,
   onRemove,
+  onCloseAutoFocus,
 }: {
   open: boolean;
   initialHref: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: (href: string) => void;
   onRemove: () => void;
+  /** Where focus goes when the dialog closes; the editor, whose text the link is about. */
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const [value, setValue] = useState(initialHref);
   const [invalid, setInvalid] = useState(false);
@@ -55,7 +58,7 @@ export function LinkDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <form onSubmit={submit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Link</DialogTitle>

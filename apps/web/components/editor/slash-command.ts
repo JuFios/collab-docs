@@ -46,7 +46,9 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
                 props,
                 editor: props.editor,
               });
-              document.body.append(renderer.element);
+              // inside the page's main landmark, so that the menu is not content outside every region; it is
+              // placed with `position: fixed` and so does not depend on where it is mounted
+              (props.editor.view.dom.closest('main') ?? document.body).append(renderer.element);
               place(renderer.element, props);
             },
             onUpdate: (props) => {

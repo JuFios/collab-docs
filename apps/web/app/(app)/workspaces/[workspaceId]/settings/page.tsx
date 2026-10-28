@@ -103,7 +103,8 @@ export default async function SettingsPage({
         <p className="text-sm text-muted-foreground">
           {slots} of {usage.members.limit} member slots used, pending invitations included.
         </p>
-        <InviteForm workspaceId={workspaceId} />
+        {/* a new key when the slots change: a refusal for lack of a slot must not outlive the slot that was freed */}
+        <InviteForm key={slots} workspaceId={workspaceId} />
       </Section>
       <Section id="pending-heading" title="Pending invitations">
         <PendingInvites workspaceId={workspaceId} invites={invites} />

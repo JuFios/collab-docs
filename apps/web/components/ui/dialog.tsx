@@ -2,17 +2,47 @@
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type { ComponentProps, HTMLAttributes } from 'react';
+import {
+  type ComponentProps,
+  type HTMLAttributes,
+  type RefObject,
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 import { cn } from '@/lib/utils';
 
-export const Dialog = DialogPrimitive.Root;
+const OpenerContext = createContext<RefObject<HTMLElement | null> | null>(null);
+
+/**
+ * Radix returns focus to the `DialogTrigger` when a dialog closes. A dialog that is opened by some other button
+ * (most of them here: they are controlled by state) has no trigger, so focus fell to the page and a keyboard user
+ * lost their place. A controlled dialog remembers what had focus when it opened and gives it back.
+ */
+export function Dialog({ open, ...props }: ComponentProps<typeof DialogPrimitive.Root>) {
+  const opener = useRef<HTMLElement | null>(null);
+  // before the dialog's own focus handling runs, which is in a passive effect further down
+  useLayoutEffect(() => {
+    if (open)
+      opener.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, [open]);
+  return (
+    <OpenerContext value={opener}>
+      <DialogPrimitive.Root open={open} {...props} />
+    </OpenerContext>
+  );
+}
 export const DialogTrigger = DialogPrimitive.Trigger;
 
 export function DialogContent({
   className,
   children,
+  onCloseAutoFocus,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content>) {
+  const opener = useContext(OpenerContext);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -21,6 +51,14 @@ export function DialogContent({
           'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg',
           className,
         )}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          const element = opener?.current;
+          // an opener that is gone (its row was deleted, say) leaves focus to the library
+          if (event.defaultPrevented || !element?.isConnected) return;
+          event.preventDefault();
+          element.focus();
+        }}
         {...props}
       >
         {children}
