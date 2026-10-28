@@ -5,6 +5,12 @@ import { apiErrorSchema, healthCheckResultSchema } from '@collab-docs/shared';
 import { ReadinessService } from '@collab-docs/nest';
 import { createTestApp } from './test/test-app';
 
+interface OperationDocument {
+  responses: Record<string, unknown>;
+  security?: unknown[];
+}
+type PathItem = Partial<Record<'get' | 'post' | 'put' | 'patch' | 'delete', OperationDocument>>;
+
 describe('api platform', () => {
   let app: NestExpressApplication;
   const http = () => request(app.getHttpServer());
@@ -110,6 +116,29 @@ describe('api platform', () => {
       expect(body.openapi).toMatch(/^3\./);
       expect(Object.keys(body.paths)).toEqual(expect.arrayContaining(['/health', '/ready']));
       expect(body.components.securitySchemes).toHaveProperty('bearer');
+    });
+
+    it('documents the error body on every operation and 401 on the secured ones', async () => {
+      const { body } = await http().get('/docs/json').expect(200);
+      expect(body.components.schemas.ErrorResponse.required).toEqual(
+        expect.arrayContaining(['statusCode', 'code', 'message', 'correlationId']),
+      );
+      const operations = Object.entries(body.paths as Record<string, PathItem>).flatMap(
+        ([path, item]) =>
+          (['get', 'post', 'put', 'patch', 'delete'] as const).flatMap((method) => {
+            const operation = item[method];
+            return operation ? [{ where: `${method.toUpperCase()} ${path}`, operation }] : [];
+          }),
+      );
+      expect(operations.length).toBeGreaterThan(0);
+      const missing = operations
+        .filter(
+          ({ operation }) =>
+            !operation.responses['default'] ||
+            (operation.security?.length && !operation.responses['401']),
+        )
+        .map(({ where }) => where);
+      expect(missing).toEqual([]);
     });
   });
 

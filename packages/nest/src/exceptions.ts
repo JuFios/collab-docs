@@ -5,10 +5,12 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { type Observable, throwError } from 'rxjs';
 import {
   type ApiErrorBody,
+  ERROR_CODES,
   ERROR_STATUS,
   type ErrorCode,
   type ValidationIssue,
@@ -192,4 +194,39 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof AppException) response.set(exception.headers);
     response.status(body.statusCode).json(body);
   }
+}
+
+/** The error body as an OpenAPI schema; the filter above produces it for every failed request. */
+export class ErrorResponse implements ApiErrorBody {
+  @ApiProperty({ example: 400 })
+  statusCode!: number;
+
+  @ApiProperty({ enum: ERROR_CODES, description: 'Branch on this, never on `message`.' })
+  code!: ErrorCode;
+
+  @ApiProperty()
+  message!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'For `VALIDATION_FAILED`: one entry per invalid field. Other codes may add an object.',
+    oneOf: [
+      {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['field', 'messages'],
+          properties: {
+            field: { type: 'string' },
+            messages: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+      { type: 'object', additionalProperties: true },
+    ],
+  })
+  details?: unknown;
+
+  @ApiProperty({ description: 'The same id is returned in the `x-correlation-id` header.' })
+  correlationId!: string;
 }
