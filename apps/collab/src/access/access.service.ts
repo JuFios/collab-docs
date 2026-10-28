@@ -9,7 +9,13 @@ export interface Identity {
 }
 
 export type AccessOutcome =
-  | { status: 'ok'; access: Exclude<Access, 'NONE'>; workspaceId: string }
+  | {
+      status: 'ok';
+      access: Exclude<Access, 'NONE'>;
+      workspaceId: string;
+      /** When a guest's link stops working (epoch ms); `null` for users and for links without an expiry. */
+      expiresAt: number | null;
+    }
   | { status: 'not_found' }
   | { status: 'deleted' }
   | { status: 'forbidden' };
@@ -33,13 +39,15 @@ export class AccessService {
     if (!document) return { status: 'not_found' };
     if (document.deletedAt) return { status: 'deleted' };
 
-    const access = identity.userId
-      ? await this.userAccess(identity.userId, documentId, document)
-      : identity.linkId
-        ? await this.linkAccess(identity.linkId, documentId)
-        : 'NONE';
+    let expiresAt: number | null = null;
+    let access: Access = 'NONE';
+    if (identity.userId) {
+      access = await this.userAccess(identity.userId, documentId, document);
+    } else if (identity.linkId) {
+      ({ access, expiresAt } = await this.linkAccess(identity.linkId, documentId));
+    }
     if (access === 'NONE') return { status: 'forbidden' };
-    return { status: 'ok', access, workspaceId: document.workspaceId };
+    return { status: 'ok', access, workspaceId: document.workspaceId, expiresAt };
   }
 
   /** Display name for the presence list; `null` when the user no longer exists. */
@@ -78,17 +86,22 @@ export class AccessService {
   }
 
   /** A guest keeps access exactly as long as their link is live: revoked and expired links cut them off. */
-  private async linkAccess(linkId: string, documentId: string): Promise<Access> {
-    if (!UUID.test(linkId)) return 'NONE';
+  private async linkAccess(
+    linkId: string,
+    documentId: string,
+  ): Promise<{ access: Access; expiresAt: number | null }> {
+    if (!UUID.test(linkId)) return { access: 'NONE', expiresAt: null };
     const link = await this.prisma.publicLink.findUnique({ where: { id: linkId } });
-    if (!link || link.documentId !== documentId) return 'NONE';
-    return resolveLinkAccess(
+    if (!link || link.documentId !== documentId) return { access: 'NONE', expiresAt: null };
+    const expiresAt = link.expiresAt?.getTime() ?? null;
+    const access = resolveLinkAccess(
       {
         mode: link.mode,
         revoked: link.revokedAt !== null,
-        expired: link.expiresAt !== null && link.expiresAt.getTime() <= Date.now(),
+        expired: expiresAt !== null && expiresAt <= Date.now(),
       },
       false,
     );
+    return { access, expiresAt };
   }
 }

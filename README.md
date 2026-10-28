@@ -1272,9 +1272,12 @@ the access decorator on those routes (with a comment: the order is the behaviour
 environment), and checks that presence cannot be spoken for another client or carry an identity the server did
 not assign, that every close reason is one of a fixed list of texts (no parser or JWT message ever reaches a client),
 and that a socket without write access, fed hundreds of valid and mutated sync, step-2 and awareness frames, changes
-nothing in the document while an editor on the same document keeps working. A guest link that expires is cut off on
-the next re-evaluation (`COLLAB_ACCESS_RECHECK_MS`, 60 s by default): that is the window in which a guest whose
-link has just expired can still write, and revocation does not wait for it (collab is told at once).
+nothing in the document while an editor on the same document keeps working. A guest is cut off at the moment their edit link
+expires: every admission and every re-evaluation sets a timer for `expiresAt` (`AccessReevaluator.watchExpiry`),
+so the cut-off does not wait for the periodic check (`COLLAB_ACCESS_RECHECK_MS`), which stays the safety net for a
+link that was changed behind collab's back. `guest-expiry.int.spec.ts` turns the periodic check off and checks that
+the socket is closed with `4403` when the link expires and that a late write is not stored. Revocation does not wait
+either (collab is told at once).
 
 ### Caches follow the data
 
@@ -1306,7 +1309,6 @@ api as well.
   anyone who knows a checkout session id can complete it. A real provider replaces the module; the webhook behind it
   authenticates by signature either way.
 - `script-src` keeps `'unsafe-inline'` (see above).
-- A guest with an expired edit link may keep typing for up to one re-evaluation interval.
 
 ## Frontend
 
