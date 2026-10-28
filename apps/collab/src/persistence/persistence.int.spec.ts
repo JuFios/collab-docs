@@ -1,5 +1,5 @@
-import './test/persistence-env';
-import './test/setup-env';
+import '../test/env/persistence';
+import '../test/setup-env';
 import { randomUUID } from 'node:crypto';
 import * as Y from 'yjs';
 import {
@@ -17,12 +17,12 @@ import {
 import { COLLAB_INTERNAL } from '@collab-docs/shared';
 import { parseConfig, QUEUE_NAMES, QueueService, REDIS_CLIENT } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
-import { DOCUMENT_STORE, type DocumentStore } from './rooms/document-store';
-import type { PostgresDocumentStore } from './rooms/postgres-document-store';
-import { RoomManager } from './rooms/room-manager';
-import { type RunningCollab, startCollab } from './test/collab-app';
-import { Client, makeTeam, settle, ticketFor, waitFor } from './test/collab-fixtures';
-import { PrismaService } from './prisma/prisma.service';
+import { DOCUMENT_STORE, type DocumentStore } from '../rooms/document-store';
+import type { PostgresDocumentStore } from '../rooms/postgres-document-store';
+import { RoomManager } from '../rooms/room-manager';
+import { type RunningCollab, startCollab } from '../test/collab-app';
+import { Client, makeTeam, settle, ticketFor, waitFor } from '../test/collab-fixtures';
+import { PrismaService } from '../prisma/prisma.service';
 
 const IDLE_MS = parseConfig(process.env).COLLAB_ROOM_IDLE_MS;
 

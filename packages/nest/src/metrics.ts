@@ -15,7 +15,7 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { AppConfig } from './config';
 import { AppException } from './exceptions';
-import { Public } from './public';
+import { Public } from './public.decorator';
 import type { NextFunction, Request, Response } from 'express';
 import { collectDefaultMetrics, Histogram, Registry } from '@prometheus-io/client';
 

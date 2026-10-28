@@ -9,7 +9,7 @@ import { HealthModule } from './health';
 import { platformLoggerModule } from './logger';
 import { MetricsModule } from './metrics';
 import { QueueModule } from './queue';
-import { RequestPipelineModule } from './pipeline';
+import { RequestPipelineModule } from './request-pipeline.module';
 import { REDIS_CLIENT, RedisModule } from './redis';
 import { ClientIpThrottlerGuard, throttlerOptions } from './throttle';
 

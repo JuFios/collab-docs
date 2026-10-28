@@ -19,7 +19,7 @@ import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import type { Redis } from 'ioredis';
-import { Public } from './public';
+import { Public } from './public.decorator';
 import { REDIS_CLIENT } from './redis';
 
 const CHECK_TIMEOUT_MS = 2000;

@@ -1,5 +1,5 @@
-import './test/security-env';
-import './test/setup-env';
+import '../test/env/security';
+import '../test/setup-env';
 import { randomBytes, randomUUID } from 'node:crypto';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
@@ -10,8 +10,8 @@ import WebSocket from 'ws';
 import { DocumentStateReader, type PrismaClient } from '@collab-docs/db';
 import { COLLAB_CLOSE, COLLAB_MESSAGE } from '@collab-docs/shared';
 import { parseConfig, signCollabTicket } from '@collab-docs/nest';
-import { PrismaService } from './prisma/prisma.service';
-import { type RunningCollab, startCollab } from './test/collab-app';
+import { PrismaService } from '../prisma/prisma.service';
+import { type RunningCollab, startCollab } from '../test/collab-app';
 
 const config = parseConfig(process.env);
 const SECRET = config.COLLAB_TICKET_SECRET;

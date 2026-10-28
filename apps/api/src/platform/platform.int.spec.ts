@@ -3,7 +3,7 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { apiErrorSchema, healthCheckResultSchema } from '@collab-docs/shared';
 import { ReadinessService } from '@collab-docs/nest';
-import { createTestApp } from './test/test-app';
+import { createTestApp } from '../test/test-app';
 
 interface OperationDocument {
   responses: Record<string, unknown>;

@@ -1,4 +1,4 @@
-import './test/setup-env';
+import '../test/setup-env';
 import { randomBytes, randomUUID } from 'node:crypto';
 import * as decoding from 'lib0/decoding';
 import * as Y from 'yjs';
@@ -14,9 +14,9 @@ import {
 } from '@collab-docs/shared';
 import { REDIS_CLIENT, parseConfig, signCollabTicket } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
-import { RoomManager } from './rooms/room-manager';
-import { type RunningCollab, startCollab } from './test/collab-app';
-import { PrismaService } from './prisma/prisma.service';
+import { RoomManager } from '../rooms/room-manager';
+import { type RunningCollab, startCollab } from '../test/collab-app';
+import { PrismaService } from '../prisma/prisma.service';
 
 const SECRET = parseConfig(process.env).COLLAB_TICKET_SECRET;
 const IDLE_MS = parseConfig(process.env).COLLAB_ROOM_IDLE_MS;

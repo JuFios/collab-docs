@@ -22,17 +22,17 @@ import {
   renameWorkspaceInputSchema,
   updatePublicLinkInputSchema,
 } from '@collab-docs/shared';
-import { LoginDto, RegisterDto } from './auth/auth.dto';
-import { PresignAttachmentDto } from './attachments/attachments.dto';
-import { CreateCommentDto, CreateThreadDto } from './comments/comments.dto';
-import { CreateDocumentDto, MoveDocumentDto } from './documents/documents.dto';
-import { CreatePublicLinkDto, UpdatePublicLinkDto } from './publishing/public-links.dto';
-import { CreateVersionDto } from './versions/versions.dto';
+import { LoginDto, RegisterDto } from '../auth/auth.dto';
+import { PresignAttachmentDto } from '../attachments/attachments.dto';
+import { CreateCommentDto, CreateThreadDto } from '../comments/comments.dto';
+import { CreateDocumentDto, MoveDocumentDto } from '../documents/documents.dto';
+import { CreatePublicLinkDto, UpdatePublicLinkDto } from '../publishing/public-links.dto';
+import { CreateVersionDto } from '../versions/versions.dto';
 import {
   CreateInviteDto,
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
-} from './workspaces/workspaces.dto';
+} from '../workspaces/workspaces.dto';
 
 /**
  * The web client validates forms with the zod schemas of `@collab-docs/shared` and the api validates the same
