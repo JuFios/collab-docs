@@ -192,6 +192,19 @@ test.describe('document tree', () => {
     );
   });
 
+  test('cancelling the trash dialog opened from the tree returns to the row', async ({
+    signedInPage: page,
+  }) => {
+    const workspaceId = await createWorkspace(page, 'Row focus');
+    await createDocument(page, workspaceId, 'Kept');
+    await page.goto(`/workspaces/${workspaceId}`);
+
+    await page.getByRole('treeitem', { name: 'Kept' }).focus();
+    await page.keyboard.press('Delete');
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('treeitem', { name: 'Kept' })).toBeFocused();
+  });
+
   test('cancelling the trash dialog returns to the menu button', async ({ signedInPage: page }) => {
     const workspaceId = await createWorkspace(page, 'Cancel trash');
     const id = await createDocument(page, workspaceId, 'Stays');

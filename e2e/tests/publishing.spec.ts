@@ -72,9 +72,14 @@ test.describe('published page', () => {
     expect(first.body).not.toContain('Publishing');
     expect(first.body).not.toContain(owner.url());
 
-    // the second request is served from the ISR cache
-    const second = await pageHtml(request, slug);
-    expect(second.headers['x-nextjs-cache']).toBe('HIT');
+    // later requests are served from the ISR cache; the worker may still be revalidating the page that was just
+    // published, and a request that lands in between is a miss
+    await expect
+      .poll(async () => (await pageHtml(request, slug)).headers['x-nextjs-cache'], {
+        timeout: 10_000,
+        intervals: [300],
+      })
+      .toBe('HIT');
 
     // an edit reaches the page without a deploy: the worker invalidates the tag after the debounce
     await typeInto(owner, ' Then search.');

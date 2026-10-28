@@ -33,7 +33,8 @@ export function DeleteDocumentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         onCloseAutoFocus={(event) => {
-          if (!returnFocusTo?.current) return;
+          // the element is gone when the document it belonged to was deleted
+          if (!returnFocusTo?.current?.isConnected) return;
           event.preventDefault();
           returnFocusTo.current.focus();
         }}

@@ -59,16 +59,17 @@ export function NotificationBell({ initialCount }: { initialCount?: number }) {
         <div className="flex items-center justify-between pr-1">
           <DropdownMenuLabel>Notifications</DropdownMenuLabel>
           {count > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7"
+            // a menu item, so the arrow keys reach it; it keeps the menu open, as the list changes under it
+            <DropdownMenuItem
               disabled={markRead.isPending}
-              onClick={() => markRead.mutate({ all: true })}
+              className="mr-1 w-auto shrink-0 px-2 py-1 text-xs"
+              onSelect={(event) => {
+                event.preventDefault();
+                markRead.mutate({ all: true });
+              }}
             >
               Mark all as read
-            </Button>
+            </DropdownMenuItem>
           ) : null}
         </div>
         {list.isPending && open ? <LoadingState label="Loading notifications…" /> : null}

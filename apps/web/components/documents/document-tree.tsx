@@ -73,6 +73,7 @@ export function DocumentTree() {
   const dropTargetRef = useRef<DropTarget | null>(null);
   const elements = useRef(new Map<string, HTMLElement>());
   const refocus = useRef<string | null>(null);
+  const deleteOrigin = useRef<HTMLElement | null>(null);
 
   const canCreate = roleAtLeast(role, 'EDITOR');
   const tabbableId =
@@ -110,6 +111,13 @@ export function DocumentTree() {
     const next = title.trim();
     if (next !== node.title)
       rename.mutate({ id: node.id, title: next }, { onSuccess: refreshListings });
+  };
+
+  const askToDelete = (node: TreeNode) => {
+    // the dialog has no trigger of its own, so it is told where focus goes when it closes
+    deleteOrigin.current = elements.current.get(node.id) ?? null;
+    setMenuId(null);
+    setDeleting(node);
   };
 
   const confirmDelete = async () => {
@@ -175,7 +183,7 @@ export function DocumentTree() {
         break;
       case 'Delete':
         event.preventDefault();
-        if (canEdit) setDeleting(node);
+        if (canEdit) askToDelete(node);
         break;
       case 'ContextMenu':
         event.preventDefault();
@@ -329,10 +337,7 @@ export function DocumentTree() {
                   setMenuId(null);
                   setRenamingId(node.id);
                 }}
-                onDelete={(node) => {
-                  setMenuId(null);
-                  setDeleting(node);
-                }}
+                onDelete={askToDelete}
               />
             ))}
           </div>
@@ -346,6 +351,7 @@ export function DocumentTree() {
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
+        returnFocusTo={deleteOrigin}
         onConfirm={() => void confirmDelete()}
       />
     </div>
