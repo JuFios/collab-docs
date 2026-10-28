@@ -1,6 +1,7 @@
 import type { Page, WebSocketRoute } from '@playwright/test';
 import { connectRaw } from '../collab-client';
 import { expect, test } from '../fixtures';
+import { logsOf } from '../logs';
 import { ORIGIN, createDocument, createWorkspace, invitedMember } from '../workspace';
 
 const editorOf = (page: Page) => page.getByRole('textbox', { name: 'Document content' });
@@ -15,6 +16,36 @@ const textOf = (page: Page) =>
   editorOf(page).evaluate((root) =>
     [...root.children].map((block) => block.textContent ?? '').join('\n'),
   );
+
+/**
+ * Puts the caret into the `index`-th top-level block, `offset` characters from its start (or at its end). Keys such
+ * as Home and End do not move the caret the same way on every platform, and the tests run on more than one.
+ */
+async function placeCaret(page: Page, index: number, offset: number | 'end'): Promise<void> {
+  await editorOf(page)
+    .locator(':scope > *')
+    .nth(index)
+    .evaluate((block, target) => {
+      const texts: Text[] = [];
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) texts.push(node as Text);
+      let remaining = target === 'end' ? Number.POSITIVE_INFINITY : target;
+      const range = document.createRange();
+      range.selectNodeContents(block);
+      range.collapse(false);
+      for (const text of texts) {
+        if (remaining <= text.length) {
+          range.setStart(text, remaining);
+          range.collapse(true);
+          break;
+        }
+        remaining -= text.length;
+      }
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }, offset);
+}
 
 async function openDocument(page: Page, workspaceId: string, documentId: string): Promise<void> {
   await page.goto(`/w/${workspaceId}/d/${documentId}`);
@@ -56,6 +87,13 @@ test.describe('viewer access', () => {
     await editorOf(owner).click();
     await owner.keyboard.type('Original text');
     await expect(saveStatus(owner)).toHaveText('Saved');
+    // a version for the viewer to try to restore
+    const saved = await owner.request.post(`/api/documents/${documentId}/versions`, {
+      data: { label: 'checkpoint' },
+      headers: { origin: ORIGIN },
+    });
+    expect(saved.status(), await saved.text()).toBe(201);
+    const { id: versionId } = (await saved.json()) as { id: string };
 
     const { page: viewer, context } = await invitedMember(
       browser,
@@ -76,6 +114,14 @@ test.describe('viewer access', () => {
     await viewer.keyboard.type('viewer typing');
     await expect(editorOf(viewer)).not.toContainText('viewer typing');
 
+    // the history is readable, but offers neither saving nor restoring; sharing is not offered at all
+    await expect(viewer.getByRole('button', { name: 'Share' })).toHaveCount(0);
+    await viewer.getByRole('button', { name: 'History' }).click();
+    const history = viewer.getByTestId('versions-panel');
+    await expect(history.getByRole('button', { name: /checkpoint/ })).toBeVisible();
+    await expect(history.getByRole('button', { name: 'Save version' })).toHaveCount(0);
+    await expect(history.getByRole('button', { name: 'Restore this version' })).toHaveCount(0);
+
     // API: direct writes are refused
     const patch = await viewer.request.patch(`/api/documents/${documentId}`, {
       data: { title: 'Hacked' },
@@ -87,14 +133,40 @@ test.describe('viewer access', () => {
       headers: { origin: ORIGIN },
     });
     expect([403, 404]).toContain(move.status());
+    const restore = await viewer.request.post(
+      `/api/documents/${documentId}/versions/${versionId}/restore`,
+      { headers: { origin: ORIGIN } },
+    );
+    expect([403, 404]).toContain(restore.status());
+    const publish = await viewer.request.post(`/api/documents/${documentId}/public-links`, {
+      data: { mode: 'VIEW' },
+      headers: { origin: ORIGIN },
+    });
+    expect([403, 404]).toContain(publish.status());
+    const remove = await viewer.request.delete(`/api/documents/${documentId}`, {
+      headers: { origin: ORIGIN },
+    });
+    expect([403, 404]).toContain(remove.status());
 
     // WebSocket: a raw client with a viewer ticket sends an update; the document does not change
     const raw = await connectRaw(context.request, documentId);
     await raw.synced;
     expect(raw.text()).toContain('Original text');
+    const started = new Date(Date.now() - 5000);
     raw.injectParagraph('INJECTED BY VIEWER');
-    // the server flushes within a second; give it time to persist anything it wrongly accepted
-    await owner.waitForTimeout(2500);
+    // the server logs a refused update; once it has, there is nothing left in flight that could change the document
+    await expect
+      .poll(
+        async () =>
+          (await logsOf('collab', started)).lines.some(
+            (line) =>
+              line.event === 'collab.update_rejected' &&
+              line.reason === 'read_only' &&
+              line.documentId === documentId,
+          ),
+        { timeout: 20_000, intervals: [500] },
+      )
+      .toBe(true);
     raw.close();
 
     const check = await connectRaw(owner.request, documentId);
@@ -107,6 +179,13 @@ test.describe('viewer access', () => {
     await expect(editorOf(owner)).toContainText('Original text');
     await expect(editorOf(owner)).not.toContainText('INJECTED');
     await expect(owner.getByRole('textbox', { name: 'Document title' })).toHaveValue('Handbook');
+    // none of the refused calls left a trace: the document is alive, unpublished and has its one version
+    const state = await owner.request.get(`/api/documents/${documentId}/public-links`);
+    expect(await state.json()).toEqual([]);
+    const versions = await owner.request.get(`/api/documents/${documentId}/versions`);
+    expect(((await versions.json()) as { label: string | null }[]).map((v) => v.label)).toContain(
+      'checkpoint',
+    );
   });
 });
 
@@ -219,6 +298,69 @@ test.describe('concurrent editing', () => {
     }
     expect(await textOf(a)).toBe(await textOf(b));
   });
+
+  test('both editors offline at once edit the same block and different blocks, and every insertion survives', async ({
+    browser,
+    baseURL,
+    signedInPage: a,
+  }) => {
+    const workspaceId = await createWorkspace(a, 'Both offline');
+    const documentId = await createDocument(a, workspaceId, 'Split brain');
+    const { page: b, context: contextB } = await invitedMember(
+      browser,
+      baseURL,
+      a,
+      workspaceId,
+      'Editor',
+    );
+    const socketA = await controllableSocket(a);
+    const socketB = await controllableSocket(b);
+    await openEditable(a, workspaceId, documentId);
+    await openEditable(b, workspaceId, documentId);
+    await editorOf(a).click();
+    await a.keyboard.type('base');
+    await expect(editorOf(b)).toContainText('base');
+    await expect(saveStatus(a)).toHaveText('Saved');
+    await expect(saveStatus(b)).toHaveText('Saved');
+
+    await Promise.all([a.context().setOffline(true), contextB.setOffline(true)]);
+    await Promise.all([socketA.cut(), socketB.cut()]);
+    const offline = 'Offline — changes will sync on reconnect';
+    await expect(saveStatus(a)).toHaveText(offline);
+    await expect(saveStatus(b)).toHaveText(offline);
+
+    // A appends to the paragraph and adds a block; B writes in the middle of the same paragraph and adds a block
+    await editorOf(a).click();
+    await placeCaret(a, 0, 'end');
+    await a.keyboard.type(' [A end]');
+    await a.keyboard.press('Enter');
+    await a.keyboard.type('block from A');
+    await editorOf(b).click();
+    await placeCaret(b, 0, 2);
+    await b.keyboard.type('[B middle]');
+    await placeCaret(b, 0, 'end');
+    await b.keyboard.press('Enter');
+    await b.keyboard.type('block from B');
+    // nothing crossed while both were cut off
+    await expect(editorOf(a)).not.toContainText('B middle');
+    await expect(editorOf(b)).not.toContainText('A end');
+
+    await Promise.all([a.context().setOffline(false), contextB.setOffline(false)]);
+    await expect(saveStatus(a)).toHaveText('Saved', { timeout: 20_000 });
+    await expect(saveStatus(b)).toHaveText('Saved', { timeout: 20_000 });
+    const everything = ['[A end]', '[B middle]', 'block from A', 'block from B'];
+    for (const page of [a, b]) {
+      for (const piece of everything) await expect(editorOf(page)).toContainText(piece);
+    }
+    const [final, other] = await Promise.all([textOf(a), textOf(b)]);
+    expect(final).toBe(other);
+    // each insertion arrived whole, in the place it was made
+    expect(final).toContain('ba[B middle]se [A end]');
+
+    // and the merged document is what was stored
+    await a.reload();
+    await expect.poll(() => textOf(a)).toBe(final);
+  });
 });
 
 test.describe('editor features', () => {
@@ -302,9 +444,7 @@ test.describe('editor features', () => {
     });
     const image = page.getByTestId('image-block').locator('img');
     await expect(image).toBeVisible();
-    await expect
-      .poll(() => image.evaluate((el) => (el as unknown as { naturalWidth: number }).naturalWidth))
-      .toBe(1);
+    await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(1);
     await expect(saveStatus(page)).toHaveText('Saved');
 
     await page.reload();

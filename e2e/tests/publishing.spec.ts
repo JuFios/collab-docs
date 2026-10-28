@@ -225,7 +225,13 @@ test.describe('edit link', () => {
       expiresAt: new Date(Date.now() + 3000).toISOString(),
     });
     const visitor = await (await browser.newContext({ baseURL })).newPage();
-    await owner.waitForTimeout(3500);
+    // the api says when the link has expired; no guess at how long three seconds take on a slow runner
+    await expect
+      .poll(async () => (await visitor.request.get(`/api/public/links/${token}`)).status(), {
+        timeout: 20_000,
+        intervals: [500],
+      })
+      .toBe(410);
     await visitor.goto(`/e/${token}`);
     await expect(visitor.getByText('This link no longer works')).toBeVisible();
     await expect(visitor.getByRole('textbox')).toHaveCount(0);

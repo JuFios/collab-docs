@@ -68,6 +68,25 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node, ...globals.jest } },
   },
   {
+    // a fixed sleep makes a test slow where the machine is fast and flaky where it is slow
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'waitForTimeout',
+          message: 'Wait for the thing that changes: expect(...), expect.poll(...) or a response.',
+        },
+      ],
+    },
+  },
+  {
+    // command-line scripts of the CI workflow: printing is their output
+    files: ['.github/scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+    rules: { 'no-console': 'off' },
+  },
+  {
     files: ['**/*.config.js'],
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
