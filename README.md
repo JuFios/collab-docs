@@ -454,17 +454,19 @@ to the next request. Routes declare their requirement with `@WorkspaceRole('ADMI
 
 Document access, evaluated top to bottom:
 
-| #   | Condition                                | Access                                       |
-| --- | ---------------------------------------- | -------------------------------------------- |
-| 1   | Document is deleted                      | `NONE` (restore: Owner/Admin, Editor-author) |
-| 2   | Role is `OWNER` or `ADMIN`               | `MANAGE`                                     |
-| 3   | The user has a `document_share`          | share `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW` |
-| 4   | Member and visibility is `WORKSPACE`     | `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW`       |
-| 5   | Anything else (non-member, `RESTRICTED`) | `NONE`                                       |
+| #   | Condition                                      | Access                                       |
+| --- | ---------------------------------------------- | -------------------------------------------- |
+| 1   | Document is deleted                            | `NONE` (restore: Owner/Admin, Editor-author) |
+| 2   | Role is `OWNER` or `ADMIN`                     | `MANAGE`                                     |
+| 3   | The user has a `document_share`                | share `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW` |
+| 4   | The user wrote the document and is an `EDITOR` | `EDIT`                                       |
+| 5   | Member and visibility is `WORKSPACE`           | `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW`       |
+| 6   | Anything else (non-member, `RESTRICTED`)       | `NONE`                                       |
 
-An explicit share overrides the workspace role in both directions. Public links are a separate path: a
-`VIEW` link allows anonymous reading of the published page, a live `EDIT` link grants `EDIT` on that one
-document to a guest who cannot comment.
+An explicit share overrides the workspace role in both directions. An `EDITOR` who wrote a document keeps
+`EDIT` on it even when it is `RESTRICTED`, so the author cannot lock themselves out; a `VIEWER` author is not
+upgraded. Public links are a separate path: a `VIEW` link allows anonymous reading of the published page, a live
+`EDIT` link grants `EDIT` on that one document to a guest who cannot comment.
 
 ```mermaid
 flowchart TD
@@ -474,19 +476,22 @@ flowchart TD
   C -- yes --> M[MANAGE]
   C -- no --> D{Has a share?}
   D -- yes --> S[VIEW or EDIT from the share]
-  D -- no --> E{Member and visibility WORKSPACE?}
+  D -- no --> AU{Author and EDITOR?}
+  AU -- yes --> AE[EDIT]
+  AU -- no --> E{Member and visibility WORKSPACE?}
   E -- yes --> R[VIEW or EDIT from the role]
   E -- no --> N
   M --> G{Enough for the action?}
   S --> G
+  AE --> G
   R --> G
   G -- yes --> OK[200]
   G -- no --> F[403]
 ```
 
-**404 vs 403.** No access at all (not a member, `RESTRICTED` without a share, deleted, unknown id, malformed
-id) gives `404`, so the response never confirms that a resource exists; access that is too low for the action
-gives `403`. A member of a workspace also gets `403` where a non-member gets `404`.
+**404 vs 403.** No access at all (not a member, `RESTRICTED` without a share or authorship, deleted, unknown
+id, malformed id) gives `404`, so the response never confirms that a resource exists; access that is too low for
+the action gives `403`. A member of a workspace also gets `403` where a non-member gets `404`.
 
 Creating a document needs `EDITOR` and `EDIT` on the parent; the child copies the parent's visibility and
 shares at that moment (a snapshot, not live inheritance). Moving needs `EDIT` on the document and on the new
@@ -895,9 +900,10 @@ the worker process serves no endpoint, and a job that keeps failing shows up as 
 **Consistency.** The index is **eventually consistent**: a change is searchable roughly 5 s plus the job time
 after it was stored, and a document just created is found by its title only after that too. **Permissions are
 not part of the index.** Every request evaluates them in SQL: the caller must be a member, the document must not be
-deleted, and it must be visible to them: owner/admin, or `visibility = WORKSPACE`, or an explicit share (the
-same rules as `resolveDocumentAccess`, spec §4). So a removed share, a restricted document, a deleted document or a
-removed member stops matching on the next request, however far the index lags behind. The text of a result
+deleted, and it must be visible to them: owner/admin, the `EDITOR` who wrote it, a member of a
+`visibility = WORKSPACE` document, or an explicit share (the same rules as `resolveDocumentAccess`, spec §4). So a
+removed share, a restricted document, a deleted document or a removed member stops matching on the next request,
+however far the index lags behind. The text of a result
 comes from the index, the title from the document, so a rename shows at once in titles and is searchable after
 the job.
 
@@ -954,8 +960,8 @@ in-app notification (pushed live over SSE) and an email. All routes are under `/
 viewers do not (a viewer reads the threads and gets `403` when writing), and neither does a guest on an edit link.
 A guest with an `EDITOR` share has it. Routes that carry a thread or comment id resolve the document from the row
 and check access on **that** document, again inside the write transaction, so an id from another workspace, a
-restricted document without a share, a revoked share and a document in the trash are all `404`, the same as for
-a document id. A malformed id is `400`.
+restricted document the caller cannot open, a revoked share and a document in the trash are all `404`, the same
+as for a document id. A malformed id is `400`.
 
 **Body.** Plain text of 1 to 4000 characters, trimmed. It is never interpreted as HTML: the api returns it as
 written, clients draw it as text, and the email escapes it. A mention is the token `@[<user id>]`, which the client

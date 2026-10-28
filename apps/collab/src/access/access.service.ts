@@ -28,7 +28,7 @@ export class AccessService {
     if (!UUID.test(documentId)) return { status: 'not_found' };
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
-      select: { workspaceId: true, visibility: true, deletedAt: true },
+      select: { workspaceId: true, visibility: true, deletedAt: true, createdBy: true },
     });
     if (!document) return { status: 'not_found' };
     if (document.deletedAt) return { status: 'deleted' };
@@ -55,7 +55,7 @@ export class AccessService {
   private async userAccess(
     userId: string,
     documentId: string,
-    document: { workspaceId: string; visibility: 'WORKSPACE' | 'RESTRICTED' },
+    document: { workspaceId: string; visibility: 'WORKSPACE' | 'RESTRICTED'; createdBy: string },
   ): Promise<Access> {
     if (!UUID.test(userId)) return 'NONE';
     const [member, share] = await Promise.all([
@@ -73,6 +73,7 @@ export class AccessService {
       workspaceRole: member?.role ?? null,
       shareRole: share?.role ?? null,
       visibility: document.visibility,
+      isAuthor: document.createdBy === userId,
     });
   }
 

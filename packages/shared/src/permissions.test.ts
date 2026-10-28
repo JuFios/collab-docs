@@ -27,6 +27,7 @@ const base: DocumentAccessContext = {
   workspaceRole: null,
   shareRole: null,
   visibility: 'WORKSPACE',
+  isAuthor: false,
 };
 
 describe('resolveDocumentAccess', () => {
@@ -61,6 +62,23 @@ describe('resolveDocumentAccess', () => {
     // plain members on RESTRICTED visibility without a share
     ['editor, restricted', { workspaceRole: 'EDITOR', visibility: 'RESTRICTED' }, 'NONE'],
     ['viewer, restricted', { workspaceRole: 'VIEWER', visibility: 'RESTRICTED' }, 'NONE'],
+    // an editor keeps their own restricted document; a viewer author, a guest and a share are not upgraded
+    [
+      'editor author, restricted',
+      { workspaceRole: 'EDITOR', visibility: 'RESTRICTED', isAuthor: true },
+      'EDIT',
+    ],
+    [
+      'editor author, restricted, viewer share',
+      { workspaceRole: 'EDITOR', visibility: 'RESTRICTED', isAuthor: true, shareRole: 'VIEWER' },
+      'VIEW',
+    ],
+    [
+      'viewer author, restricted',
+      { workspaceRole: 'VIEWER', visibility: 'RESTRICTED', isAuthor: true },
+      'NONE',
+    ],
+    ['guest author, restricted', { visibility: 'RESTRICTED', isAuthor: true }, 'NONE'],
     // a share overrides the workspace role upwards...
     ['viewer + editor share, workspace', { workspaceRole: 'VIEWER', shareRole: 'EDITOR' }, 'EDIT'],
     [
@@ -105,7 +123,13 @@ describe('resolveDocumentAccess', () => {
       for (const visibility of ['WORKSPACE', 'RESTRICTED'] as const)
         for (const shareRole of [null, 'VIEWER', 'EDITOR'] as const)
           for (const deleted of [false, true]) {
-            const result = resolveDocumentAccess({ deleted, workspaceRole, shareRole, visibility });
+            const result = resolveDocumentAccess({
+              deleted,
+              workspaceRole,
+              shareRole,
+              visibility,
+              isAuthor: false,
+            });
             expect(['NONE', 'VIEW', 'EDIT', 'MANAGE']).toContain(result);
             count++;
           }

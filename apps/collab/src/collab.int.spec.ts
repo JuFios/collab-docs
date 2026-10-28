@@ -343,6 +343,34 @@ describe('collab gateway', () => {
       expect(client.event('access')).toMatchObject({ readOnly: false });
     });
 
+    it('admits the editor who wrote a restricted document, and refuses a viewer author', async () => {
+      const { editor, viewer, workspace } = await setup();
+      const authored = await prisma.document.create({
+        data: {
+          workspaceId: workspace.id,
+          createdBy: editor.id,
+          position: 'a1',
+          title: 'Authored',
+          visibility: 'RESTRICTED',
+        },
+      });
+      const client = await connect(editor, authored.id);
+      await waitFor(() => client.synced, 'sync of the author');
+      expect(client.event('access')).toMatchObject({ level: 'EDIT', readOnly: false });
+
+      const viewerDoc = await prisma.document.create({
+        data: {
+          workspaceId: workspace.id,
+          createdBy: viewer.id,
+          position: 'a2',
+          title: 'Viewer authored',
+          visibility: 'RESTRICTED',
+        },
+      });
+      const ticket = await signCollabTicket(SECRET, { docId: viewerDoc.id, sub: viewer.id });
+      await expect(closeCodeOf(viewerDoc.id, ticket)).resolves.toBe(COLLAB_CLOSE.forbidden);
+    });
+
     it('closes with 4404 for a document that does not exist and 4410 for a deleted one', async () => {
       const { editor, documentId } = await setup();
       const missing = randomUUID();

@@ -14,9 +14,10 @@ export interface TreeRow {
   icon: string | null;
   position: string;
   visibility: DocumentVisibility;
+  createdBy: string;
 }
 
-export interface TreeNode extends TreeRow {
+export interface TreeNode extends Omit<TreeRow, 'createdBy'> {
   myAccess: Exclude<Access, 'NONE'>;
 }
 
@@ -26,16 +27,18 @@ export interface TreeNode extends TreeRow {
  */
 export function buildTree(
   rows: readonly TreeRow[],
+  userId: string,
   workspaceRole: WorkspaceRole,
   shares: ReadonlyMap<string, ShareRole>,
 ): TreeNode[] {
   const visible: TreeNode[] = [];
-  for (const row of rows) {
+  for (const { createdBy, ...row } of rows) {
     const access = resolveDocumentAccess({
       deleted: false,
       workspaceRole,
       shareRole: shares.get(row.id) ?? null,
       visibility: row.visibility,
+      isAuthor: createdBy === userId,
     });
     if (access !== 'NONE') visible.push({ ...row, myAccess: access });
   }

@@ -185,7 +185,7 @@ export class DocumentsService {
       }),
     ]);
     const shareByDocument = new Map<string, ShareRole>(shares.map((s) => [s.documentId, s.role]));
-    return buildTree(rows, role, shareByDocument);
+    return buildTree(rows, userId, role, shareByDocument);
   }
 
   /**
@@ -205,7 +205,13 @@ export class DocumentsService {
         ...LIVE_DOCUMENT,
         ...(managesAll
           ? {}
-          : { OR: [{ visibility: 'WORKSPACE' }, { shares: { some: { userId } } }] }),
+          : {
+              OR: [
+                { visibility: 'WORKSPACE' },
+                { shares: { some: { userId } } },
+                ...(role === 'EDITOR' ? [{ createdBy: userId }] : []),
+              ],
+            }),
       },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: limit,
@@ -214,6 +220,7 @@ export class DocumentsService {
         title: true,
         icon: true,
         visibility: true,
+        createdBy: true,
         updatedAt: true,
         shares: { where: { userId }, select: { role: true } },
       },
@@ -224,6 +231,7 @@ export class DocumentsService {
         workspaceRole: role,
         shareRole: row.shares[0]?.role ?? null,
         visibility: row.visibility,
+        isAuthor: row.createdBy === userId,
       });
       return access === 'NONE'
         ? []
@@ -438,6 +446,7 @@ export class DocumentsService {
       workspaceRole: current.workspaceRole,
       shareRole: current.shareRole,
       visibility: current.document.visibility,
+      isAuthor: current.document.createdBy === userId,
     });
     if (sees === 'NONE') throw notFound('Document');
     if (!canRestoreDocument(current.workspaceRole, current.document.createdBy === userId)) {
@@ -523,6 +532,7 @@ export class DocumentsService {
             workspaceRole: role,
             shareRole: shareByDocument.get(root.id) ?? null,
             visibility: root.visibility,
+            isAuthor: root.created_by === userId,
           }) !== 'NONE',
       )
       .map((root) => ({
