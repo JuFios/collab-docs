@@ -254,6 +254,36 @@ describe('DocRoom', () => {
       expect(room.doc.getXmlFragment('content').toString()).toContain('ok');
     });
 
+    it('does not apply, fan out or persist an update that fails halfway through', () => {
+      const { room, observer, store } = setup();
+      const sender = new TestClient(room);
+      const watcher = new TestClient(room);
+      sender.join();
+      watcher.join();
+      sender.settle();
+      watcher.settle();
+      const enqueue = jest.spyOn(store, 'enqueue');
+
+      // Yjs applies the structs first and reads the delete set afterwards: cutting the tail makes the update
+      // throw only after its content is already in the document
+      const source = new Y.Doc();
+      const text = new Y.XmlText();
+      source.getXmlFragment('content').insert(0, [text]);
+      text.insert(0, 'smuggled');
+      const update = Y.encodeStateAsUpdate(source);
+      sender.sendRaw(
+        frame(COLLAB_MESSAGE.sync, (e) => syncProtocol.writeUpdate(e, update.subarray(0, -1))),
+      );
+      sender.settle();
+      watcher.settle();
+
+      expect(observer.rejected).toEqual(['invalid']);
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('smuggled');
+      expect(watcher.value()).not.toContain('smuggled');
+      expect(enqueue).not.toHaveBeenCalled();
+      source.destroy();
+    });
+
     it('refuses updates that would push the document past its size limit', () => {
       const { room, observer } = setup({ maxDocumentBytes: 300 });
       const client = new TestClient(room);

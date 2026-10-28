@@ -334,6 +334,9 @@ export class DocRoom {
     }
     this.appliedChange = false;
     try {
+      // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
+      // decode first, or an update called "rejected" has already changed the document
+      Y.decodeUpdate(update);
       Y.applyUpdate(this.doc, update, state);
     } catch (error) {
       return this.reject(state, 'invalid', error);

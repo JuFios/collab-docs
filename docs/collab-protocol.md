@@ -77,7 +77,8 @@ Sync step 2 and update messages from a client are applied to the room's `Y.Doc` 
 - the connection has `EDIT` or better (otherwise ignored; counted and logged as `collab.update_rejected`),
 - the update is at most `COLLAB_MAX_UPDATE_BYTES`, and applying it keeps the document under
   `COLLAB_MAX_DOCUMENT_BYTES`,
-- it decodes and applies (applied inside `try/catch`; a corrupt update never reaches the other clients), and
+- it decodes as a whole before anything is applied, so a malformed update never reaches the document, the other
+  clients or the store, and
 - it changes the document. A duplicate or no-op update is neither stored nor broadcast
   (`collab_updates_duplicate_total`).
 
