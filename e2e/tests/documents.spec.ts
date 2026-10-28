@@ -133,6 +133,76 @@ test.describe('document tree', () => {
     expect(await rows(page)).toEqual(['One@1', 'Second@1']);
   });
 
+  test('Rename in the row menu edits the title in place and keeps the field open', async ({
+    signedInPage: page,
+  }) => {
+    const workspaceId = await createWorkspace(page, 'Row menu');
+    await createDocument(page, workspaceId, 'Old name');
+    await page.goto(`/workspaces/${workspaceId}`);
+
+    await page.getByRole('treeitem', { name: 'Old name' }).hover();
+    await page.getByRole('button', { name: 'Actions for Old name' }).click();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    // the menu hands focus back when it closes; that must not end the rename
+    const field = page.getByRole('treeitem').getByRole('textbox', { name: 'Document title' });
+    await expect(field).toBeFocused();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('New name');
+    await persisted(page, 'PATCH', /\/documents\/[0-9a-f-]{36}$/, () =>
+      page.keyboard.press('Enter'),
+    );
+    await expect(page.getByRole('treeitem', { name: 'New name' })).toBeVisible();
+    await expect(page.getByRole('treeitem')).toHaveCount(1);
+  });
+
+  test('Rename in the document menu moves the cursor to the title', async ({
+    signedInPage: page,
+  }) => {
+    const workspaceId = await createWorkspace(page, 'Page menu');
+    const id = await createDocument(page, workspaceId, 'Before');
+    await page.goto(`/workspaces/${workspaceId}/documents/${id}`);
+    const title = page.getByRole('textbox', { name: 'Document title' });
+    await expect(title).toHaveValue('Before');
+
+    await page.getByRole('button', { name: 'Document actions' }).click();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    await expect(title).toBeFocused();
+    await page.keyboard.type('After');
+    await persisted(page, 'PATCH', /\/documents\/[0-9a-f-]{36}$/, () =>
+      page.keyboard.press('Enter'),
+    );
+    await expect(page.getByRole('treeitem', { name: 'After' })).toBeVisible();
+  });
+
+  test('Copy link puts the address of the document on the clipboard', async ({
+    signedInPage: page,
+  }) => {
+    await page
+      .context()
+      .grantPermissions(['clipboard-read', 'clipboard-write'], { origin: ORIGIN });
+    const workspaceId = await createWorkspace(page, 'Copy');
+    const id = await createDocument(page, workspaceId, 'Copied');
+    await page.goto(`/workspaces/${workspaceId}/documents/${id}`);
+
+    await page.getByRole('button', { name: 'Document actions' }).click();
+    await page.getByRole('menuitem', { name: 'Copy link' }).click();
+    await expect(page.getByText('Link copied')).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      `${ORIGIN}/workspaces/${workspaceId}/documents/${id}`,
+    );
+  });
+
+  test('cancelling the trash dialog returns to the menu button', async ({ signedInPage: page }) => {
+    const workspaceId = await createWorkspace(page, 'Cancel trash');
+    const id = await createDocument(page, workspaceId, 'Stays');
+    await page.goto(`/workspaces/${workspaceId}/documents/${id}`);
+
+    await page.getByRole('button', { name: 'Document actions' }).click();
+    await page.getByRole('menuitem', { name: 'Move to trash' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('button', { name: 'Document actions' })).toBeFocused();
+  });
+
   test('a node created in one window appears in another without a reload', async ({
     browser,
     baseURL,

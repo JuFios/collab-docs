@@ -18,6 +18,7 @@ export function DeleteDocumentDialog({
   pending,
   onOpenChange,
   onConfirm,
+  returnFocusTo,
 }: {
   title: string;
   subpages: number;
@@ -25,10 +26,18 @@ export function DeleteDocumentDialog({
   pending: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
+  /** Where focus goes when the dialog closes; without it nothing has focus, as the dialog has no trigger of its own. */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusTo?.current) return;
+          event.preventDefault();
+          returnFocusTo.current.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Move “{title || 'Untitled'}” to trash?</DialogTitle>
           <DialogDescription>

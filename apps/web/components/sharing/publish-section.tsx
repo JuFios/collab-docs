@@ -1,7 +1,7 @@
 'use client';
 
 import type { PublicLink } from '@collab-docs/shared';
-import { useState } from 'react';
+import { useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,12 +36,14 @@ export function PublishSection({
   const update = useUpdatePublicLink(documentId);
   const revoke = useRevokePublicLink(documentId);
   const live = link?.status === 'active' ? link : undefined;
-  const [expiry, setExpiry] = useState('');
+  // read when a button is pressed: the field shows the stored expiry, and an untouched field must keep it
+  const expiryField = useRef<HTMLInputElement>(null);
+  const chosenExpiry = () => toExpiresAt(expiryField.current?.value ?? '');
   const pending = create.isPending || update.isPending || revoke.isPending;
 
   const publish = () =>
     create.mutate(
-      { mode: 'VIEW', expiresAt: toExpiresAt(expiry) },
+      { mode: 'VIEW', expiresAt: chosenExpiry() },
       {
         onSuccess: (created) => {
           if (created.flushed === false) {
@@ -72,14 +74,19 @@ export function PublishSection({
                 type="datetime-local"
                 defaultValue={toLocalInput(live.expiresAt)}
                 key={live.expiresAt ?? 'never'}
-                onChange={(event) => setExpiry(event.target.value)}
+                ref={expiryField}
               />
             </div>
             <Button
               type="button"
               variant="outline"
               disabled={pending}
-              onClick={() => update.mutate({ linkId: live.id, expiresAt: toExpiresAt(expiry) })}
+              onClick={() =>
+                update.mutate(
+                  { linkId: live.id, expiresAt: chosenExpiry() },
+                  { onSuccess: () => toast.success('Expiry updated') },
+                )
+              }
             >
               Update expiry
             </Button>
@@ -103,11 +110,7 @@ export function PublishSection({
           <div className="flex flex-wrap items-end gap-2">
             <div className="grid gap-1">
               <Label htmlFor="publish-expiry">Expires (optional)</Label>
-              <Input
-                id="publish-expiry"
-                type="datetime-local"
-                onChange={(event) => setExpiry(event.target.value)}
-              />
+              <Input id="publish-expiry" type="datetime-local" ref={expiryField} />
             </div>
             <Button type="button" disabled={pending || block !== null} onClick={publish}>
               Publish to web

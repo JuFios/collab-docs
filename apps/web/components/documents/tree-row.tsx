@@ -59,6 +59,9 @@ export function TreeRowItem(props: TreeRowProps) {
   const canCreate = canEdit && roleAtLeast(role, 'EDITOR');
   const { ref, handleRef, isDragSource } = useDraggable({ id: node.id, disabled: !canEdit });
   const elementRef = useRef<HTMLDivElement | null>(null);
+  // the menu closes because the rename started, and it reads this when it does, after the render that started it
+  const renamingRef = useRef(renaming);
+  renamingRef.current = renaming;
   const label = node.title || DEFAULT_DOCUMENT_TITLE;
 
   const setElement = (element: HTMLDivElement | null) => {
@@ -197,9 +200,10 @@ export function TreeRowItem(props: TreeRowProps) {
               <DropdownMenuContent
                 align="end"
                 onCloseAutoFocus={(event) => {
-                  // focus goes back to the row, not to the (hidden, untabbable) trigger
+                  // focus goes back to the row, not to the (hidden, untabbable) trigger; while the row is being
+                  // renamed the title field has it, and taking it away would end the rename at once
                   event.preventDefault();
-                  elementRef.current?.focus();
+                  if (!renamingRef.current) elementRef.current?.focus();
                 }}
               >
                 {canCreate ? (
