@@ -2,6 +2,7 @@ import { invitePreviewSchema } from '@collab-docs/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AuthCard } from '@/components/auth/auth-card';
+import { RenewSession } from '@/components/auth/renew-session';
 import { Button } from '@/components/ui/button';
 import { AcceptInviteForm } from '@/components/workspaces/accept-invite-form';
 import { isApiError } from '@/lib/api/errors';
@@ -52,6 +53,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   if (!user) {
     return (
       <AuthCard title={`Join ${preview.workspaceName}`} description={summary}>
+        <RenewSession />
         <p className="mb-4 text-sm text-muted-foreground">
           Sign in or create an account with {preview.email} to accept.
         </p>
