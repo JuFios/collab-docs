@@ -127,8 +127,14 @@ signedInTest.describe('static policy and cached pages', () => {
       signedInExpect(link.status()).toBe(201);
       const { slug } = (await link.json()) as { slug: string };
 
-      // the first request may fill the cache; from the second on, the page comes out of it
-      await request.get(`/published/${slug}`);
+      // the first request may fill the cache, and the worker revalidates the page that was just published, which
+      // empties it once more; after that the page comes out of the cache
+      await signedInExpect
+        .poll(async () => (await request.get(`/published/${slug}`)).headers()['x-nextjs-cache'], {
+          timeout: 15_000,
+          intervals: [500],
+        })
+        .toBe('HIT');
       const second = await request.get(`/published/${slug}`);
       signedInExpect(second.status()).toBe(200);
       const headers = second.headers();

@@ -60,7 +60,7 @@ export async function invitedMember(
   );
   await owner.goto(`/workspaces/${workspaceId}/settings`);
   await owner.getByRole('textbox', { name: 'Email' }).fill(member.email);
-  await owner.getByRole('combobox', { name: 'Role' }).selectOption({ label: role });
+  await owner.getByRole('combobox', { name: 'Role', exact: true }).selectOption({ label: role });
   await owner.getByRole('button', { name: 'Send invitation' }).click();
   const { page, context } = await signedIn(browser, baseURL, member);
   await page.goto(new URL(await inviteLinkFor(member.email)).pathname);

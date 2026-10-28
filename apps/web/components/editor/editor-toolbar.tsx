@@ -164,6 +164,11 @@ export function EditorToolbar({
           open
           initialHref={state.href}
           onOpenChange={setLinkOpen}
+          onCloseAutoFocus={(event) => {
+            // the dialog has no trigger to return to; the caret and the selection are still where they were
+            event.preventDefault();
+            editor.commands.focus();
+          }}
           onSubmit={(href) => {
             chain().extendMarkRange('link').setLink({ href }).run();
             setLinkOpen(false);

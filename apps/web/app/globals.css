@@ -236,3 +236,14 @@
   user-select: none;
   white-space: nowrap;
 }
+
+/*
+ * The coloured toasts of the library (`richColors`) fall just under the contrast the text needs (4.5:1) on their
+ * pale backgrounds; a darker shade of each colour for the text clears it.
+ */
+[data-sonner-toaster][data-sonner-theme='light'] [data-sonner-toast] {
+  --success-text: hsl(140, 100%, 20%);
+  --error-text: hsl(360, 100%, 35%);
+  --info-text: hsl(210, 92%, 33%);
+  --warning-text: hsl(31, 92%, 28%);
+}

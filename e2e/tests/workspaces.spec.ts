@@ -158,6 +158,21 @@ test.describe('workspaces', () => {
     await expect(page.getByRole('link', { name: 'Sign in' })).toHaveCount(0);
   });
 
+  test('cancelling a dialog returns focus to the button that opened it', async ({
+    signedInPage: page,
+  }) => {
+    const workspaceId = await createWorkspace(page, 'Focus back');
+    await page.goto(`/workspaces/${workspaceId}`);
+    const leave = page.getByRole('button', { name: 'Leave workspace' });
+    await leave.click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(leave).toBeFocused();
+
+    await leave.click();
+    await page.keyboard.press('Escape');
+    await expect(leave).toBeFocused();
+  });
+
   test('an invitation for another account cannot be accepted', async ({
     browser,
     baseURL,
@@ -231,6 +246,11 @@ test.describe('workspaces', () => {
     await expect(alert).toContainText('pending invitations count too');
     // what was typed stays in the form
     await expect(owner.getByRole('textbox', { name: 'Email' })).toHaveValue('three@example.test');
+
+    // the refusal does not outlive the slot that is freed
+    await owner.getByRole('button', { name: 'Revoke invitation for one@example.test' }).click();
+    await expect(owner.getByText('2 of 3 member slots used')).toBeVisible();
+    await expect(alert).toHaveCount(0);
   });
 
   test('members without admin rights cannot open settings, and strangers get a not-found page', async ({

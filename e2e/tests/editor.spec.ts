@@ -401,6 +401,26 @@ test.describe('editor features', () => {
     await expect(panel.getByRole('button', { name: /Before restore/ })).toBeVisible();
   });
 
+  test('closing the link dialog leaves the caret in the editor', async ({ signedInPage: page }) => {
+    const workspaceId = await createWorkspace(page, 'Link focus');
+    const documentId = await createDocument(page, workspaceId, 'Links');
+    await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
+    const editor = page.getByRole('textbox', { name: 'Document content' });
+    await expect(editor).toHaveAttribute('contenteditable', 'true');
+    await editor.click();
+    await page.keyboard.type('some words');
+    await page.keyboard.press('ControlOrMeta+a');
+
+    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Link' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(editor).toBeFocused();
+    // typing goes on where it was, replacing the selection that was never lost
+    await page.keyboard.type('replaced');
+    await expect(editor).toContainText('replaced');
+    await expect(editor).not.toContainText('some words');
+  });
+
   test('blocks are inserted from the slash menu and the toolbar', async ({
     signedInPage: page,
   }) => {
