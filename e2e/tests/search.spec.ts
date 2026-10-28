@@ -94,7 +94,7 @@ test.describe('search', () => {
     // a page that has not hydrated yet resets the field and swallows the click: repeat until the query is sent
     await expect(async () => {
       await searchField(page).fill('nothingmatchesthis');
-      await page.getByRole('button', { name: 'Search' }).click();
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
       await expect(page).toHaveURL(/search\?q=nothingmatchesthis$/, { timeout: 2_000 });
     }).toPass({ timeout: 15_000 });
     await expect(page.getByText('No documents match “nothingmatchesthis”')).toBeVisible();
