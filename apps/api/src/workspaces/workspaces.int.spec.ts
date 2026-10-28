@@ -104,6 +104,9 @@ describe('workspaces, members, invites', () => {
     flush.disconnect();
     redis = new Redis(process.env.REDIS_URL as string);
     app = await createTestApp([], [MailWorkerModule]);
+    // listening once lets supertest reuse the address; without it every one of the parallel requests below
+    // would start the server itself, piling up listeners on one http.Server
+    await app.listen(0, '127.0.0.1');
     prisma = app.get(PrismaService, { strict: false });
 
     // capture the invite links regardless of whether a Mailpit is running; delivery still happens through the queue
