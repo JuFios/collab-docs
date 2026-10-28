@@ -30,7 +30,8 @@ const overflowOf = (page: Page) =>
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
-  { name: 'phone', width: 375, height: 812 },
+  // 360 is a common phone width and what 375 comes down to where scrollbars take room (Linux, CI)
+  { name: 'phone', width: 360, height: 812 },
 ] as const;
 
 for (const viewport of VIEWPORTS) {

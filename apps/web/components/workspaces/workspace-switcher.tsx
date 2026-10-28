@@ -25,7 +25,7 @@ export function WorkspaceSwitcher({ workspaces }: { workspaces: readonly Workspa
       <DropdownMenuTrigger asChild>
         {/* the accessible name has to contain the visible text (WCAG 2.5.3) */}
         <Button variant="ghost" size="sm" aria-label={`${visibleName}, switch workspace`}>
-          {visibleName}
+          <span className="max-w-[7rem] truncate sm:max-w-[16rem]">{visibleName}</span>
           <ChevronDown className="h-3 w-3" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
