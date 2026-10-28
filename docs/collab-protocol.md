@@ -114,9 +114,10 @@ does the same, so guests are cut off at once; the 60 s check remains the fallbac
 ## Rooms
 
 A room is created when the first client connects (`DocumentStore.load`) and unloaded `COLLAB_ROOM_IDLE_MS` after
-the last one leaves, after the store has written its buffer and compacted the log (a room that could not be
-written stays loaded and is retried). `DocumentStore` is the only way a room touches storage; the Postgres
-implementation is described in the README ("CRDT persistence strategy").
+the last one leaves (an operation holding the room, such as a restore, postpones the unload until it finishes),
+after the store has written its buffer and compacted the log (a room that could not be written stays loaded and is
+retried). `DocumentStore` is the only way a room touches storage; the Postgres implementation is described in the
+README ("CRDT persistence strategy").
 
 ## Internal API (port 4002)
 

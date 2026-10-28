@@ -15,13 +15,16 @@ import {
   base64ToBytes,
 } from '@collab-docs/shared';
 import { COLLAB_INTERNAL } from '@collab-docs/shared';
-import { QUEUE_NAMES, QueueService, REDIS_CLIENT } from '@collab-docs/nest';
+import { parseConfig, QUEUE_NAMES, QueueService, REDIS_CLIENT } from '@collab-docs/nest';
 import type { Redis } from 'ioredis';
 import { DOCUMENT_STORE, type DocumentStore } from './rooms/document-store';
+import type { PostgresDocumentStore } from './rooms/postgres-document-store';
 import { RoomManager } from './rooms/room-manager';
 import { type RunningCollab, startCollab } from './test/collab-app';
 import { Client, makeTeam, settle, ticketFor, waitFor } from './test/collab-fixtures';
 import { PrismaService } from './prisma/prisma.service';
+
+const IDLE_MS = parseConfig(process.env).COLLAB_ROOM_IDLE_MS;
 
 describe('document persistence', () => {
   let collab: RunningCollab;
@@ -446,6 +449,62 @@ describe('document persistence', () => {
         async () => (await rooms.find(documentId)) === undefined,
         'the temporary room to unload',
       );
+    });
+
+    it('writes the restored content even when the last client leaves mid-restore', async () => {
+      const { editor, documentId } = await makeTeam(prisma);
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      const room = await rooms.find(documentId);
+      expect(room).toBeDefined();
+      client.paragraph().insert(0, 'version one');
+      await internal('flush', { documentId });
+      const snapshot = await versions.create({ documentId, kind: 'MANUAL', label: 'first' });
+
+      client.paragraph().insert(client.paragraph().length, ' and then version two');
+      await waitFor(
+        () => (store as PostgresDocumentStore).pendingCount(documentId) > 0,
+        'the server to buffer the second edit',
+      );
+
+      const realFlush = store.flush.bind(store);
+      let releaseGate!: () => void;
+      const gate = new Promise<void>((resolve) => (releaseGate = resolve));
+      let firstFlushReached!: () => void;
+      const reached = new Promise<void>((resolve) => (firstFlushReached = resolve));
+      let gated = false;
+      jest.spyOn(store, 'flush').mockImplementation(async (id: string) => {
+        if (!gated) {
+          gated = true;
+          firstFlushReached();
+          await gate;
+        }
+        return realFlush(id);
+      });
+
+      const responsePromise = internal('restore', {
+        documentId,
+        versionId: snapshot.id,
+        userId: editor.id,
+      });
+      await reached;
+      client.destroy();
+      await waitFor(() => room?.size === 0, 'the last client to leave');
+      // the room is empty now but the restore still holds the document: an idle unload must not take it away
+      await settle(IDLE_MS * 2);
+      releaseGate();
+
+      const response = await responsePromise;
+      expect(response.status).toBe(200);
+      expect(await content(documentId)).toContain('version one');
+      expect(await content(documentId)).not.toContain('version two');
+
+      const safety = await prisma.documentVersion.findFirstOrThrow({
+        where: { documentId, kind: 'PRE_RESTORE' },
+      });
+      const before = await versions.readDoc(documentId, safety.id);
+      expect(before?.getXmlFragment('content').toString()).toContain('version two');
+      before?.destroy();
     });
 
     it('answers 404 for a version of another document and 400 for a malformed request', async () => {
