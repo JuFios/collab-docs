@@ -184,7 +184,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup();
     mount(2);
     await user.click(screen.getByRole('button', { name: /Notifications/ }));
-    await user.click(await screen.findByRole('button', { name: 'Mark all as read' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Mark all as read' }));
     expect(request).toHaveBeenCalledWith(
       '/notifications/read',
       expect.objectContaining({ body: { all: true } }),

@@ -25,6 +25,7 @@ import { DeleteDocumentDialog } from './delete-document-dialog';
 import { TreeRowItem } from './tree-row';
 import { TreeSkeleton } from './tree-skeleton';
 import { useDocumentActions } from './use-document-actions';
+import { useRefreshListings } from './use-refresh-listings';
 
 interface DropTarget {
   overId: string;
@@ -62,6 +63,7 @@ export function DocumentTree() {
   const actions = useDocumentActions(expand);
   const move = useMoveDocument(workspaceId);
   const rename = useSaveDocumentTitle(workspaceId);
+  const refreshListings = useRefreshListings();
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function DocumentTree() {
   const dropTargetRef = useRef<DropTarget | null>(null);
   const elements = useRef(new Map<string, HTMLElement>());
   const refocus = useRef<string | null>(null);
+  const deleteOrigin = useRef<HTMLElement | null>(null);
 
   const canCreate = roleAtLeast(role, 'EDITOR');
   const tabbableId =
@@ -106,7 +109,15 @@ export function DocumentTree() {
     setRenamingId(null);
     refocus.current = node.id;
     const next = title.trim();
-    if (next !== node.title) rename.mutate({ id: node.id, title: next });
+    if (next !== node.title)
+      rename.mutate({ id: node.id, title: next }, { onSuccess: refreshListings });
+  };
+
+  const askToDelete = (node: TreeNode) => {
+    // the dialog has no trigger of its own, so it is told where focus goes when it closes
+    deleteOrigin.current = elements.current.get(node.id) ?? null;
+    setMenuId(null);
+    setDeleting(node);
   };
 
   const confirmDelete = async () => {
@@ -172,7 +183,7 @@ export function DocumentTree() {
         break;
       case 'Delete':
         event.preventDefault();
-        if (canEdit) setDeleting(node);
+        if (canEdit) askToDelete(node);
         break;
       case 'ContextMenu':
         event.preventDefault();
@@ -326,10 +337,7 @@ export function DocumentTree() {
                   setMenuId(null);
                   setRenamingId(node.id);
                 }}
-                onDelete={(node) => {
-                  setMenuId(null);
-                  setDeleting(node);
-                }}
+                onDelete={askToDelete}
               />
             ))}
           </div>
@@ -343,6 +351,7 @@ export function DocumentTree() {
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
+        returnFocusTo={deleteOrigin}
         onConfirm={() => void confirmDelete()}
       />
     </div>

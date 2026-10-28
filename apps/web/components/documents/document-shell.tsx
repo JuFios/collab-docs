@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { ShareDialog } from '@/components/sharing/share-dialog';
 import { useOptionalWorkspace } from '@/components/workspaces/workspace-provider';
 import { isApiError } from '@/lib/api/errors';
+import { copyText } from '@/lib/clipboard';
 import type { Viewer } from '@/lib/comments/queries';
 import { useDocumentQuery, useTree } from '@/lib/documents/queries';
 import { descendantIds, pathTo } from '@/lib/documents/tree';
@@ -98,6 +99,7 @@ function MemberShell({
   const tree = useTree();
   const actions = useDocumentActions();
   const [confirming, setConfirming] = useState(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const nodes = tree.data ?? [];
   const trail = pathTo(nodes, document.id);
   const canDelete = accessAtLeast(document.myAccess, 'EDIT');
@@ -115,6 +117,7 @@ function MemberShell({
           canDelete ? (
             <DocumentMenu
               document={document}
+              triggerRef={menuTrigger}
               onRename={focusTitle}
               onTrash={() => setConfirming(true)}
             />
@@ -127,6 +130,7 @@ function MemberShell({
         open={confirming}
         pending={actions.deleting}
         onOpenChange={setConfirming}
+        returnFocusTo={menuTrigger}
         onConfirm={() =>
           void actions.deleteDocument(document).then((ok) => {
             if (ok) setConfirming(false);
@@ -139,36 +143,47 @@ function MemberShell({
 
 function DocumentMenu({
   document,
+  triggerRef,
   onRename,
   onTrash,
 }: {
   document: DocumentDetails;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
   onRename: () => void;
   onTrash: () => void;
 }) {
+  const renameRequested = useRef(false);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Document actions">
+        <Button ref={triggerRef} variant="ghost" size="icon" aria-label="Document actions">
           <MoreHorizontal className="h-4 w-4" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(event) => {
+          // the menu returns focus to its trigger when it closes; the title field takes it instead
+          if (!renameRequested.current) return;
+          renameRequested.current = false;
+          event.preventDefault();
+          onRename();
+        }}
+      >
         <DropdownMenuItem
           onSelect={() => {
-            void navigator.clipboard
-              ?.writeText(
-                `${window.location.origin}/workspaces/${document.workspaceId}/documents/${document.id}`,
-              )
-              .then(() => toast.success('Link copied'))
-              .catch(() => toast.error('Could not copy the link'));
+            const url = `${window.location.origin}/workspaces/${document.workspaceId}/documents/${document.id}`;
+            void copyText(url).then((ok) =>
+              ok ? toast.success('Link copied') : toast.error('Could not copy the link'),
+            );
           }}
         >
           <Link2 className="h-4 w-4" aria-hidden /> Copy link
         </DropdownMenuItem>
         <DropdownMenuItem
-          // the menu returns focus to its trigger when it closes; focus the field after that
-          onSelect={() => setTimeout(onRename, 0)}
+          onSelect={() => {
+            renameRequested.current = true;
+          }}
         >
           <Pencil className="h-4 w-4" aria-hidden /> Rename
         </DropdownMenuItem>

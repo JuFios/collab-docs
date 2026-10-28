@@ -4,9 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicLink } from '@collab-docs/shared';
 
 const createMutate = vi.fn();
+const updateMutate = vi.fn();
 vi.mock('@/lib/sharing/queries', () => ({
   useCreatePublicLink: () => ({ mutate: createMutate, isPending: false }),
-  useUpdatePublicLink: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdatePublicLink: () => ({ mutate: updateMutate, isPending: false }),
   useRevokePublicLink: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -16,6 +17,7 @@ import { publishBlock } from './share-dialog';
 afterEach(() => {
   cleanup();
   createMutate.mockReset();
+  updateMutate.mockReset();
 });
 
 const live: PublicLink = {
@@ -84,5 +86,47 @@ describe('PublishSection', () => {
       'http://localhost:3000/published/plan-3fa9c1',
     );
     expect(screen.getByRole('button', { name: 'Unpublish' })).toBeEnabled();
+  });
+
+  it('keeps the stored expiry when the field is left as it is', () => {
+    const expiring = { ...live, expiresAt: '2031-05-01T10:30:00.000Z' };
+    render(
+      <PublishSection
+        documentId="d1"
+        link={expiring}
+        block={null}
+        origin="http://localhost:3000"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Update expiry' }));
+    expect(updateMutate).toHaveBeenCalledWith(
+      { linkId: 'l1', expiresAt: '2031-05-01T10:30:00.000Z' },
+      expect.anything(),
+    );
+  });
+
+  it('sends the date that was typed, and an emptied field removes the expiry', () => {
+    const expiring = { ...live, expiresAt: '2031-05-01T10:30:00.000Z' };
+    render(
+      <PublishSection
+        documentId="d1"
+        link={expiring}
+        block={null}
+        origin="http://localhost:3000"
+      />,
+    );
+    const field = screen.getByLabelText('Expires');
+    fireEvent.change(field, { target: { value: '2032-01-02T03:04' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update expiry' }));
+    expect(updateMutate).toHaveBeenLastCalledWith(
+      { linkId: 'l1', expiresAt: new Date('2032-01-02T03:04').toISOString() },
+      expect.anything(),
+    );
+    fireEvent.change(field, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update expiry' }));
+    expect(updateMutate).toHaveBeenLastCalledWith(
+      { linkId: 'l1', expiresAt: null },
+      expect.anything(),
+    );
   });
 });

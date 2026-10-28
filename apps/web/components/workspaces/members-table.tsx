@@ -34,7 +34,7 @@ interface Props {
 export function MembersTable({ workspaceId, members, currentUserId, actorRole }: Props) {
   const owners = members.filter((member) => member.role === 'OWNER').length;
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="relative overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <caption className="sr-only">Workspace members</caption>
         <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
@@ -130,7 +130,7 @@ function MemberRow({
 
   return (
     <tr className="border-t">
-      <td className="px-3 py-2">
+      <td className="px-3 py-2 [overflow-wrap:anywhere]">
         <div className="font-medium">
           {member.name}
           {isSelf ? <span className="ml-2 text-xs text-muted-foreground">(you)</span> : null}

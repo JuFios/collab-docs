@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { copyText } from '@/lib/clipboard';
 
 /** A read-only value with a copy button (the address of a page or an edit link). */
 export function CopyField({ label, value }: { label: string; value: string }) {
@@ -16,13 +17,11 @@ export function CopyField({ label, value }: { label: string; value: string }) {
         type="button"
         variant="outline"
         onClick={() => {
-          void navigator.clipboard
-            ?.writeText(value)
-            .then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            })
-            .catch(() => toast.error('Could not copy the link'));
+          void copyText(value).then((ok) => {
+            if (!ok) return toast.error('Could not copy the link');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          });
         }}
       >
         {copied ? (
