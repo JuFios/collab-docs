@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
-import { createDocument, createWorkspace } from '../workspace';
+import { logsOf } from '../logs';
+import { ORIGIN, createDocument, createWorkspace } from '../workspace';
 
 const FREE_DOCUMENT_LIMIT = 20;
 /** The webhook goes through two queues with retries, so the plan follows the payment by a few seconds. */
@@ -68,13 +69,62 @@ test.describe('billing', () => {
   test('a webhook delivered twice changes the plan and the invoices once', async ({
     signedInPage: page,
   }) => {
+    // the confirmation and the two repeats each wait on the queues
+    test.setTimeout(90_000);
     const workspaceId = await createWorkspace(page, 'Idempotency');
+    await openCheckout(page, workspaceId, 'Pro');
+    const sessionId = new URL(page.url()).pathname.split('/').pop();
+
+    // the payment, then the provider delivers the same event again and again; the ids come from the api so that
+    // the test waits for exactly those deliveries instead of for a guessed amount of time
+    const paid = await page.request.post(
+      `/api/mock-provider/checkout-sessions/${sessionId}/complete`,
+      {
+        headers: { origin: ORIGIN },
+      },
+    );
+    expect(paid.status(), await paid.text()).toBe(202);
+    const { eventId } = (await paid.json()) as { eventId: string };
+    await expect
+      .poll(async () => (await overview(page, workspaceId)).plan, {
+        timeout: CONFIRMATION_TIMEOUT,
+        intervals: [500, 1000],
+      })
+      .toBe('PRO');
+
+    const started = new Date(Date.now() - 60_000);
+    for (const repeat of [1, 2]) {
+      const again = await page.request.post(`/api/mock-provider/events/${eventId}/redeliver`, {
+        headers: { origin: ORIGIN },
+      });
+      expect(again.status(), `redelivery ${repeat}`).toBe(202);
+    }
+    await expect
+      .poll(
+        async () =>
+          (await logsOf('api', started)).lines.filter(
+            (line) => line.event === 'webhook.duplicate_delivery' && line.eventId === eventId,
+          ).length,
+        { timeout: CONFIRMATION_TIMEOUT, intervals: [500, 1000] },
+      )
+      .toBe(2);
+
+    const after = await overview(page, workspaceId);
+    expect(after.plan).toBe('PRO');
+    expect(after.invoices).toHaveLength(1);
+  });
+
+  test('the checkout button that re-sends the webhook leaves one plan change and one invoice', async ({
+    signedInPage: page,
+  }) => {
+    const workspaceId = await createWorkspace(page, 'Resend button');
     await openCheckout(page, workspaceId, 'Pro');
     await page.getByRole('button', { name: 'Pay and re-send webhook' }).click();
 
     await expect(page.getByText(/Paid through/)).toBeVisible({ timeout: CONFIRMATION_TIMEOUT });
-    // the second delivery is queued behind the first; give it time to arrive before looking for its effect
-    await page.waitForTimeout(3_000);
+    await expect(page.getByRole('region', { name: 'Invoices' })).toContainText('$12.00');
+    // that the repeat was really delivered is shown by the test above, which waits for it in the logs; this
+    // one covers the button of the mock checkout
     const after = await overview(page, workspaceId);
     expect(after.plan).toBe('PRO');
     expect(after.invoices).toHaveLength(1);

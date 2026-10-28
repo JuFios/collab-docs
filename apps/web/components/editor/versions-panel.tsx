@@ -113,9 +113,12 @@ export function VersionsPanel({
 
       {versions.isPending ? <LoadingState label="Loading versions…" /> : null}
       {versions.isError ? (
-        <p role="alert" className="text-destructive">
-          Could not load the version history.
-        </p>
+        <div role="alert" className="grid gap-2">
+          <p className="text-destructive">Could not load the version history.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void versions.refetch()}>
+            Try again
+          </Button>
+        </div>
       ) : null}
       {versions.data?.length === 0 ? (
         <p className="text-muted-foreground">
@@ -149,9 +152,17 @@ export function VersionsPanel({
         <section aria-label="Version preview" className="grid gap-2 border-t pt-3">
           {preview.isPending ? <LoadingState label="Loading preview…" /> : null}
           {preview.isError ? (
-            <p role="alert" className="text-destructive">
-              Could not load this version.
-            </p>
+            <div role="alert" className="grid gap-2">
+              <p className="text-destructive">Could not load this version.</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void preview.refetch()}
+              >
+                Try again
+              </Button>
+            </div>
           ) : null}
           {preview.data ? (
             <>

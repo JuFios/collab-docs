@@ -212,6 +212,73 @@ describe('collab gateway', () => {
       );
     });
 
+    it('merges what two clients wrote while both were disconnected, losing no insertion', async () => {
+      const { editor, owner, documentId } = await setup();
+      const a = await connect(editor, documentId);
+      const b = await connect(owner, documentId);
+      await waitFor(() => a.synced && b.synced, 'both clients to sync');
+      a.paragraph().insert(0, 'base text');
+      await waitFor(() => b.text() === 'base text', 'b to receive the paragraph');
+
+      a.provider.disconnect();
+      b.provider.disconnect();
+      await waitFor(() => !a.provider.wsconnected && !b.provider.wsconnected, 'both to disconnect');
+
+      // the same paragraph from both ends, a deletion, and a new block each
+      a.paragraph().insert(4, '[A]');
+      a.paragraph().insert(a.paragraph().length, ' end-A');
+      b.paragraph().insert(4, '[B]');
+      b.paragraph().delete(0, 2);
+      for (const [client, name] of [
+        [a, 'A'],
+        [b, 'B'],
+      ] as const) {
+        const block = new Y.XmlElement('paragraph');
+        block.insert(0, [new Y.XmlText(`block ${name}`)]);
+        client.doc.getXmlFragment('content').push([block]);
+      }
+      expect(a.text()).not.toContain('[B]');
+      expect(b.text()).not.toContain('[A]');
+
+      a.provider.connect();
+      b.provider.connect();
+      const fragment = (client: Client) => client.doc.getXmlFragment('content').toString();
+      await waitFor(() => a.synced && b.synced && fragment(a) === fragment(b), 'both to converge');
+      for (const piece of ['[A]', '[B]', 'end-A', 'block A', 'block B']) {
+        expect(fragment(a)).toContain(piece);
+      }
+      // b's deletion of the first two characters held
+      expect(fragment(a)).not.toContain('base');
+      await waitFor(
+        async () => (await stored(documentId)) === fragment(a),
+        'the database to hold the merged document',
+      );
+    });
+
+    it('applies a late, duplicated copy of an update once', async () => {
+      const { editor, owner, documentId } = await setup();
+      const a = await connect(editor, documentId);
+      const b = await connect(owner, documentId);
+      await waitFor(() => a.synced && b.synced, 'both clients to sync');
+      const sent: Uint8Array[] = [];
+      a.doc.on('update', (update: Uint8Array) => sent.push(update));
+      a.paragraph().insert(0, 'once');
+      await waitFor(() => b.text() === 'once', 'b to receive the text');
+
+      // the same update arrives again through another socket, as after a flaky reconnect
+      const echo = await connect(editor, documentId);
+      await waitFor(() => echo.synced, 'the echo client to sync');
+      for (const update of sent) Y.applyUpdate(echo.doc, update);
+      await settle(300);
+      expect(b.text()).toBe('once');
+      expect(echo.text()).toBe('once');
+      await waitFor(
+        async () => (await stored(documentId)).includes('once'),
+        'the text to be stored',
+      );
+      expect(await stored(documentId)).not.toContain('onceonce');
+    });
+
     it('tells a client when its changes are durable', async () => {
       const { editor, documentId } = await setup();
       const client = await connect(editor, documentId);

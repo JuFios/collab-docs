@@ -10,5 +10,13 @@ export default defineConfig({
     exclude: ['node_modules', '.next'],
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
+    // informational (`COVERAGE=1`): the CI summary reads `coverage/coverage-summary.json`
+    coverage: {
+      enabled: Boolean(process.env.COVERAGE),
+      provider: 'v8',
+      reporter: ['text-summary', 'json-summary'],
+      include: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.{ts,tsx}'],
+    },
   },
 });
