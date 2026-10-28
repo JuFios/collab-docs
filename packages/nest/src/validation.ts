@@ -1,14 +1,9 @@
 import { ParseUUIDPipe, ValidationPipe, type ValidationError } from '@nestjs/common';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import type { ValidationIssue } from '@collab-docs/shared';
-import {
-  DEFAULT_PAGE_SIZE,
-  type IdParam,
-  MAX_PAGE_SIZE,
-  type PaginationQuery,
-} from '@collab-docs/shared';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type PaginationQuery } from '@collab-docs/shared';
 import { ValidationFailedException } from './exceptions';
 
 function flatten(errors: ValidationError[], prefix = ''): ValidationIssue[] {
@@ -58,10 +53,4 @@ export class PaginationQueryDto implements PaginationQuery {
   @Min(1)
   @Max(MAX_PAGE_SIZE)
   pageSize = DEFAULT_PAGE_SIZE;
-}
-
-export class IdParamDto implements IdParam {
-  @ApiProperty({ type: String, format: 'uuid' })
-  @IsUUID()
-  id!: string;
 }

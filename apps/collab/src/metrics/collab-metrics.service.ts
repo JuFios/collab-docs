@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Counter, Gauge, Histogram } from 'prom-client';
+import { Counter, Gauge, Histogram } from '@prometheus-io/client';
 import { MetricsService } from '@collab-docs/nest';
 import type { RejectReason, RoomObserver } from '../rooms/doc-room';
 import type { PersistenceObserver } from '../rooms/postgres-document-store';

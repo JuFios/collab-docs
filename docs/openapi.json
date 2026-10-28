@@ -8,6 +8,16 @@
         "responses": {
           "200": {
             "description": "The process is alive; no dependency is checked"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -176,6 +186,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -204,6 +224,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -239,6 +269,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Sign in with email and password",
@@ -259,6 +299,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -291,6 +351,26 @@
         "responses": {
           "302": {
             "description": "Redirect to `next` (or to /login on failure)"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -311,6 +391,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -335,6 +435,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthUserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -378,6 +498,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -406,6 +546,26 @@
                   "items": {
                     "$ref": "#/components/schemas/WorkspaceResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -445,6 +605,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -495,6 +675,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -531,6 +731,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -573,6 +793,26 @@
                   "items": {
                     "$ref": "#/components/schemas/MemberResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -634,6 +874,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -673,6 +933,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -723,6 +1003,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -760,6 +1060,26 @@
                   "items": {
                     "$ref": "#/components/schemas/InviteResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -803,6 +1123,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -842,6 +1182,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "What an invite token is for (400 INVITE_INVALID if unusable)",
@@ -871,6 +1221,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AcceptInviteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -908,6 +1278,26 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -958,6 +1348,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -998,6 +1408,26 @@
                   "items": {
                     "$ref": "#/components/schemas/TreeNodeResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1055,6 +1485,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1097,6 +1547,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1124,6 +1594,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1166,6 +1656,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1188,6 +1698,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1225,6 +1755,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1278,6 +1828,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1311,6 +1881,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1341,6 +1931,26 @@
                   "items": {
                     "$ref": "#/components/schemas/ShareResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1380,6 +1990,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ShareResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1432,6 +2062,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1462,6 +2112,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1494,8 +2164,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1536,6 +2226,26 @@
                   "items": {
                     "$ref": "#/components/schemas/VersionResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1588,8 +2298,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The document already has 100 saved versions"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1634,6 +2364,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VersionContentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1686,8 +2436,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "503": {
             "description": "The collaboration service is not available"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1739,11 +2509,31 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "PLAN_LIMIT_EXCEEDED with `details.kind = \"storage\"`"
           },
           "413": {
             "description": "The file is larger than the per-file limit"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1785,8 +2575,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "The upload is missing or does not match (`details.reason`)"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1827,6 +2637,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1858,6 +2688,26 @@
                   "items": {
                     "$ref": "#/components/schemas/PublicLinkResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1901,8 +2751,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1953,8 +2823,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The link was revoked"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1986,6 +2876,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2029,6 +2939,16 @@
           },
           "404": {
             "description": "The page is not available"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Sanitised content of a published page",
@@ -2066,6 +2986,16 @@
           },
           "404": {
             "description": "The page or the image is not available"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Image of a published page",
@@ -2104,6 +3034,16 @@
           },
           "410": {
             "description": "LINK_EXPIRED or DOCUMENT_DELETED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "State of an edit link",
@@ -2145,6 +3085,16 @@
           },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Collab ticket for a guest with an edit link",
@@ -2208,8 +3158,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2229,7 +3199,7 @@
     "/api/notifications": {
       "get": {
         "description": "From every workspace. A notification about a document the caller can no longer open is not listed.",
-        "operationId": "InboxController_list",
+        "operationId": "NotificationsController_list",
         "parameters": [
           {
             "name": "limit",
@@ -2272,6 +3242,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2290,7 +3280,7 @@
     },
     "/api/notifications/unread-count": {
       "get": {
-        "operationId": "InboxController_unreadCount",
+        "operationId": "NotificationsController_unreadCount",
         "parameters": [],
         "responses": {
           "200": {
@@ -2299,6 +3289,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnreadCountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2321,7 +3331,7 @@
     "/api/notifications/read": {
       "post": {
         "description": "Pass `ids` (up to 100) or `all: true`. Only the caller’s own notifications are affected.",
-        "operationId": "InboxController_markRead",
+        "operationId": "NotificationsController_markRead",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -2340,6 +3350,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MarkReadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2400,6 +3430,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2449,8 +3499,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2501,6 +3571,26 @@
                   "items": {
                     "$ref": "#/components/schemas/MentionableUserResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2556,8 +3646,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2599,6 +3709,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2637,6 +3767,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2692,8 +3842,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2726,6 +3896,26 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2756,6 +3946,26 @@
                   "items": {
                     "$ref": "#/components/schemas/PlanInfoResponse"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2796,6 +4006,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BillingOverviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2850,8 +4080,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The workspace is already on that plan"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2893,8 +4143,28 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The workspace is on the FREE plan"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2938,6 +4208,16 @@
           },
           "401": {
             "description": "WEBHOOK_SIGNATURE_INVALID"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Receives an event of the mock payment provider",
@@ -2966,6 +4246,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MockCheckoutSessionResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3004,6 +4294,16 @@
           },
           "409": {
             "description": "The session was already settled"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Pays the session",
@@ -3038,6 +4338,16 @@
           },
           "409": {
             "description": "The session was already settled"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Declines the payment (`checkout.session.failed`)",
@@ -3067,6 +4377,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventIssuedResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5121,6 +6441,81 @@
         },
         "required": [
           "eventId"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 400
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "VALIDATION_FAILED",
+              "BAD_REQUEST",
+              "UNAUTHENTICATED",
+              "TOKEN_EXPIRED",
+              "FORBIDDEN",
+              "CSRF_REJECTED",
+              "NOT_FOUND",
+              "CONFLICT",
+              "RATE_LIMITED",
+              "PLAN_LIMIT_EXCEEDED",
+              "LINK_EXPIRED",
+              "DOCUMENT_DELETED",
+              "INVITE_INVALID",
+              "WEBHOOK_SIGNATURE_INVALID",
+              "PAYLOAD_TOO_LARGE",
+              "SERVICE_UNAVAILABLE",
+              "INTERNAL_ERROR"
+            ],
+            "description": "Branch on this, never on `message`."
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "description": "For `VALIDATION_FAILED`: one entry per invalid field. Other codes may add an object.",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "field",
+                    "messages"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "The same id is returned in the `x-correlation-id` header."
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "correlationId"
         ]
       }
     }

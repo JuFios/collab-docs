@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
-import { Counter } from 'prom-client';
+import { Counter } from '@prometheus-io/client';
 import { MetricsService, REDIS_CLIENT, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { LIVE_DOCUMENT } from '../prisma/live-document';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';

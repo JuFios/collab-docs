@@ -10,7 +10,7 @@ import {
 } from '@collab-docs/shared';
 import { extractBlockIds, yDocToContentJson } from '@collab-docs/shared/content';
 import { AppException, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
-import { InboxService } from '../inbox/inbox.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { viewableDocumentSql } from '../permissions/document-access-sql';
 import { PermissionsService, notFound } from '../permissions/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -53,7 +53,7 @@ export class CommentsService {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
     private readonly reader: DocumentStateReader,
-    private readonly inbox: InboxService,
+    private readonly notifications: NotificationsService,
     @InjectPinoLogger(CommentsService.name) private readonly logger: PinoLogger,
   ) {}
 
@@ -95,7 +95,7 @@ export class CommentsService {
       );
       return { thread, comment, warnings: prepared.warnings, created };
     });
-    await this.inbox.announce(created);
+    await this.notifications.announce(created);
     return {
       thread: toThread({ ...thread, comments: [comment] }, false),
       warnings,
@@ -120,7 +120,7 @@ export class CommentsService {
       );
       return { comment, warnings: prepared.warnings, created };
     });
-    await this.inbox.announce(created);
+    await this.notifications.announce(created);
     return { comment: toComment(comment), warnings };
   }
 
@@ -161,7 +161,7 @@ export class CommentsService {
       );
       return { comment, warnings: prepared.warnings, created };
     });
-    await this.inbox.announce(created);
+    await this.notifications.announce(created);
     return { comment: toComment(comment), warnings };
   }
 
@@ -183,7 +183,7 @@ export class CommentsService {
         data: { deletedAt: new Date(), body: '' },
       });
       await tx.commentMention.deleteMany({ where: { commentId } });
-      await this.inbox.removeForComment(tx, commentId);
+      await this.notifications.removeForComment(tx, commentId);
     });
   }
 
@@ -343,7 +343,7 @@ export class CommentsService {
       where: { id: documentId },
       select: { workspaceId: true, title: true },
     });
-    return this.inbox.syncMentions(tx, {
+    return this.notifications.syncMentions(tx, {
       commentId: comment.id,
       recipientIds: [...prepared.mentioned.keys()].filter((id) => id !== comment.authorId),
       payload: {

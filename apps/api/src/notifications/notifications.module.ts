@@ -1,18 +1,15 @@
 import { Module } from '@nestjs/common';
-import { MailProcessor } from './mail.processor';
-import { MailQueueService } from './mail-queue.service';
-import { MailerService } from './mailer.service';
-import { MentionMailService } from './mention-mail.service';
+import { MailModule } from '../mail/mail.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RealtimeEventsModule } from '../realtime/realtime.module';
+import { NotificationsController } from './notifications.controller';
+import { NotificationsService } from './notifications.service';
 
-/** Enqueues emails (used by the api process) and renders the ones that depend on stored data. */
+/** Notifications API of the signed-in user; also the one place that writes them (`NotificationsService`). */
 @Module({
-  imports: [PrismaModule],
-  providers: [MailerService, MailQueueService, MentionMailService],
-  exports: [MailerService, MailQueueService, MentionMailService],
+  imports: [PrismaModule, RealtimeEventsModule, MailModule],
+  controllers: [NotificationsController],
+  providers: [NotificationsService],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}
-
-/** Registers the `mail` queue processor; imported by the worker process only. */
-@Module({ imports: [NotificationsModule], providers: [MailProcessor] })
-export class MailWorkerModule {}

@@ -374,7 +374,7 @@ export const IDOR_TABLE: Record<string, Row> = {
     call: async (r) => ({ params: { commentId: (await r.thread()).commentId } }),
   },
 
-  // --- notifications: a user's own inbox, nothing to aim at ---
+  // --- notifications: a user's own notifications, nothing to aim at ---
   'GET /api/notifications': authRow(200, () => ({})),
   'GET /api/notifications/unread-count': authRow(200, () => ({})),
   'POST /api/notifications/read': authRow(200, () => ({ body: { all: true } })),
