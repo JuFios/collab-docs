@@ -12,7 +12,7 @@ import { redeliverEnabled } from '@/lib/billing/mock-checkout';
 import { billingPath } from '@/lib/billing/return';
 
 export const metadata: Metadata = {
-  title: 'Checkout · Collab Docs',
+  title: 'Checkout',
   // the session id is the credential of the payment
   robots: { index: false },
   referrer: 'no-referrer',

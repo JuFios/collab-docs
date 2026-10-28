@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { EmptyState } from '@/components/states';
 import { getSharedDocuments } from '@/lib/workspaces/data';
 
-export const metadata: Metadata = { title: 'Shared with me · Collab Docs' };
+export const metadata: Metadata = { title: 'Shared with me' };
 
 export default async function SharedPage() {
   const documents = await getSharedDocuments();

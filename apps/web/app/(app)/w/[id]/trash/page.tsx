@@ -3,7 +3,7 @@ import { TrashList } from '@/components/documents/trash-list';
 import { EmptyState } from '@/components/states';
 import { getTrash, requireWorkspace } from '@/lib/workspaces/data';
 
-export const metadata: Metadata = { title: 'Trash · Collab Docs' };
+export const metadata: Metadata = { title: 'Trash' };
 
 export default async function TrashPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

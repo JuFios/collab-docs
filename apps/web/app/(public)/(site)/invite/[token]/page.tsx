@@ -11,7 +11,7 @@ import { getCurrentUser } from '@/lib/workspaces/data';
 import { ROLE_LABELS } from '@/lib/workspaces/labels';
 
 export const metadata: Metadata = {
-  title: 'Invitation · Collab Docs',
+  title: 'Invitation',
   // the URL carries a secret token
   robots: { index: false },
   referrer: 'no-referrer',

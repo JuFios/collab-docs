@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Collab Docs">
+  <rect width="32" height="32" rx="7" fill="#171717" />
+  <path d="M10 7h8l5 5v13a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" fill="#ffffff" />
+  <path d="M18 7v5h5" fill="none" stroke="#171717" stroke-width="1.6" stroke-linejoin="round" />
+  <path d="M12.5 17h7M12.5 20.5h7" stroke="#171717" stroke-width="1.6" stroke-linecap="round" />
+</svg>

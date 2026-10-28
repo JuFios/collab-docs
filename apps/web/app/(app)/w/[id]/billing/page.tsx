@@ -13,7 +13,7 @@ import { billingPath, parseBillingReturn } from '@/lib/billing/return';
 import { requireWorkspace } from '@/lib/workspaces/data';
 import { formatDate } from '@/lib/workspaces/labels';
 
-export const metadata: Metadata = { title: 'Billing · Collab Docs' };
+export const metadata: Metadata = { title: 'Billing' };
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (

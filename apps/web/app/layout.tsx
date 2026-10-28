@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Collab Docs',
+  title: { default: 'Collab Docs', template: '%s · Collab Docs' },
   description: 'Collaborative workspace with real-time document editing.',
 };
 

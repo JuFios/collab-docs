@@ -10,7 +10,7 @@ import {
 import { DashboardBlock } from '@/components/dashboard/dashboard-block';
 import { requireWorkspace } from '@/lib/workspaces/data';
 
-export const metadata: Metadata = { title: 'Overview · Collab Docs' };
+export const metadata: Metadata = { title: 'Overview' };
 
 /**
  * The page itself awaits only the (cached) workspace the layout already loaded. Each block below is an async

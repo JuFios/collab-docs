@@ -7,7 +7,16 @@ import { ForbiddenState } from '@/components/states';
 import { isApiError } from '@/lib/api/errors';
 import { getCurrentUser, getDocument, getTrash } from '@/lib/workspaces/data';
 
-export const metadata: Metadata = { title: 'Document · Collab Docs' };
+/** The tab shows the document's title; the page below asks for the same document, which React shares. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ docId: string }>;
+}): Promise<Metadata> {
+  const { docId } = await params;
+  const document = await getDocument(docId).catch(() => null);
+  return { title: document ? document.title || 'Untitled' : 'Document' };
+}
 
 const threadParam = z.string().uuid();
 

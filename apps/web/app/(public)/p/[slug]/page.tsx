@@ -19,12 +19,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   // the same call as the page's: Next shares the result between the two within one render
   const page = await getPublishedDocument(slug);
-  if (!page) return { title: 'Page not found · Collab Docs', robots: { index: false } };
+  if (!page) return { title: 'Page not found', robots: { index: false } };
   const title = page.title || 'Untitled';
   const url = `${webOrigin()}/p/${encodeURIComponent(slug)}`;
   return {
     metadataBase: new URL(webOrigin()),
-    title,
+    // the page belongs to its author: no site suffix
+    title: { absolute: title },
     description: page.description || undefined,
     alternates: { canonical: url },
     robots: { index: true, follow: true },
