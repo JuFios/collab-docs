@@ -16,6 +16,8 @@ const BATCH_SIZE = 25;
 @Injectable()
 export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
   private timer: NodeJS.Timeout | null = null;
+  /** The newest check started for a session: an older, slower answer must not overwrite a fresher one. */
+  private readonly generations = new WeakMap<Session, number>();
 
   constructor(
     private readonly config: ConfigService<AppConfig, true>,
@@ -50,9 +52,13 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
   }
 
   private async check(session: Session): Promise<void> {
+    const generation = (this.generations.get(session) ?? 0) + 1;
+    this.generations.set(session, generation);
     const { conn, room } = session;
     try {
       const outcome = await this.access.resolve(session.identity, session.documentId);
+      // a check started after this one owns the decision, whatever order the answers arrive in
+      if (this.generations.get(session) !== generation) return;
       switch (outcome.status) {
         case 'ok': {
           session.workspaceId = outcome.workspaceId;

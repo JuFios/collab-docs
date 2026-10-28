@@ -388,6 +388,43 @@ describe('collab gateway', () => {
     });
   });
 
+  describe('admission', () => {
+    it('decides access after the room has loaded, not before it', async () => {
+      const { editor, workspace, documentId } = await setup();
+      const realAcquire = rooms.acquire.bind(rooms);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let acquireCalled = false;
+      const spy = jest.spyOn(rooms, 'acquire').mockImplementation(async (id: string) => {
+        acquireCalled = true;
+        await gate;
+        return realAcquire(id);
+      });
+      try {
+        const client = await connect(editor, documentId);
+        await waitFor(() => acquireCalled, 'the admission to reach the room');
+        // revoked while the room is still loading; the connection is not in the session map yet
+        await prisma.workspaceMember.update({
+          where: { workspaceId_userId: { workspaceId: workspace.id, userId: editor.id } },
+          data: { role: 'VIEWER' },
+        });
+        await publish(PERM_EVENT_CHANNELS.permChanged, {
+          workspaceId: workspace.id,
+          userId: editor.id,
+          reason: 'role_changed',
+        });
+        await settle(50);
+        release();
+
+        const accessEvent = () => client.events.find((event) => event.type === 'access');
+        await waitFor(() => accessEvent() !== undefined, 'the access event');
+        expect(accessEvent()).toMatchObject({ level: 'VIEW', readOnly: true });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
   describe('permission changes on open sockets', () => {
     it('downgrades an editor to read-only on perm.changed and upgrades again', async () => {
       const { editor, workspace, owner, documentId } = await setup();

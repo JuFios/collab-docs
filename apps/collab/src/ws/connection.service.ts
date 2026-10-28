@@ -162,6 +162,15 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
         this.rooms.releaseIfEmpty(documentId);
         return;
       }
+      // a cold room takes a database round-trip to load, and permissions can change meanwhile: decide again
+      const latest = await this.access.resolve(identity, documentId);
+      if (state.closed) {
+        this.rooms.releaseIfEmpty(documentId);
+        return;
+      }
+      if (latest.status === 'not_found') return fail(COLLAB_CLOSE.notFound, 'document not found');
+      if (latest.status === 'deleted') return fail(COLLAB_CLOSE.deleted, 'document deleted');
+      if (latest.status === 'forbidden') return fail(COLLAB_CLOSE.forbidden, 'no access');
       const conn = new WsConnection(
         socket,
         identity.userId ?? null,
@@ -169,11 +178,11 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
         presenceColor(identity.userId ?? identity.linkId ?? 'guest'),
         ticketCorrelationId ?? correlationId,
       );
-      if (!room.connect(conn, outcome.access)) return;
+      if (!room.connect(conn, latest.access)) return;
       state.conn = conn;
-      this.rooms.attach({ conn, room, documentId, identity, workspaceId: outcome.workspaceId });
+      this.rooms.attach({ conn, room, documentId, identity, workspaceId: latest.workspaceId });
       log.info(
-        { event: 'collab.connected', connectionId: conn.id, access: outcome.access },
+        { event: 'collab.connected', connectionId: conn.id, access: latest.access },
         'collab connected',
       );
       ready(room, conn);
