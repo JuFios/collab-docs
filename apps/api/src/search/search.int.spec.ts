@@ -427,6 +427,22 @@ describe('search', () => {
       }
     });
 
+    it('finds a restricted document for the editor who wrote it, for nobody else', async () => {
+      const { editor, workspaceId } = await setup();
+      const own = await createDocument(editor, workspaceId, 'Pelican authored');
+      await as(editor).patch(`/documents/${own}`).send({ visibility: 'RESTRICTED' }).expect(200);
+      await edit(own, 'pelican body');
+      await until(async () => (await indexedRevision(own)) === (await currentRevision(own)));
+
+      expect(await idsFor(editor, workspaceId, 'pelican')).toEqual([own]);
+
+      const second = await register('editor2');
+      await prisma.workspaceMember.create({
+        data: { workspaceId, userId: second.id, role: 'EDITOR' },
+      });
+      expect(await idsFor(second, workspaceId, 'pelican')).toEqual([]);
+    });
+
     it('answers 404 to people outside the workspace, guests with a share included', async () => {
       const { owner, guest, outsider, workspaceId, open } = await seeded();
       await as(owner)

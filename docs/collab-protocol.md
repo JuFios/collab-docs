@@ -42,15 +42,19 @@ close the socket with 1009.
 ### Room events (type 100)
 
 ```json
-{ "type": "persisted", "sv": "<base64 Yjs state vector>" }
+{ "type": "persisted", "sv": "<base64 Yjs state vector>", "saved": true }
 { "type": "access", "level": "VIEW", "readOnly": true }
 { "type": "deleted" }
 ```
 
-- **`persisted`** is sent after every flush of the document to storage and once when a client connects. The state
-  vector covers everything that is durable. `y-websocket` does not acknowledge deliveries, so a client computes
-  `hasUnsyncedChanges = !covers(persistedSV, encodeStateVector(localDoc))` and drives its `Saved / Saving… /
-Offline` indicator from it. Publishing is allowed only when the persisted vector covers the local one.
+- **`persisted`** is sent after every flush of the document to storage, when a client repeats an update the room
+  already has, and once when a client connects. The state vector covers everything that is durable. After a flush
+  or a repeat, `saved` says that every update the room had received is stored too; the event sent on connect
+  carries only `sv`, because the client's offline changes have not arrived yet and nothing there can acknowledge
+  them. A state vector does not move for a deletion, so `saved` is what acknowledges one; a client treats a
+  missing `saved` as "not confirmed", keeps its own changes pending until an event says `saved: true`, and drives
+  its `Saved / Saving… / Offline` indicator from that. Publishing is allowed only when the server has confirmed
+  everything as stored.
 - **`access`** is sent on connect and whenever the permission of this socket changes. `readOnly` is true below
   `EDIT`. After a downgrade the client recreates its `Y.Doc` from the server state (local changes the server
   ignored are discarded, with a warning to the user).
@@ -73,7 +77,8 @@ Sync step 2 and update messages from a client are applied to the room's `Y.Doc` 
 - the connection has `EDIT` or better (otherwise ignored; counted and logged as `collab.update_rejected`),
 - the update is at most `COLLAB_MAX_UPDATE_BYTES`, and applying it keeps the document under
   `COLLAB_MAX_DOCUMENT_BYTES`,
-- it decodes and applies (applied inside `try/catch`; a corrupt update never reaches the other clients), and
+- it decodes as a whole before anything is applied, so a malformed update never reaches the document, the other
+  clients or the store, and
 - it changes the document. A duplicate or no-op update is neither stored nor broadcast
   (`collab_updates_duplicate_total`).
 
@@ -110,9 +115,10 @@ does the same, so guests are cut off at once; the 60 s check remains the fallbac
 ## Rooms
 
 A room is created when the first client connects (`DocumentStore.load`) and unloaded `COLLAB_ROOM_IDLE_MS` after
-the last one leaves, after the store has written its buffer and compacted the log (a room that could not be
-written stays loaded and is retried). `DocumentStore` is the only way a room touches storage; the Postgres
-implementation is described in the README ("CRDT persistence strategy").
+the last one leaves (an operation holding the room, such as a restore, postpones the unload until it finishes),
+after the store has written its buffer and compacted the log (a room that could not be written stays loaded and is
+retried). `DocumentStore` is the only way a room touches storage; the Postgres implementation is described in the
+README ("CRDT persistence strategy").
 
 ## Internal API (port 4002)
 

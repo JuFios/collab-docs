@@ -454,17 +454,19 @@ to the next request. Routes declare their requirement with `@WorkspaceRole('ADMI
 
 Document access, evaluated top to bottom:
 
-| #   | Condition                                | Access                                       |
-| --- | ---------------------------------------- | -------------------------------------------- |
-| 1   | Document is deleted                      | `NONE` (restore: Owner/Admin, Editor-author) |
-| 2   | Role is `OWNER` or `ADMIN`               | `MANAGE`                                     |
-| 3   | The user has a `document_share`          | share `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW` |
-| 4   | Member and visibility is `WORKSPACE`     | `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW`       |
-| 5   | Anything else (non-member, `RESTRICTED`) | `NONE`                                       |
+| #   | Condition                                      | Access                                       |
+| --- | ---------------------------------------------- | -------------------------------------------- |
+| 1   | Document is deleted                            | `NONE` (restore: Owner/Admin, Editor-author) |
+| 2   | Role is `OWNER` or `ADMIN`                     | `MANAGE`                                     |
+| 3   | The user has a `document_share`                | share `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW` |
+| 4   | The user wrote the document and is an `EDITOR` | `EDIT`                                       |
+| 5   | Member and visibility is `WORKSPACE`           | `EDITOR` -> `EDIT`, `VIEWER` -> `VIEW`       |
+| 6   | Anything else (non-member, `RESTRICTED`)       | `NONE`                                       |
 
-An explicit share overrides the workspace role in both directions. Public links are a separate path: a
-`VIEW` link allows anonymous reading of the published page, a live `EDIT` link grants `EDIT` on that one
-document to a guest who cannot comment.
+An explicit share overrides the workspace role in both directions. An `EDITOR` who wrote a document keeps
+`EDIT` on it even when it is `RESTRICTED`, so the author cannot lock themselves out; a `VIEWER` author is not
+upgraded. Public links are a separate path: a `VIEW` link allows anonymous reading of the published page, a live
+`EDIT` link grants `EDIT` on that one document to a guest who cannot comment.
 
 ```mermaid
 flowchart TD
@@ -474,19 +476,22 @@ flowchart TD
   C -- yes --> M[MANAGE]
   C -- no --> D{Has a share?}
   D -- yes --> S[VIEW or EDIT from the share]
-  D -- no --> E{Member and visibility WORKSPACE?}
+  D -- no --> AU{Author and EDITOR?}
+  AU -- yes --> AE[EDIT]
+  AU -- no --> E{Member and visibility WORKSPACE?}
   E -- yes --> R[VIEW or EDIT from the role]
   E -- no --> N
   M --> G{Enough for the action?}
   S --> G
+  AE --> G
   R --> G
   G -- yes --> OK[200]
   G -- no --> F[403]
 ```
 
-**404 vs 403.** No access at all (not a member, `RESTRICTED` without a share, deleted, unknown id, malformed
-id) gives `404`, so the response never confirms that a resource exists; access that is too low for the action
-gives `403`. A member of a workspace also gets `403` where a non-member gets `404`.
+**404 vs 403.** No access at all (not a member, `RESTRICTED` without a share or authorship, deleted, unknown
+id, malformed id) gives `404`, so the response never confirms that a resource exists; access that is too low for
+the action gives `403`. A member of a workspace also gets `403` where a non-member gets `404`.
 
 Creating a document needs `EDITOR` and `EDIT` on the parent; the child copies the parent's visibility and
 shares at that moment (a snapshot, not live inheritance). Moving needs `EDIT` on the document and on the new
@@ -631,24 +636,28 @@ any order reproduces the document, and the log is folded into a snapshot now and
 bytes)`, `ON CONFLICT DO NOTHING`, so a retried flush cannot insert twice) and, in the **same transaction**,
    does `revision = revision + 1, content_updated_at = now()`. A consumer that sees the new revision therefore
    finds the content.
-4. After the commit the store tells the room, which sends `persisted {sv}` to its clients, and (fire-and-forget)
-   queues `document.changed` for search (5 s debounce) and page revalidation (3 s). A Redis outage is logged and
-   counted, and editing continues.
+4. After the commit the store tells the room, which sends `persisted {sv, saved}` to its clients, and
+   (fire-and-forget) queues `document.changed` for search (5 s debounce) and page revalidation (3 s). A Redis
+   outage is logged and counted, and editing continues.
 
 **Failures.** If the write fails, the buffer is kept in order and retried with backoff (1, 2, 5, 10, then every
 30 s); a room whose updates are not written is not unloaded, and loading a document first writes whatever the store
 still holds for it. Shutdown (`SIGTERM`) flushes every buffer before the database connection is closed.
 
-**Saved means durable.** `y-websocket` does not acknowledge updates, so the server reports what is in the database
-as a state vector (`persisted`, also once on connect) and the client computes `hasUnsyncedChanges =
-!covers(persistedSV, localSV)` (`stateVectorCovers` in `@collab-docs/shared`). The same check gates publishing:
-"publish only saved changes".
+**Saved means durable.** `y-websocket` does not acknowledge updates, so after every flush — and when a client
+repeats an update the room already has — the server reports the state vector of what is in the database and
+whether everything it received is stored (`persisted {sv, saved}`). The event sent on connect carries only the
+vector: the client's offline changes have not reached the room yet, so nothing there can acknowledge them. A state
+vector does not move for a deletion, so the flag is what acknowledges one: the client keeps a local change unsaved
+until an event says `saved: true`, and the vector settles edits the server has not received yet
+(`stateVectorCovers` in `@collab-docs/shared`). A server that sends no `saved` counts as "not confirmed". The same
+check gates publishing: "publish only saved changes".
 
 **The loss window.** If the process is killed (`kill -9`, power) the server loses at most the updates buffered since
 its last flush, up to 5 s. They are not lost for good while the author's tab is open: the browser keeps its `Y.Doc`
 and, on reconnect, answers the server's sync step 1 with everything the server lacks. What cannot be recovered is
-a tab closed inside that window, which is why the editor is designed to show "Saving…" until `persisted` covers the
-local state and to warn before the page is left with unsaved changes.
+a tab closed inside that window, which is why the editor is designed to show "Saving…" until the server confirms
+the local state is stored and to warn before the page is left with unsaved changes.
 
 **Cold start.** `load` reads the compacted state and every log row with `id > last_update_id` in one
 repeatable-read transaction (a compaction between two separate reads could otherwise hide rows), merges them and
@@ -790,7 +799,7 @@ React elements, so no HTML string is ever built from user content.
 keystrokes may not be there yet (edge case "publish with local changes"). Two layers cover it:
 
 1. _Client contract_ (implemented with the share dialog): the Publish action is enabled only while
-   `!hasUnsyncedChanges`, i.e. when the `persisted` state vector covers the local one (see
+   `!hasUnsyncedChanges`, i.e. when the server has confirmed the latest local change as stored (see
    [CRDT persistence](#crdt-persistence-strategy)). While the editor says "Saving…" the button waits; offline it
    explains why it is disabled.
 2. _Server_: publishing a `VIEW` link first asks collab to write its buffer (`collab.flush`, 2 s limit). If collab
@@ -895,9 +904,10 @@ the worker process serves no endpoint, and a job that keeps failing shows up as 
 **Consistency.** The index is **eventually consistent**: a change is searchable roughly 5 s plus the job time
 after it was stored, and a document just created is found by its title only after that too. **Permissions are
 not part of the index.** Every request evaluates them in SQL: the caller must be a member, the document must not be
-deleted, and it must be visible to them: owner/admin, or `visibility = WORKSPACE`, or an explicit share (the
-same rules as `resolveDocumentAccess`, spec §4). So a removed share, a restricted document, a deleted document or a
-removed member stops matching on the next request, however far the index lags behind. The text of a result
+deleted, and it must be visible to them: owner/admin, the `EDITOR` who wrote it, a member of a
+`visibility = WORKSPACE` document, or an explicit share (the same rules as `resolveDocumentAccess`, spec §4). So a
+removed share, a restricted document, a deleted document or a removed member stops matching on the next request,
+however far the index lags behind. The text of a result
 comes from the index, the title from the document, so a rename shows at once in titles and is searchable after
 the job.
 
@@ -954,8 +964,8 @@ in-app notification (pushed live over SSE) and an email. All routes are under `/
 viewers do not (a viewer reads the threads and gets `403` when writing), and neither does a guest on an edit link.
 A guest with an `EDITOR` share has it. Routes that carry a thread or comment id resolve the document from the row
 and check access on **that** document, again inside the write transaction, so an id from another workspace, a
-restricted document without a share, a revoked share and a document in the trash are all `404`, the same as for
-a document id. A malformed id is `400`.
+restricted document the caller cannot open, a revoked share and a document in the trash are all `404`, the same
+as for a document id. A malformed id is `400`.
 
 **Body.** Plain text of 1 to 4000 characters, trimmed. It is never interpreted as HTML: the api returns it as
 written, clients draw it as text, and the email escapes it. A mention is the token `@[<user id>]`, which the client
@@ -1426,18 +1436,22 @@ instead of reconnecting forever; the hook still calls `disconnect()` on the fina
 the two it recovers from.
 
 **Why "Saved" rests on `persisted`.** A WebSocket send succeeding says nothing about the database, and
-`y-websocket` has no acknowledgements. The server therefore announces, after every flush and once on connect, the
-state vector of what is durable. The client compares it with its own: `hasUnsyncedChanges =
-!stateVectorCovers(persisted, encodeStateVector(ydoc))`. The indicator (`lib/collab/save-status.ts`) is derived from
-that and from the connection, so it cannot claim more than the server confirmed:
+`y-websocket` has no acknowledgements. The server therefore announces, after every flush and when a client
+repeats an update it already has, the state vector of what is durable and whether everything it received is
+stored (`saved`); the event on connect carries only the vector, since the client's offline changes are still on
+their way. A state vector cannot show a deletion, so the client keeps a local change unsaved until an event says
+`saved: true`; the vector then settles edits the server has not received yet. A server that sends no `saved`
+counts as "not confirmed". The indicator
+(`lib/collab/save-status.ts`) is derived from that and from the connection, so it cannot claim more than the
+server confirmed:
 
-| Indicator                                  | When                                                                                                      |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `Connecting…`                              | Before the first sync of this session                                                                     |
-| `Saving…`                                  | Connected and synced, but the persisted vector does not cover the local one (or the title is being saved) |
-| `Saved`                                    | Connected, synced, everything covered by `persisted`, title saved                                         |
-| `Offline — changes will sync on reconnect` | `navigator.onLine` is false or the socket dropped after it had been open                                  |
-| `Could not save`                           | The title request failed                                                                                  |
+| Indicator                                  | When                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `Connecting…`                              | Before the first sync of this session                                                                        |
+| `Saving…`                                  | Connected and synced, but the server has not confirmed the latest local change (or the title is being saved) |
+| `Saved`                                    | Connected, synced, every local change confirmed by `persisted {saved: true}`, title saved                    |
+| `Offline — changes will sync on reconnect` | `navigator.onLine` is false or the socket dropped after it had been open                                     |
+| `Could not save`                           | The title request failed                                                                                     |
 
 Readers (Viewer, or EDIT revoked) see only the connection states, never "Saved". Edits made while offline stay
 in the in-memory `Y.Doc` and merge on reconnect; nothing is kept in IndexedDB, so closing the tab while offline

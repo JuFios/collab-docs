@@ -105,6 +105,7 @@ export class PermissionsService {
       workspaceRole,
       shareRole: share?.role ?? null,
       visibility: document.visibility,
+      isAuthor: document.createdBy === userId,
     });
     return { access, workspaceRole, shareRole: share?.role ?? null, document };
   }

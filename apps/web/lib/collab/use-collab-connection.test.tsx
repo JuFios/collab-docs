@@ -113,8 +113,38 @@ describe('useCollabConnection', () => {
     expect(result.current.hasUnsyncedChanges).toBe(true);
 
     act(() =>
-      current().roomEvent({ type: 'persisted', sv: bytesToBase64(Y.encodeStateVector(ydoc)) }),
+      current().roomEvent({
+        type: 'persisted',
+        sv: bytesToBase64(Y.encodeStateVector(ydoc)),
+        saved: true,
+      }),
     );
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+  });
+
+  it('keeps a deletion unsaved until the server confirms it, since the vector does not move', async () => {
+    const { result } = await connected();
+    const ydoc = result.current.ydoc as Y.Doc;
+    act(() => ydoc.getText('t').insert(0, 'hello'));
+    act(() =>
+      current().roomEvent({
+        type: 'persisted',
+        sv: bytesToBase64(Y.encodeStateVector(ydoc)),
+        saved: true,
+      }),
+    );
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    const vector = Y.encodeStateVector(ydoc);
+    act(() => ydoc.getText('t').delete(0, 'hello'.length));
+    expect(Y.encodeStateVector(ydoc)).toEqual(vector);
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+
+    // a server that does not say `saved` cannot prove a deletion is durable
+    act(() => current().roomEvent({ type: 'persisted', sv: bytesToBase64(vector) }));
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+
+    act(() => current().roomEvent({ type: 'persisted', sv: bytesToBase64(vector), saved: true }));
     expect(result.current.hasUnsyncedChanges).toBe(false);
   });
 

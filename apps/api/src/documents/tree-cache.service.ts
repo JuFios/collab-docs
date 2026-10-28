@@ -40,8 +40,12 @@ export class TreeCacheService {
       version = Number((await this.redis.get(this.versionKey(workspaceId))) ?? 0);
       const cached = await this.redis.get(this.entryKey(workspaceId, version));
       if (cached) {
-        this.lookups.inc({ result: 'hit' });
-        return JSON.parse(cached) as TreeRow[];
+        const rows = JSON.parse(cached) as TreeRow[];
+        // an entry written before `createdBy` was cached cannot apply the author rule: reload it
+        if (rows.every((row) => typeof row.createdBy === 'string')) {
+          this.lookups.inc({ result: 'hit' });
+          return rows;
+        }
       }
     } catch (error) {
       this.logger.warn({ err: error }, 'tree cache read failed');
@@ -78,6 +82,7 @@ export class TreeCacheService {
         icon: true,
         position: true,
         visibility: true,
+        createdBy: true,
       },
     });
   }

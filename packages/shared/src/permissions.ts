@@ -37,6 +37,8 @@ export interface DocumentAccessContext {
   /** Explicit `document_share` of the user on this document. */
   shareRole: ShareRole | null;
   visibility: DocumentVisibility;
+  /** The user created the document. */
+  isAuthor: boolean;
 }
 
 /** Spec §4, rules 1-5. Public links are a separate path (`resolveLinkAccess`). */
@@ -45,6 +47,8 @@ export function resolveDocumentAccess(ctx: DocumentAccessContext): Access {
   if (ctx.workspaceRole === 'OWNER' || ctx.workspaceRole === 'ADMIN') return 'MANAGE';
   // an explicit share overrides the workspace role, upwards and downwards
   if (ctx.shareRole) return ctx.shareRole === 'EDITOR' ? 'EDIT' : 'VIEW';
+  // an Editor cannot lock themselves out of a document they wrote; a Viewer author is not upgraded
+  if (ctx.isAuthor && ctx.workspaceRole === 'EDITOR') return 'EDIT';
   if (ctx.workspaceRole && ctx.visibility === 'WORKSPACE') {
     return ctx.workspaceRole === 'EDITOR' ? 'EDIT' : 'VIEW';
   }

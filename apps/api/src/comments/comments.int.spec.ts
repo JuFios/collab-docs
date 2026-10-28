@@ -886,6 +886,20 @@ describe('comments and notifications', () => {
       expect(await unreadOf(team.editor2)).toBe(1);
     });
 
+    it('keeps a mention visible to the editor who wrote the document after it is restricted', async () => {
+      const team = await setup();
+      const documentId = await createDocument(team.editor, team.workspaceId, 'Authored');
+      await startThread(team.owner, documentId, `hello ${mention(team.editor)}`);
+      expect(await unreadOf(team.editor)).toBe(1);
+
+      await as(team.editor)
+        .patch(`/documents/${documentId}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
+      expect(await unreadOf(team.editor)).toBe(1);
+      expect((await notificationsOf(team.editor)).items).toHaveLength(1);
+    });
+
     it('removes the notifications of a deleted comment', async () => {
       const team = await setup();
       const documentId = await createDocument(team.owner, team.workspaceId);

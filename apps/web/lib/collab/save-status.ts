@@ -23,8 +23,8 @@ export const SAVE_STATUS_LABELS: Record<SaveStatus, string> = {
 
 /**
  * "Saved" means the server wrote everything to the database, not that the WebSocket accepted the bytes:
- * `y-websocket` has no acknowledgements, so `hasUnsyncedChanges` compares the local state vector with the one
- * the server reported as persisted.
+ * `y-websocket` has no acknowledgements, so `hasUnsyncedChanges` waits for a `persisted` event with `saved`
+ * (a state vector alone cannot acknowledge a deletion) that also covers the local state vector.
  */
 export function deriveSaveStatus(input: SaveStatusInput): SaveStatus {
   if (!input.online || input.connection === 'disconnected') return 'offline';

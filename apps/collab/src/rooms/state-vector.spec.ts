@@ -18,6 +18,10 @@ function client() {
       text.insert(text.length, value);
       return updates[updates.length - 1]!;
     },
+    remove(start: number, length: number) {
+      text.delete(start, length);
+      return updates[updates.length - 1]!;
+    },
   };
 }
 
@@ -75,5 +79,18 @@ describe('advanceStateVector', () => {
     const first = Y.mergeUpdates(peer.updates);
     const once = advanceStateVector(EMPTY, first);
     expect(decodeStateVector(advanceStateVector(once, first))).toEqual(decodeStateVector(once));
+  });
+
+  it('does not move for an update that only deletes, so it cannot acknowledge one', () => {
+    const peer = client();
+    const stored = advanceStateVector(EMPTY, Y.mergeUpdates(peer.updates));
+    peer.type('gone');
+    const storedAfterTyping = advanceStateVector(stored, peer.updates.at(-1)!);
+    const local = Y.encodeStateVector(peer.doc);
+    const deletion = peer.remove(0, 'gone'.length);
+
+    expect(deletion.byteLength).toBeGreaterThan(2);
+    expect(advanceStateVector(storedAfterTyping, deletion)).toEqual(storedAfterTyping);
+    expect(Y.encodeStateVector(peer.doc)).toEqual(local);
   });
 });

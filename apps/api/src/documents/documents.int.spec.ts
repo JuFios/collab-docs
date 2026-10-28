@@ -583,6 +583,38 @@ describe('documents', () => {
       );
     });
 
+    it('keeps a restricted document with the editor author: read, tree, recent, share and back', async () => {
+      const team = await setupTeam();
+      const doc = await createDoc(team.editor, team.workspaceId, { title: 'mine' });
+
+      await as(team.editor)
+        .patch(`/documents/${doc.id}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
+
+      const seen = await as(team.editor).get(`/documents/${doc.id}`).expect(200);
+      expect(seen.body).toMatchObject({ id: doc.id, visibility: 'RESTRICTED', myAccess: 'EDIT' });
+      expect(
+        (await treeOf(team.editor, team.workspaceId)).find((n) => n.id === doc.id),
+      ).toMatchObject({ myAccess: 'EDIT' });
+      const recent = (
+        await as(team.editor).get(`/workspaces/${team.workspaceId}/documents/recent`).expect(200)
+      ).body as Array<{ id: string; myAccess: string }>;
+      expect(recent.find((n) => n.id === doc.id)).toMatchObject({ myAccess: 'EDIT' });
+
+      // the fix is about the author, not about every editor
+      await as(team.editor2).get(`/documents/${doc.id}`).expect(404);
+      expect((await treeOf(team.editor2, team.workspaceId)).map((n) => n.id)).not.toContain(doc.id);
+
+      // the author may share it and make it visible again
+      await share(team.editor, doc.id, team.viewer, 'VIEWER');
+      await as(team.editor)
+        .patch(`/documents/${doc.id}`)
+        .send({ visibility: 'WORKSPACE' })
+        .expect(200);
+      await as(team.editor2).get(`/documents/${doc.id}`).expect(200);
+    });
+
     it('hides the parent id of a single document when the parent is inaccessible', async () => {
       const team = await setupTeam();
       const parent = await createDoc(team.owner, team.workspaceId);
@@ -594,6 +626,26 @@ describe('documents', () => {
       const seen = await as(team.editor).get(`/documents/${child.id}`).expect(200);
       expect(seen.body.parentId).toBeNull();
       expect((await as(team.owner).get(`/documents/${child.id}`)).body.parentId).toBe(parent.id);
+    });
+
+    it('reloads an entry cached before createdBy was stored instead of hiding the author', async () => {
+      const team = await setupTeam();
+      const doc = await createDoc(team.editor, team.workspaceId, { title: 'mine' });
+      await as(team.editor)
+        .patch(`/documents/${doc.id}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
+      const version = Number(await redis.get(`tree:ver:${team.workspaceId}`));
+      const key = `tree:${team.workspaceId}:${version}`;
+      await treeOf(team.editor, team.workspaceId);
+
+      const legacy = JSON.parse((await redis.get(key))!) as Array<Record<string, unknown>>;
+      for (const row of legacy) delete row.createdBy;
+      await redis.set(key, JSON.stringify(legacy));
+
+      expect((await treeOf(team.editor, team.workspaceId)).map((n) => n.id)).toContain(doc.id);
+      const rewritten = JSON.parse((await redis.get(key))!) as Array<Record<string, unknown>>;
+      expect(rewritten.every((row) => typeof row.createdBy === 'string')).toBe(true);
     });
 
     it('is cached per version, invalidated by every mutation, and counts hits and misses', async () => {

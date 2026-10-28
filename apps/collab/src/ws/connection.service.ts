@@ -98,6 +98,10 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     void this.admit(socket, request, state, (room, conn) => {
       deliver = (message) => room.receive(conn, message);
       for (const message of pending.splice(0)) deliver(message);
+    }).catch((error) => {
+      // admission has its own guards; this only keeps a bug from leaving the socket open and nobody notified
+      this.logger.error({ err: error }, 'collab admission failed');
+      socket.close(1011, 'internal error');
     });
   }
 
@@ -107,14 +111,23 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     state: { conn: WsConnection | null; documentId: string; closed: boolean },
     ready: (room: DocRoom, conn: WsConnection) => void,
   ): Promise<void> {
-    const url = new URL(request.url ?? '/', 'http://collab');
-    const documentId = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() ?? '');
     const correlationId = resolveCorrelationId(request.headers['x-correlation-id']);
-    const log = this.logger.logger.child({ correlationId, documentId });
+    const log = this.logger.logger.child({ correlationId, documentId: '' });
     const fail = (code: number, reason: string) => {
       log.info({ event: 'collab.connection_refused', code, reason }, 'collab connection refused');
       socket.close(code, reason);
     };
+
+    let url: URL;
+    let documentId: string;
+    try {
+      url = new URL(request.url ?? '/', 'http://collab');
+      documentId = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() ?? '');
+    } catch {
+      // the path is not even a document name (`/ws/%` makes decodeURIComponent throw), so it is "not found"
+      return fail(COLLAB_CLOSE.notFound, 'document not found');
+    }
+    log.setBindings({ documentId });
 
     if (!UUID.test(documentId)) return fail(COLLAB_CLOSE.notFound, 'document not found');
 
@@ -149,6 +162,15 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
         this.rooms.releaseIfEmpty(documentId);
         return;
       }
+      // a cold room takes a database round-trip to load, and permissions can change meanwhile: decide again
+      const latest = await this.access.resolve(identity, documentId);
+      if (state.closed) {
+        this.rooms.releaseIfEmpty(documentId);
+        return;
+      }
+      if (latest.status === 'not_found') return fail(COLLAB_CLOSE.notFound, 'document not found');
+      if (latest.status === 'deleted') return fail(COLLAB_CLOSE.deleted, 'document deleted');
+      if (latest.status === 'forbidden') return fail(COLLAB_CLOSE.forbidden, 'no access');
       const conn = new WsConnection(
         socket,
         identity.userId ?? null,
@@ -156,11 +178,11 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
         presenceColor(identity.userId ?? identity.linkId ?? 'guest'),
         ticketCorrelationId ?? correlationId,
       );
-      if (!room.connect(conn, outcome.access)) return;
+      if (!room.connect(conn, latest.access)) return;
       state.conn = conn;
-      this.rooms.attach({ conn, room, documentId, identity, workspaceId: outcome.workspaceId });
+      this.rooms.attach({ conn, room, documentId, identity, workspaceId: latest.workspaceId });
       log.info(
-        { event: 'collab.connected', connectionId: conn.id, access: outcome.access },
+        { event: 'collab.connected', connectionId: conn.id, access: latest.access },
         'collab connected',
       );
       ready(room, conn);

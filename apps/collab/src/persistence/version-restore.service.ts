@@ -24,6 +24,7 @@ export class VersionRestoreService {
     if (!snapshot) throw new AppException('NOT_FOUND', 'Version not found');
     try {
       const room = await this.rooms.acquire(documentId);
+      const release = this.rooms.lease(documentId);
       try {
         // what the room has so far must be in the database before the safety snapshot is taken from it
         await this.store.flush(documentId);
@@ -36,7 +37,7 @@ export class VersionRestoreService {
         room.replaceContent(snapshot);
         await this.store.flush(documentId);
       } finally {
-        this.rooms.releaseIfEmpty(documentId);
+        release();
       }
     } finally {
       snapshot.destroy();

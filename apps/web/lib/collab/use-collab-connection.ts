@@ -117,13 +117,15 @@ export function useCollabConnection(
     let everConnected = false;
     let failedRounds = 0;
     let unsynced = false;
+    // a local change the server has not confirmed as stored; a state vector alone cannot show a deletion
+    let dirty = false;
 
     const patch = (change: Partial<Snapshot>) => {
       if (alive) setSnapshot((current) => ({ ...current, ...change }));
     };
 
     const recomputeUnsynced = () => {
-      unsynced = !stateVectorCovers(persisted, Y.encodeStateVector(ydoc));
+      unsynced = dirty || !stateVectorCovers(persisted, Y.encodeStateVector(ydoc));
       patch({ hasUnsyncedChanges: unsynced });
     };
 
@@ -158,6 +160,8 @@ export function useCollabConnection(
       const event = parsed.data;
       if (event.type === 'persisted') {
         persisted = base64ToBytes(event.sv);
+        // `saved` (absent from older servers) is the only acknowledgement that covers a deletion
+        if (event.saved === true) dirty = false;
         recomputeUnsynced();
       } else if (event.type === 'access') {
         const previous = level;
@@ -225,7 +229,11 @@ export function useCollabConnection(
     }
 
     setSnapshot(INITIAL);
-    ydoc.on('update', recomputeUnsynced);
+    ydoc.on('update', (_update: Uint8Array, origin: unknown) => {
+      // updates applied from the provider come from the server and are not ours to acknowledge
+      if (origin !== provider) dirty = true;
+      recomputeUnsynced();
+    });
     void connect();
 
     return () => {

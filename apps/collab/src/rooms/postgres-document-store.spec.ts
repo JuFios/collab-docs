@@ -113,17 +113,25 @@ function setup(overrides: Partial<ConstructorParameters<typeof PostgresDocumentS
 
 const tick = (ms: number) => jest.advanceTimersByTimeAsync(ms);
 
+let seq = 0;
+/** Enqueues with the next sequence number the room would have given the update. */
+const enqueue = (store: PostgresDocumentStore, update: Uint8Array, documentId = DOC) =>
+  store.enqueue(documentId, update, (seq += 1));
+
 describe('PostgresDocumentStore', () => {
-  beforeEach(() => jest.useFakeTimers());
+  beforeEach(() => {
+    jest.useFakeTimers();
+    seq = 0;
+  });
   afterEach(() => jest.useRealTimers());
 
   describe('write-behind buffer', () => {
     it('merges everything buffered during the quiet period into one row', async () => {
       const { store, storage } = setup();
       const client = typist();
-      store.enqueue(DOC, client.type('a'));
-      store.enqueue(DOC, client.type('b'));
-      store.enqueue(DOC, client.type('c'));
+      enqueue(store, client.type('a'));
+      enqueue(store, client.type('b'));
+      enqueue(store, client.type('c'));
       await tick(999);
       expect(storage.appendCalls).toBe(0);
       await tick(2);
@@ -141,7 +149,7 @@ describe('PostgresDocumentStore', () => {
       const client = typist();
       // an update every 400 ms keeps resetting the 1 s quiet period
       for (let elapsed = 0; elapsed < 4800; elapsed += 400) {
-        store.enqueue(DOC, client.type('x'));
+        enqueue(store, client.type('x'));
         await tick(400);
       }
       expect(storage.appendCalls).toBe(0);
@@ -153,7 +161,7 @@ describe('PostgresDocumentStore', () => {
     it('does nothing when asked to flush an empty buffer', async () => {
       const { store, storage } = setup();
       await store.flush(DOC);
-      store.enqueue(DOC, typist().type('x'));
+      enqueue(store, typist().type('x'));
       await store.flush(DOC);
       await store.flush(DOC);
       expect(storage.appendCalls).toBe(1);
@@ -172,10 +180,10 @@ describe('PostgresDocumentStore', () => {
         running -= 1;
         return original(documentId, update);
       };
-      store.enqueue(DOC, client.type('a'));
+      enqueue(store, client.type('a'));
       const first = store.flush(DOC);
       await tick(10); // the first write is now in flight
-      store.enqueue(DOC, client.type('b'));
+      enqueue(store, client.type('b'));
       const second = store.flush(DOC);
       await tick(200);
       await Promise.all([first, second]);
@@ -189,12 +197,12 @@ describe('PostgresDocumentStore', () => {
       const { store, storage, observer } = setup();
       const client = typist();
       storage.failAppends = 2;
-      store.enqueue(DOC, client.type('one '));
+      enqueue(store, client.type('one '));
       await tick(1001); // first attempt fails
       expect(storage.rows).toHaveLength(0);
       expect(store.pendingCount(DOC)).toBe(1);
 
-      store.enqueue(DOC, client.type('two ')); // arrives while the database is down
+      enqueue(store, client.type('two ')); // arrives while the database is down
       await tick(1100); // quiet-period flush: second failure
       expect(storage.rows).toHaveLength(0);
 
@@ -212,7 +220,7 @@ describe('PostgresDocumentStore', () => {
     it('rejects an explicit flush that fails but keeps the data for the retry', async () => {
       const { store, storage } = setup();
       storage.failAppends = 1;
-      store.enqueue(DOC, typist().type('x'));
+      enqueue(store, typist().type('x'));
       await expect(store.flush(DOC)).rejects.toThrow('database is down');
       expect(store.pendingCount(DOC)).toBe(1);
       await tick(1100);
@@ -223,7 +231,7 @@ describe('PostgresDocumentStore', () => {
       const { store, storage, logger } = setup();
       storage.failAppends = 1;
       storage.failWith = Object.assign(new Error('foreign key'), { code: 'P2003' });
-      store.enqueue(DOC, typist().type('x'));
+      enqueue(store, typist().type('x'));
       await tick(1100);
       expect(store.pendingCount(DOC)).toBe(0);
       expect(logger.error).toHaveBeenCalledWith(
@@ -237,18 +245,49 @@ describe('PostgresDocumentStore', () => {
     it('announces what is durable, and only after it is written', async () => {
       const { store } = setup();
       const client = typist();
-      const seen: Uint8Array[] = [];
-      store.onPersisted(DOC, (sv) => seen.push(sv));
+      const seen: Array<{ sv: Uint8Array; seq: number }> = [];
+      store.onPersisted(DOC, (sv, persistedSeq) => seen.push({ sv, seq: persistedSeq }));
       const update = client.type('hello');
-      store.enqueue(DOC, update);
+      enqueue(store, update);
       await tick(500);
       expect(seen).toHaveLength(0);
       await tick(600);
       expect(seen).toHaveLength(1);
-      expect(stateVectorCovers(seen[0]!, Y.encodeStateVector(client.doc))).toBe(true);
+      expect(stateVectorCovers(seen[0]!.sv, Y.encodeStateVector(client.doc))).toBe(true);
+      expect(seen[0]!.seq).toBe(1);
 
       client.type(' more');
-      expect(stateVectorCovers(seen[0]!, Y.encodeStateVector(client.doc))).toBe(false);
+      expect(stateVectorCovers(seen[0]!.sv, Y.encodeStateVector(client.doc))).toBe(false);
+    });
+
+    it('announces the sequence it wrote, not the newest one buffered meanwhile', async () => {
+      const { store, storage } = setup();
+      const client = typist();
+      const seen: Array<{ covers: boolean; seq: number }> = [];
+      store.onPersisted(DOC, (sv, persistedSeq) =>
+        seen.push({
+          covers: stateVectorCovers(sv, Y.encodeStateVector(client.doc)),
+          seq: persistedSeq,
+        }),
+      );
+      const original = storage.append.bind(storage);
+      storage.append = async (documentId, update) => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return original(documentId, update);
+      };
+
+      enqueue(store, client.type('a'));
+      const flushing = store.flush(DOC);
+      await tick(10);
+      enqueue(store, client.type('b'));
+      await tick(200);
+      await flushing;
+
+      expect(seen).toEqual([{ covers: false, seq: 1 }]);
+      expect(store.pendingCount(DOC)).toBe(1);
+      void store.flush(DOC);
+      await tick(100);
+      expect(seen.at(-1)).toEqual({ covers: true, seq: 2 });
     });
 
     it('keeps covering the document across several flushes of incremental updates', async () => {
@@ -257,7 +296,7 @@ describe('PostgresDocumentStore', () => {
       const seen: Uint8Array[] = [];
       store.onPersisted(DOC, (sv) => seen.push(sv));
       for (const word of ['one', ' two', ' three']) {
-        store.enqueue(DOC, client.type(word));
+        enqueue(store, client.type(word));
         await store.flush(DOC);
         expect(stateVectorCovers(seen.at(-1)!, Y.encodeStateVector(client.doc))).toBe(true);
       }
@@ -269,7 +308,7 @@ describe('PostgresDocumentStore', () => {
       const listener = jest.fn();
       store.onPersisted(DOC, listener);
       storage.failAppends = 1;
-      store.enqueue(DOC, typist().type('x'));
+      enqueue(store, typist().type('x'));
       await store.flush(DOC).catch(() => undefined);
       expect(listener).not.toHaveBeenCalled();
     });
@@ -277,9 +316,9 @@ describe('PostgresDocumentStore', () => {
     it('reports the new revision to the hook after each stored write', async () => {
       const { store, hooks } = setup();
       const client = typist();
-      store.enqueue(DOC, client.type('a'));
+      enqueue(store, client.type('a'));
       await store.flush(DOC);
-      store.enqueue(DOC, client.type('b'));
+      enqueue(store, client.type('b'));
       await store.flush(DOC);
       expect(hooks.contentPersisted.mock.calls).toEqual([
         [DOC, 1],
@@ -289,8 +328,8 @@ describe('PostgresDocumentStore', () => {
 
     it('flushes everything on close', async () => {
       const { store, storage } = setup();
-      store.enqueue('a', typist().type('1'));
-      store.enqueue('b', typist().type('2'));
+      enqueue(store, typist().type('1'), 'a');
+      enqueue(store, typist().type('2'), 'b');
       await store.close();
       expect(storage.rows).toHaveLength(2);
       await tick(60_000);
@@ -300,7 +339,7 @@ describe('PostgresDocumentStore', () => {
     it('logs which documents could not be written on close', async () => {
       const { store, storage, logger } = setup();
       storage.failAppends = 1;
-      store.enqueue(DOC, typist().type('1'));
+      enqueue(store, typist().type('1'));
       await store.close();
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'collab.shutdown_flush_failed', documentId: DOC }),
@@ -329,7 +368,7 @@ describe('PostgresDocumentStore', () => {
 
     it('writes updates still buffered before reading, so a reloaded room does not lose them', async () => {
       const { store, storage } = setup();
-      store.enqueue(DOC, typist().type('late'));
+      enqueue(store, typist().type('late'));
       const loaded = await store.load(DOC);
       expect(storage.rows).toHaveLength(1);
       expect(loaded).not.toBeNull();
@@ -340,7 +379,7 @@ describe('PostgresDocumentStore', () => {
     async function flushMany(store: PostgresDocumentStore, count: number, size = 1) {
       const client = typist();
       for (let i = 0; i < count; i += 1) {
-        store.enqueue(DOC, client.type('x'.repeat(size)));
+        enqueue(store, client.type('x'.repeat(size)));
         await store.flush(DOC);
       }
     }
@@ -368,7 +407,7 @@ describe('PostgresDocumentStore', () => {
       const client = typist();
       let maxRows = 0;
       for (let i = 0; i < 10_000; i += 1) {
-        store.enqueue(DOC, client.type('.'));
+        enqueue(store, client.type('.'));
         if (i % 10 === 9) {
           await store.flush(DOC);
           maxRows = Math.max(maxRows, storage.rows.length);
@@ -390,9 +429,9 @@ describe('PostgresDocumentStore', () => {
       const { store, storage, observer } = setup({ compactMaxRows: 2 });
       storage.failCompact = true;
       const client = typist();
-      store.enqueue(DOC, client.type('a'));
+      enqueue(store, client.type('a'));
       await store.flush(DOC);
-      store.enqueue(DOC, client.type('b'));
+      enqueue(store, client.type('b'));
       await expect(store.flush(DOC)).resolves.toBeUndefined();
       expect(observer.compactionFailed).toHaveBeenCalled();
       expect(storage.rows).toHaveLength(2);
@@ -400,7 +439,7 @@ describe('PostgresDocumentStore', () => {
 
     it('compacts when the room is released, then forgets the document', async () => {
       const { store, storage, hooks } = setup();
-      store.enqueue(DOC, typist().type('a'));
+      enqueue(store, typist().type('a'));
       await store.release(DOC);
       expect(storage.rows).toHaveLength(0);
       expect(storage.compactCalls).toBe(1);
@@ -412,7 +451,7 @@ describe('PostgresDocumentStore', () => {
     it('refuses to release a document whose updates could not be written', async () => {
       const { store, storage, hooks } = setup();
       storage.failAppends = 1;
-      store.enqueue(DOC, typist().type('a'));
+      enqueue(store, typist().type('a'));
       await expect(store.release(DOC)).rejects.toThrow();
       expect(hooks.released).not.toHaveBeenCalled();
       expect(store.pendingCount(DOC)).toBe(1);

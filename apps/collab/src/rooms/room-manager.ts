@@ -28,6 +28,8 @@ interface Entry {
 export class RoomManager implements BeforeApplicationShutdown {
   private readonly entries = new Map<string, Entry>();
   private readonly sessions = new Map<string, Session>();
+  /** Documents with an operation in flight that an idle unload must not race (a restore). */
+  private readonly leases = new Map<string, number>();
   private readonly limits: RoomLimits;
   private readonly idleMs: number;
   private shuttingDown = false;
@@ -122,6 +124,28 @@ export class RoomManager implements BeforeApplicationShutdown {
     }
   }
 
+  /**
+   * Keeps the room loaded for the whole operation, however empty it looks. Returns the function that ends the
+   * lease; once the last one ends, the room unloads if it is empty.
+   */
+  lease(documentId: string): () => void {
+    const entry = this.entries.get(documentId);
+    if (entry) this.cancelIdle(entry);
+    this.leases.set(documentId, (this.leases.get(documentId) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const remaining = (this.leases.get(documentId) ?? 1) - 1;
+      if (remaining > 0) {
+        this.leases.set(documentId, remaining);
+        return;
+      }
+      this.leases.delete(documentId);
+      this.releaseIfEmpty(documentId);
+    };
+  }
+
   matching(filter: {
     documentIds?: readonly string[];
     userId?: string;
@@ -157,7 +181,7 @@ export class RoomManager implements BeforeApplicationShutdown {
 
   private scheduleUnload(documentId: string): void {
     const entry = this.entries.get(documentId);
-    if (!entry || entry.closing) return;
+    if (!entry || entry.closing || this.leases.has(documentId)) return;
     this.cancelIdle(entry);
     entry.idleTimer = setTimeout(() => void this.unloadIfIdle(documentId), this.idleMs);
     entry.idleTimer.unref();
@@ -172,7 +196,7 @@ export class RoomManager implements BeforeApplicationShutdown {
     const entry = this.entries.get(documentId);
     if (!entry || entry.closing) return;
     const room = await entry.room.catch(() => undefined);
-    if (room && room.size === 0) await this.unload(documentId);
+    if (room && room.size === 0 && !this.leases.has(documentId)) await this.unload(documentId);
   }
 
   private unload(documentId: string): Promise<void> {

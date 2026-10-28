@@ -105,6 +105,10 @@ export class DocRoom {
   private readonly awarenessOwners = new Map<number, ConnectionState | null>();
   private guestSequence = 0;
   private persistedStateVector: Uint8Array;
+  /** The last update the room handed to the store; every update gets the next number. */
+  private lastSubmittedSeq = 0;
+  /** The last of those the store has written. */
+  private persistedSeq = 0;
   private approximateBytes: number;
   private appliedChange = false;
   private readonly unsubscribe: () => void;
@@ -182,6 +186,7 @@ export class DocRoom {
       );
     }
     this.sendEvent(state, { type: 'access', level: access, readOnly: state.readOnly });
+    // the handshake says what is durable, not what the client has: its offline changes have not arrived yet
     this.sendEvent(state, { type: 'persisted', sv: toBase64(this.persistedStateVector) });
     return true;
   }
@@ -329,12 +334,19 @@ export class DocRoom {
     }
     this.appliedChange = false;
     try {
+      // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
+      // decode first, or an update called "rejected" has already changed the document
+      Y.decodeUpdate(update);
       Y.applyUpdate(this.doc, update, state);
     } catch (error) {
       return this.reject(state, 'invalid', error);
     }
     if (this.appliedChange) this.observer.updateApplied();
-    else this.observer.updateDuplicate();
+    else {
+      this.observer.updateDuplicate();
+      // a client repeats what it holds after reconnecting; answering says whether that is stored or still pending
+      this.sendEvent(state, this.persistedEvent());
+    }
   }
 
   private handleAwareness(state: ConnectionState, payload: Uint8Array): void {
@@ -412,7 +424,8 @@ export class DocRoom {
     for (const state of this.connections.values()) {
       if (state !== origin) this.send(state, message);
     }
-    this.store.enqueue(this.documentId, update);
+    this.lastSubmittedSeq += 1;
+    this.store.enqueue(this.documentId, update, this.lastSubmittedSeq);
   };
 
   private readonly onAwarenessUpdate = (
@@ -431,11 +444,21 @@ export class DocRoom {
     for (const state of this.connections.values()) this.send(state, message);
   };
 
-  private readonly onPersisted = (stateVector: Uint8Array): void => {
+  private readonly onPersisted = (stateVector: Uint8Array, persistedSeq: number): void => {
     this.persistedStateVector = stateVector;
-    const event: CollabRoomEvent = { type: 'persisted', sv: toBase64(stateVector) };
+    this.persistedSeq = persistedSeq;
+    const event = this.persistedEvent();
     for (const state of this.connections.values()) this.sendEvent(state, event);
   };
+
+  /** What is durable, and whether that covers every update the room received: a vector cannot show a deletion. */
+  private persistedEvent(): CollabRoomEvent {
+    return {
+      type: 'persisted',
+      sv: toBase64(this.persistedStateVector),
+      saved: this.lastSubmittedSeq <= this.persistedSeq,
+    };
+  }
 
   private sendAllAwareness(state: ConnectionState): void {
     const ids = [...this.awareness.getStates().keys()];

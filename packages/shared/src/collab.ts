@@ -46,9 +46,12 @@ export const COLLAB_FINAL_CLOSE_CODES: readonly number[] = [
 /**
  * Server → client events carried in message type 100 as JSON.
  * `persisted.sv` is a base64 Yjs state vector: everything it covers is stored in the database.
+ * `persisted.saved` says the room stored every update it received, which a state vector alone cannot do: a
+ * deletion produces an update without moving it. The event sent on connect carries only `sv` — the client's
+ * offline changes have not reached the room yet — and a missing `saved` means "not confirmed" to the client.
  */
 export const collabRoomEventSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('persisted'), sv: z.string() }),
+  z.object({ type: z.literal('persisted'), sv: z.string(), saved: z.boolean().optional() }),
   z.object({
     type: z.literal('access'),
     level: z.enum(ACCESS_LEVELS),
