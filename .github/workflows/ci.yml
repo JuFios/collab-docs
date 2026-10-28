@@ -54,7 +54,33 @@ jobs:
       - run: pnpm --filter @collab-docs/web build
       - run: pnpm --filter @collab-docs/web check:bundle
 
+  # Needs no services: anything that talks to Postgres, Redis or MinIO is an integration test.
   unit:
+    runs-on: ubuntu-latest
+    env:
+      COVERAGE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - name: Coverage (informational)
+        if: always()
+        run: node .github/scripts/coverage-summary.mjs "Unit test coverage" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-unit
+          path: |
+            apps/*/coverage
+            packages/*/coverage
+          retention-days: 7
+
+  integration:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -80,6 +106,7 @@ jobs:
       DATABASE_URL: postgresql://collab:ci-postgres-password@localhost:5432/collab
       REDIS_URL: redis://localhost:6379
       MAILPIT_URL: http://localhost:8025
+      COVERAGE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -88,7 +115,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
       - name: Migrations apply and match schema.prisma
         run: |
           pnpm --filter @collab-docs/db db:deploy
@@ -107,7 +133,19 @@ jobs:
         run: |
           docker compose up --no-build --wait -d minio
           docker compose run --rm --no-deps minio-init
+      - run: pnpm build:libs
       - run: pnpm test:integration
+      - name: Coverage (informational)
+        if: always()
+        run: node .github/scripts/coverage-summary.mjs "Integration test coverage" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-integration
+          path: |
+            apps/*/coverage
+            packages/*/coverage
+          retention-days: 7
       - name: OpenAPI document is up to date
         run: |
           pnpm --filter @collab-docs/api openapi:export
@@ -198,6 +236,9 @@ jobs:
       - name: Start the stack
         run: docker compose up --no-build --wait proxy worker
       - run: pnpm test:e2e
+      - name: Flaky tests (informational)
+        if: always()
+        run: node .github/scripts/flaky-report.mjs test-results/results.json >> "$GITHUB_STEP_SUMMARY"
       - name: Compose logs
         if: failure()
         run: docker compose logs --no-color --tail=200

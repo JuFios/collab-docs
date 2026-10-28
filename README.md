@@ -85,10 +85,23 @@ pnpm dev
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request: lint and typecheck,
-unit and integration tests (Postgres and Redis service containers plus the compose `minio` image, which is built
-from source and reuses the layer cache of the image build job), Docker image builds for `web`, `api`,
-`collab` and `minio`, and the Playwright `e2e` job against the compose stack (see [Running e2e](#running-e2e)).
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
+
+| Job              | What it does                                                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lint-typecheck` | ESLint and `tsc` for every package and for `e2e/`                                                                                                   |
+| `unit`           | Jest (api, collab) and Vitest (web, shared, nest); no services needed                                                                               |
+| `integration`    | Migrations apply and match `schema.prisma`, integration tests against Postgres, Redis and the compose `minio` image, `docs/openapi.json` is current |
+| `e2e`            | Playwright against the compose stack (see [Running e2e](#running-e2e)); depends on `lint-typecheck`                                                 |
+| `docker-build`   | Images for `web`, `api`, `collab`, `migrate` and `minio`; writes the layer cache the other jobs reuse                                               |
+| `web-bundle`     | The published page stays free of the editor's JavaScript                                                                                            |
+| `audit`          | `pnpm audit --prod`                                                                                                                                 |
+
+The `unit` and `integration` jobs print a coverage table in the job summary and keep the reports as artifacts. It is
+informational: no threshold fails a build (set `COVERAGE=1` to get the same reports locally).
+
+The `e2e` job retries a failed test once. A test that passes only on the retry is listed in the job summary with
+the first failure (`.github/scripts/flaky-report.mjs`), so a flake is investigated and fixed rather than hidden.
 
 ## Development
 
@@ -1695,6 +1708,21 @@ through the `RATE_*` variables; `client-ip.spec.ts` proves that a spoofed header
 create users through the API and reuse the session cookies instead of logging in through the UI. Shared helpers (`e2e/workspace.ts`) create workspaces and documents and accept invitations; `e2e/collab-client.ts` is a raw `y-websocket` peer for tests that must bypass the editor (a viewer writing over the socket). Traces
 and videos are kept for failed tests (`test-results/`, `playwright-report/`). CI runs the same steps in the
 `e2e` job and uploads both folders as artifacts.
+
+Waiting is done on the thing that changes, never on the clock: `expect.poll` on the api, on the page or on the
+structured log lines of a container (`e2e/logs.ts`). `waitForTimeout` is not used; the one fixed delay the stack
+needs (`DASHBOARD_BLOCK_DELAY_MS`) is a setting of the product under test, not a guess in a test. Caret
+movement in the editor specs goes through `placeCaret`, because keys such as Home and End behave differently
+per platform.
+
+What the suite covers beyond the happy paths: a Viewer refused on every write path (UI, REST including version
+restore, publishing and delete, and a raw WebSocket update, confirmed by the collab log); two editors typing at the
+same time, with one of them offline and with both offline; publishing blocked while the editor holds unsaved
+changes; a document deleted while it is open; the plan limit, the upgrade and a webhook delivered twice; search
+that respects access; a mention that reaches its addressee; and the error state of every panel that reads its own
+data (`states.spec.ts`). The same two-client scenarios run without a browser in
+`apps/collab/src/collab.int.spec.ts` (two `y-websocket` clients, a duplicated update, both clients disconnected).
+`apps/web/app/route-states.test.ts` fails when a page is added without a loading state or an error boundary.
 
 Streaming leaves a hidden copy of a boundary's content in the DOM until React reveals it, and a strict
 `getByText`/`getByLabel`/`getByTestId` that runs in that moment fails with a strict-mode violation instead of
