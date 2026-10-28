@@ -42,15 +42,19 @@ close the socket with 1009.
 ### Room events (type 100)
 
 ```json
-{ "type": "persisted", "sv": "<base64 Yjs state vector>" }
+{ "type": "persisted", "sv": "<base64 Yjs state vector>", "saved": true }
 { "type": "access", "level": "VIEW", "readOnly": true }
 { "type": "deleted" }
 ```
 
-- **`persisted`** is sent after every flush of the document to storage and once when a client connects. The state
-  vector covers everything that is durable. `y-websocket` does not acknowledge deliveries, so a client computes
-  `hasUnsyncedChanges = !covers(persistedSV, encodeStateVector(localDoc))` and drives its `Saved / Saving… /
-Offline` indicator from it. Publishing is allowed only when the persisted vector covers the local one.
+- **`persisted`** is sent after every flush of the document to storage, when a client repeats an update the room
+  already has, and once when a client connects. The state vector covers everything that is durable. After a flush
+  or a repeat, `saved` says that every update the room had received is stored too; the event sent on connect
+  carries only `sv`, because the client's offline changes have not arrived yet and nothing there can acknowledge
+  them. A state vector does not move for a deletion, so `saved` is what acknowledges one; a client treats a
+  missing `saved` as "not confirmed", keeps its own changes pending until an event says `saved: true`, and drives
+  its `Saved / Saving… / Offline` indicator from that. Publishing is allowed only when the server has confirmed
+  everything as stored.
 - **`access`** is sent on connect and whenever the permission of this socket changes. `readOnly` is true below
   `EDIT`. After a downgrade the client recreates its `Y.Doc` from the server state (local changes the server
   ignored are discarded, with a warning to the user).

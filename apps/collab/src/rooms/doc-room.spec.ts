@@ -4,7 +4,7 @@ import * as encoding from 'lib0/encoding';
 import * as Y from 'yjs';
 import { COLLAB_CLOSE, COLLAB_MESSAGE } from '@collab-docs/shared';
 import { DocRoom, type RejectReason, type RoomLimits, type RoomObserver } from './doc-room';
-import { InMemoryDocumentStore } from './document-store';
+import { type DocumentStore, InMemoryDocumentStore } from './document-store';
 import { TestClient, frame } from '../test/test-client';
 
 const LIMITS: RoomLimits = {
@@ -27,11 +27,54 @@ class Counters implements RoomObserver {
 }
 
 function setup(limits: Partial<RoomLimits> = {}, initial: Uint8Array | null = null) {
-  const store = new InMemoryDocumentStore();
+  return setupWith(new InMemoryDocumentStore(), limits, initial);
+}
+
+function setupWith<T extends DocumentStore>(
+  store: T,
+  limits: Partial<RoomLimits> = {},
+  initial: Uint8Array | null = null,
+) {
   const observer = new Counters();
   const room = new DocRoom('doc-1', initial, store, { ...LIMITS, ...limits }, observer);
   rooms.push(room);
   return { store, observer, room };
+}
+
+/**
+ * A store whose writes the test acknowledges one at a time, like the real store acknowledges a flush while newer
+ * updates keep waiting in its buffer.
+ */
+class HeldStore implements DocumentStore {
+  private readonly durable = new InMemoryDocumentStore();
+  private buffered: Array<{ documentId: string; update: Uint8Array; seq: number }> = [];
+
+  load = (documentId: string) => this.durable.load(documentId);
+
+  enqueue(documentId: string, update: Uint8Array, seq: number): void {
+    this.buffered.push({ documentId, update, seq });
+  }
+
+  onPersisted = (documentId: string, listener: (sv: Uint8Array, seq: number) => void) =>
+    this.durable.onPersisted(documentId, listener);
+
+  flush = async (): Promise<void> => this.ackAll();
+
+  release = async (): Promise<void> => this.ackAll();
+
+  close = async (): Promise<void> => this.ackAll();
+
+  ackNext(): boolean {
+    const next = this.buffered.shift();
+    if (!next) return false;
+    this.durable.enqueue(next.documentId, next.update, next.seq);
+    return true;
+  }
+
+  ackAll(): void {
+    let next = this.ackNext();
+    while (next) next = this.ackNext();
+  }
 }
 
 const rooms: DocRoom[] = [];
@@ -254,6 +297,101 @@ describe('DocRoom', () => {
       late.settle();
       const sv = Y.decodeStateVector(Buffer.from(late.lastEvent('persisted')!.sv, 'base64'));
       expect([...sv.values()].some((clock) => clock > 0)).toBe(true);
+    });
+
+    it("does not treat the handshake as an acknowledgement of the client's own changes", () => {
+      const { room } = setup();
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+      // the room has not seen anything this client holds offline; only a later flush can answer for it
+      expect(client.lastEvent('persisted')).toBeDefined();
+      expect(client.lastEvent('persisted')).not.toHaveProperty('saved');
+    });
+
+    it('answers a repeated update with what is durable, so a reconnecting client stops waiting', () => {
+      const { room } = setup();
+      const writer = new TestClient(room);
+      writer.join();
+      writer.settle();
+      writer.text().insert(0, 'hello');
+      writer.settle();
+
+      const returning = new TestClient(room);
+      returning.join();
+      returning.settle();
+      const before = returning.events.filter((event) => event.type === 'persisted').length;
+
+      // the same update the room already holds, the way a client repeats it after reconnecting
+      returning.sendRaw(
+        frame(COLLAB_MESSAGE.sync, (encoder) =>
+          syncProtocol.writeUpdate(encoder, Y.encodeStateAsUpdate(room.doc)),
+        ),
+      );
+      returning.flushInbox();
+
+      const persisted = returning.events.filter((event) => event.type === 'persisted');
+      expect(persisted).toHaveLength(before + 1);
+      expect(persisted.at(-1)).toMatchObject({ saved: true });
+    });
+
+    it('reports a deletion as unsaved until the store acknowledges it, though the vector never moves', () => {
+      const store = new HeldStore();
+      const { room } = setupWith(store);
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+      client.text().insert(0, 'hello');
+      client.settle();
+
+      const waiting = new TestClient(room);
+      waiting.join();
+      waiting.settle();
+      expect(waiting.lastEvent('persisted')).not.toHaveProperty('saved');
+
+      store.ackAll();
+      client.settle();
+      waiting.settle();
+      expect(client.lastEvent('persisted')).toMatchObject({ saved: true });
+      expect(waiting.lastEvent('persisted')).toMatchObject({ saved: true });
+
+      const vector = Y.encodeStateVector(client.doc);
+      client.text().delete(0, 'hello'.length);
+      client.settle();
+      expect(Y.encodeStateVector(client.doc)).toEqual(vector);
+
+      const late = new TestClient(room);
+      late.join();
+      late.settle();
+      expect(late.lastEvent('persisted')).not.toHaveProperty('saved');
+
+      store.ackAll();
+      client.settle();
+      late.settle();
+      expect(client.lastEvent('persisted')).toMatchObject({ saved: true });
+      expect(late.lastEvent('persisted')).toMatchObject({ saved: true });
+    });
+
+    it('says "not saved" after an acknowledgement that stops short of the newest update', () => {
+      const store = new HeldStore();
+      const { room } = setupWith(store);
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+      client.text().insert(0, 'a');
+      client.settle();
+
+      store.ackNext();
+      client.settle();
+      client.text().insert(1, 'b');
+      client.settle();
+      expect(store.ackNext()).toBe(true);
+      client.settle();
+      expect(client.lastEvent('persisted')).toMatchObject({ saved: false });
+
+      store.ackAll();
+      client.settle();
+      expect(client.lastEvent('persisted')).toMatchObject({ saved: true });
     });
   });
 

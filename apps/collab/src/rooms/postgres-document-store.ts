@@ -54,8 +54,13 @@ const DEFAULT_RETRY_DELAYS_MS = [1000, 2000, 5000, 10_000, 30_000] as const;
 /** Foreign-key and missing-row errors cannot be fixed by retrying (the document is gone). */
 const PERMANENT_ERROR_CODES = new Set(['P2003', 'P2025']);
 
+interface PendingUpdate {
+  update: Uint8Array;
+  seq: number;
+}
+
 interface DocumentState {
-  pending: Uint8Array[];
+  pending: PendingUpdate[];
   firstPendingAt: number | null;
   debounceTimer: NodeJS.Timeout | null;
   maxWaitTimer: NodeJS.Timeout | null;
@@ -65,6 +70,8 @@ interface DocumentState {
   chain: Promise<void>;
   /** What is durable: the loaded state plus every flush since. */
   persistedStateVector: Uint8Array;
+  /** Sequence number of the last update in `persistedStateVector`. */
+  persistedSeq: number;
   tailRows: number;
   tailBytes: number;
 }
@@ -78,7 +85,10 @@ interface DocumentState {
  */
 export class PostgresDocumentStore implements DocumentStore {
   private readonly states = new Map<string, DocumentState>();
-  private readonly listeners = new Map<string, Set<(stateVector: Uint8Array) => void>>();
+  private readonly listeners = new Map<
+    string,
+    Set<(stateVector: Uint8Array, persistedSeq: number) => void>
+  >();
   private closed = false;
 
   constructor(
@@ -108,9 +118,9 @@ export class PostgresDocumentStore implements DocumentStore {
     return stored.update;
   }
 
-  enqueue(documentId: string, update: Uint8Array): void {
+  enqueue(documentId: string, update: Uint8Array, seq: number): void {
     const state = this.stateOf(documentId);
-    state.pending.push(update);
+    state.pending.push({ update, seq });
     if (state.firstPendingAt === null) {
       state.firstPendingAt = this.clock();
       state.maxWaitTimer = this.timer(
@@ -125,7 +135,10 @@ export class PostgresDocumentStore implements DocumentStore {
     );
   }
 
-  onPersisted(documentId: string, listener: (stateVector: Uint8Array) => void): () => void {
+  onPersisted(
+    documentId: string,
+    listener: (stateVector: Uint8Array, persistedSeq: number) => void,
+  ): () => void {
     const set = this.listeners.get(documentId) ?? new Set();
     set.add(listener);
     this.listeners.set(documentId, set);
@@ -192,6 +205,7 @@ export class PostgresDocumentStore implements DocumentStore {
         retryAttempt: 0,
         chain: Promise.resolve(),
         persistedStateVector: Y.encodeStateVector(new Y.Doc()),
+        persistedSeq: 0,
         tailRows: 0,
         tailBytes: 0,
       };
@@ -225,7 +239,11 @@ export class PostgresDocumentStore implements DocumentStore {
     if (state.pending.length === 0) return;
 
     const batch = state.pending.splice(0);
-    const merged = batch.length === 1 ? batch[0]! : Y.mergeUpdates(batch);
+    const merged =
+      batch.length === 1
+        ? batch[0]!.update
+        : Y.mergeUpdates(batch.map((pending) => pending.update));
+    const lastSeq = batch[batch.length - 1]!.seq;
     const startedAt = this.clock();
     let result: { inserted: boolean; revision: number };
     try {
@@ -240,7 +258,7 @@ export class PostgresDocumentStore implements DocumentStore {
         return;
       }
       // keep the data, in order: the failed batch goes back in front of whatever arrived meanwhile
-      state.pending.unshift(merged);
+      state.pending.unshift({ update: merged, seq: lastSeq });
       state.firstPendingAt ??= this.clock();
       this.scheduleRetry(documentId, state);
       this.logger.warn(
@@ -257,12 +275,13 @@ export class PostgresDocumentStore implements DocumentStore {
     this.observer.persisted((this.clock() - startedAt) / 1000);
     state.retryAttempt = 0;
     state.persistedStateVector = advanceStateVector(state.persistedStateVector, merged);
+    state.persistedSeq = lastSeq;
     if (result.inserted) {
       state.tailRows += 1;
       state.tailBytes += merged.byteLength;
     }
     for (const listener of this.listeners.get(documentId) ?? [])
-      listener(state.persistedStateVector);
+      listener(state.persistedStateVector, state.persistedSeq);
     if (result.inserted) this.hooks.contentPersisted(documentId, result.revision);
     if (
       state.tailRows >= this.options.compactMaxRows ||

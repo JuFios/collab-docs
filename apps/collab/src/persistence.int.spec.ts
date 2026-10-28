@@ -104,6 +104,33 @@ describe('document persistence', () => {
       expect(await revisionOf(documentId)).toBeGreaterThan(0);
     });
 
+    it('stores a deletion and says so, though the state vector cannot show it', async () => {
+      const { editor, owner, documentId } = await makeTeam(prisma);
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      client.paragraph().insert(0, 'delete me');
+      await internal('flush', { documentId: documentId });
+      expect(await content(documentId)).toContain('delete me');
+
+      const rows = await rowsOf(documentId);
+      const vector = Y.encodeStateVector(client.doc);
+      client.paragraph().delete(0, 'delete me'.length);
+      await settle(50);
+      expect(Y.encodeStateVector(client.doc)).toEqual(vector);
+      expect(await content(documentId)).toContain('delete me');
+
+      const late = await connect(owner, documentId);
+      await waitFor(() => late.synced, 'the late client to sync');
+      // the handshake reports what is durable, not what this connection holds; no event has acknowledged the deletion
+      expect(late.event('persisted')).toBeDefined();
+      expect(late.event('persisted')).not.toHaveProperty('saved');
+
+      await internal('flush', { documentId: documentId });
+      await waitFor(() => late.event('persisted')?.saved === true, 'the deletion to be saved');
+      expect(await content(documentId)).not.toContain('delete me');
+      expect(await rowsOf(documentId)).toBe(rows + 1);
+    });
+
     it('reports "persisted" only after the content is in the database and covers the client', async () => {
       const { editor, documentId } = await makeTeam(prisma);
       const client = await connect(editor, documentId);

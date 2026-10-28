@@ -636,24 +636,28 @@ any order reproduces the document, and the log is folded into a snapshot now and
 bytes)`, `ON CONFLICT DO NOTHING`, so a retried flush cannot insert twice) and, in the **same transaction**,
    does `revision = revision + 1, content_updated_at = now()`. A consumer that sees the new revision therefore
    finds the content.
-4. After the commit the store tells the room, which sends `persisted {sv}` to its clients, and (fire-and-forget)
-   queues `document.changed` for search (5 s debounce) and page revalidation (3 s). A Redis outage is logged and
-   counted, and editing continues.
+4. After the commit the store tells the room, which sends `persisted {sv, saved}` to its clients, and
+   (fire-and-forget) queues `document.changed` for search (5 s debounce) and page revalidation (3 s). A Redis
+   outage is logged and counted, and editing continues.
 
 **Failures.** If the write fails, the buffer is kept in order and retried with backoff (1, 2, 5, 10, then every
 30 s); a room whose updates are not written is not unloaded, and loading a document first writes whatever the store
 still holds for it. Shutdown (`SIGTERM`) flushes every buffer before the database connection is closed.
 
-**Saved means durable.** `y-websocket` does not acknowledge updates, so the server reports what is in the database
-as a state vector (`persisted`, also once on connect) and the client computes `hasUnsyncedChanges =
-!covers(persistedSV, localSV)` (`stateVectorCovers` in `@collab-docs/shared`). The same check gates publishing:
-"publish only saved changes".
+**Saved means durable.** `y-websocket` does not acknowledge updates, so after every flush — and when a client
+repeats an update the room already has — the server reports the state vector of what is in the database and
+whether everything it received is stored (`persisted {sv, saved}`). The event sent on connect carries only the
+vector: the client's offline changes have not reached the room yet, so nothing there can acknowledge them. A state
+vector does not move for a deletion, so the flag is what acknowledges one: the client keeps a local change unsaved
+until an event says `saved: true`, and the vector settles edits the server has not received yet
+(`stateVectorCovers` in `@collab-docs/shared`). A server that sends no `saved` counts as "not confirmed". The same
+check gates publishing: "publish only saved changes".
 
 **The loss window.** If the process is killed (`kill -9`, power) the server loses at most the updates buffered since
 its last flush, up to 5 s. They are not lost for good while the author's tab is open: the browser keeps its `Y.Doc`
 and, on reconnect, answers the server's sync step 1 with everything the server lacks. What cannot be recovered is
-a tab closed inside that window, which is why the editor is designed to show "Saving…" until `persisted` covers the
-local state and to warn before the page is left with unsaved changes.
+a tab closed inside that window, which is why the editor is designed to show "Saving…" until the server confirms
+the local state is stored and to warn before the page is left with unsaved changes.
 
 **Cold start.** `load` reads the compacted state and every log row with `id > last_update_id` in one
 repeatable-read transaction (a compaction between two separate reads could otherwise hide rows), merges them and
@@ -795,7 +799,7 @@ React elements, so no HTML string is ever built from user content.
 keystrokes may not be there yet (edge case "publish with local changes"). Two layers cover it:
 
 1. _Client contract_ (implemented with the share dialog): the Publish action is enabled only while
-   `!hasUnsyncedChanges`, i.e. when the `persisted` state vector covers the local one (see
+   `!hasUnsyncedChanges`, i.e. when the server has confirmed the latest local change as stored (see
    [CRDT persistence](#crdt-persistence-strategy)). While the editor says "Saving…" the button waits; offline it
    explains why it is disabled.
 2. _Server_: publishing a `VIEW` link first asks collab to write its buffer (`collab.flush`, 2 s limit). If collab
@@ -1432,18 +1436,22 @@ instead of reconnecting forever; the hook still calls `disconnect()` on the fina
 the two it recovers from.
 
 **Why "Saved" rests on `persisted`.** A WebSocket send succeeding says nothing about the database, and
-`y-websocket` has no acknowledgements. The server therefore announces, after every flush and once on connect, the
-state vector of what is durable. The client compares it with its own: `hasUnsyncedChanges =
-!stateVectorCovers(persisted, encodeStateVector(ydoc))`. The indicator (`lib/collab/save-status.ts`) is derived from
-that and from the connection, so it cannot claim more than the server confirmed:
+`y-websocket` has no acknowledgements. The server therefore announces, after every flush and when a client
+repeats an update it already has, the state vector of what is durable and whether everything it received is
+stored (`saved`); the event on connect carries only the vector, since the client's offline changes are still on
+their way. A state vector cannot show a deletion, so the client keeps a local change unsaved until an event says
+`saved: true`; the vector then settles edits the server has not received yet. A server that sends no `saved`
+counts as "not confirmed". The indicator
+(`lib/collab/save-status.ts`) is derived from that and from the connection, so it cannot claim more than the
+server confirmed:
 
-| Indicator                                  | When                                                                                                      |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `Connecting…`                              | Before the first sync of this session                                                                     |
-| `Saving…`                                  | Connected and synced, but the persisted vector does not cover the local one (or the title is being saved) |
-| `Saved`                                    | Connected, synced, everything covered by `persisted`, title saved                                         |
-| `Offline — changes will sync on reconnect` | `navigator.onLine` is false or the socket dropped after it had been open                                  |
-| `Could not save`                           | The title request failed                                                                                  |
+| Indicator                                  | When                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `Connecting…`                              | Before the first sync of this session                                                                        |
+| `Saving…`                                  | Connected and synced, but the server has not confirmed the latest local change (or the title is being saved) |
+| `Saved`                                    | Connected, synced, every local change confirmed by `persisted {saved: true}`, title saved                    |
+| `Offline — changes will sync on reconnect` | `navigator.onLine` is false or the socket dropped after it had been open                                     |
+| `Could not save`                           | The title request failed                                                                                     |
 
 Readers (Viewer, or EDIT revoked) see only the connection states, never "Saved". Edits made while offline stay
 in the in-memory `Y.Doc` and merge on reconnect; nothing is kept in IndexedDB, so closing the tab while offline

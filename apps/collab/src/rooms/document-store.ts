@@ -10,14 +10,22 @@ export interface DocumentStore {
   /** The whole stored state as one Yjs update; `null` for a document that was never edited. */
   load(documentId: string): Promise<Uint8Array | null>;
 
-  /** Called for every update applied to a room's document that changed it (never for duplicates). */
-  enqueue(documentId: string, update: Uint8Array): void;
+  /**
+   * Called for every update applied to a room's document that changed it (never for duplicates). `seq` counts
+   * the updates the room submitted, in order: a state vector cannot show a deletion, so the sequence is what
+   * tells a client that a deletion is durable.
+   */
+  enqueue(documentId: string, update: Uint8Array, seq: number): void;
 
   /**
-   * Registers a listener for "everything up to this state vector is durable". Returns the unsubscribe
-   * function. Called with the state vector of what is stored, after each flush.
+   * Registers a listener for "everything up to `persistedSeq` is durable". Returns the unsubscribe function.
+   * Called with the state vector of what is stored and the sequence number of the last update it covers, after
+   * each flush.
    */
-  onPersisted(documentId: string, listener: (stateVector: Uint8Array) => void): () => void;
+  onPersisted(
+    documentId: string,
+    listener: (stateVector: Uint8Array, persistedSeq: number) => void,
+  ): () => void;
 
   /**
    * Writes pending updates now and resolves once they are durable; rejects if they could not be written (they
@@ -35,21 +43,27 @@ export interface DocumentStore {
 /** Keeps documents in memory: the store for tests, and the default until persistence lands. */
 export class InMemoryDocumentStore implements DocumentStore {
   private readonly states = new Map<string, Uint8Array>();
-  private readonly listeners = new Map<string, Set<(stateVector: Uint8Array) => void>>();
+  private readonly listeners = new Map<
+    string,
+    Set<(stateVector: Uint8Array, persistedSeq: number) => void>
+  >();
 
   load(documentId: string): Promise<Uint8Array | null> {
     return Promise.resolve(this.states.get(documentId) ?? null);
   }
 
-  enqueue(documentId: string, update: Uint8Array): void {
+  enqueue(documentId: string, update: Uint8Array, seq: number): void {
     const previous = this.states.get(documentId);
     const merged = previous ? Y.mergeUpdates([previous, update]) : update;
     this.states.set(documentId, merged);
     const stateVector = Y.encodeStateVectorFromUpdate(merged);
-    for (const listener of this.listeners.get(documentId) ?? []) listener(stateVector);
+    for (const listener of this.listeners.get(documentId) ?? []) listener(stateVector, seq);
   }
 
-  onPersisted(documentId: string, listener: (stateVector: Uint8Array) => void): () => void {
+  onPersisted(
+    documentId: string,
+    listener: (stateVector: Uint8Array, persistedSeq: number) => void,
+  ): () => void {
     const set = this.listeners.get(documentId) ?? new Set();
     set.add(listener);
     this.listeners.set(documentId, set);
