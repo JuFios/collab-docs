@@ -137,6 +137,27 @@ test.describe('workspaces', () => {
     await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
   });
 
+  test('an invite link renews an expired access token instead of asking to sign in', async ({
+    browser,
+    baseURL,
+    signedInPage: owner,
+  }) => {
+    const guest = await registerViaApi(
+      (await browser.newContext({ baseURL })).request,
+      newUser('renewed'),
+    );
+    const workspaceId = await createWorkspace(owner, 'Renewed');
+    await invite(owner, workspaceId, guest.email);
+    const path = new URL(await inviteLinkFor(guest.email)).pathname;
+
+    const page = await signedIn(browser, baseURL, guest);
+    // only the access cookie is gone; the refresh cookie still holds the session
+    await page.context().clearCookies({ name: 'cd_at' });
+    await page.goto(path);
+    await expect(page.getByRole('button', { name: 'Accept invitation' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign in' })).toHaveCount(0);
+  });
+
   test('an invitation for another account cannot be accepted', async ({
     browser,
     baseURL,
