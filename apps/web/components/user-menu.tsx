@@ -20,7 +20,7 @@ export function UserMenu({ user }: { user: AuthUser }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label="User menu">
+        <Button variant="ghost" size="sm" aria-label={`${user.name}, user menu`}>
           {user.name}
           <ChevronDown className="h-3 w-3" aria-hidden />
         </Button>

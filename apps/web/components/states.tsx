@@ -2,19 +2,25 @@ import { AlertTriangle, Inbox, Lock, Loader2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+/** A full-page state is the page's only heading, so it is an `h1`; inside a page it is an `h2`. */
+type HeadingLevel = 1 | 2;
+
 function StateShell({
   icon,
   title,
   description,
   children,
   className,
+  headingLevel = 2,
 }: {
   icon: ReactNode;
   title: string;
   description?: string;
   children?: ReactNode;
   className?: string;
+  headingLevel?: HeadingLevel;
 }) {
+  const Heading = headingLevel === 1 ? 'h1' : 'h2';
   return (
     <div
       className={cn(
@@ -25,14 +31,19 @@ function StateShell({
       <div className="text-muted-foreground" aria-hidden>
         {icon}
       </div>
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <Heading className="text-lg font-semibold">{title}</Heading>
       {description ? <p className="max-w-md text-sm text-muted-foreground">{description}</p> : null}
       {children}
     </div>
   );
 }
 
-export function EmptyState(props: { title: string; description?: string; children?: ReactNode }) {
+export function EmptyState(props: {
+  title: string;
+  description?: string;
+  children?: ReactNode;
+  headingLevel?: HeadingLevel;
+}) {
   return <StateShell icon={<Inbox className="h-8 w-8" />} {...props} />;
 }
 
@@ -41,17 +52,20 @@ export function ErrorState({
   description,
   correlationId,
   children,
+  headingLevel,
 }: {
   title?: string;
   description?: string;
   correlationId?: string;
   children?: ReactNode;
+  headingLevel?: HeadingLevel;
 }) {
   return (
     <StateShell
       icon={<AlertTriangle className="h-8 w-8" />}
       title={title}
       description={description}
+      headingLevel={headingLevel}
     >
       {children}
       {correlationId ? (

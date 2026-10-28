@@ -16,7 +16,7 @@ import {
   requireWorkspace,
 } from '@/lib/workspaces/data';
 
-export const metadata: Metadata = { title: 'Settings · Collab Docs' };
+export const metadata: Metadata = { title: 'Settings' };
 
 function Section({
   id,
@@ -64,7 +64,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
           This workspace is on the {PLAN_LABELS[usage.plan]} plan.{' '}
           <Link
             href={`/w/${id}/billing`}
-            className="text-primary underline-offset-4 hover:underline"
+            className="text-primary underline underline-offset-4 hover:no-underline"
           >
             Manage billing
           </Link>

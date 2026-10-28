@@ -21,8 +21,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <Providers>
       <div className="min-h-screen">
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:ring-2 focus:ring-ring"
+        >
+          Skip to content
+        </a>
         <Navbar user={user} workspaces={workspaces} unreadCount={unread?.count} />
-        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+        <main id="content" className="mx-auto max-w-6xl px-4 py-6">
+          {children}
+        </main>
       </div>
     </Providers>
   );

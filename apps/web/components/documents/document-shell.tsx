@@ -260,7 +260,7 @@ function Frame({
       ) : (
         <p className="text-sm text-muted-foreground">Shared with you</p>
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span aria-hidden className="text-2xl">
           {document.icon ?? '📄'}
         </span>
@@ -277,7 +277,7 @@ function Frame({
           </span>
         )}
         {showStatus ? <SaveIndicator status={status} /> : null}
-        <span className="ml-auto flex items-center gap-2">
+        <span className="ml-auto flex flex-wrap items-center gap-2">
           <PresenceAvatars users={presence} />
           {member ? (
             <ShareDialog

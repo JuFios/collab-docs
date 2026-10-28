@@ -11,13 +11,16 @@ export default function PublishedError({
   reset: () => void;
 }) {
   return (
-    <ErrorState
-      description="This page could not be loaded right now. Try again in a moment."
-      correlationId={error.digest}
-    >
-      <Button onClick={reset} variant="outline">
-        Try again
-      </Button>
-    </ErrorState>
+    <main>
+      <ErrorState
+        headingLevel={1}
+        description="This page could not be loaded right now. Try again in a moment."
+        correlationId={error.digest}
+      >
+        <Button onClick={reset} variant="outline">
+          Try again
+        </Button>
+      </ErrorState>
+    </main>
   );
 }
