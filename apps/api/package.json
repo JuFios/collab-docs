@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "nest start --watch --exec \"node --env-file-if-exists=../../.env.local\"",
+    "dev:worker": "until [ -f dist/main.worker.js ]; do sleep 1; done; sleep 3; node --watch --env-file-if-exists=../../.env.local dist/main.worker.js",
     "build": "nest build",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",

@@ -37,15 +37,24 @@ function composeSecrets(file: string): Array<[string, string]> {
 }
 
 describe('secrets in the repository', () => {
-  it('keeps only marked placeholders in .env.example', () => {
-    const entries = parseEnv('.env.example');
-    const secrets = secretsOf(entries);
-    expect(secrets.length).toBeGreaterThanOrEqual(8);
-    // empty (an optional credential) or a value the services refuse to start with outside dev and test
-    const real = secrets.filter(([, value]) => value !== '' && !value.includes('dev-only'));
-    expect(real).toEqual([]);
-    // the URL that embeds the database password carries the placeholder, too
-    expect(entries.find(([key]) => key === 'DATABASE_URL')?.[1]).toContain('dev-only');
+  it.each(['.env.example', '.env.local.example'])(
+    'keeps only marked placeholders in %s',
+    (file) => {
+      const entries = parseEnv(file);
+      const secrets = secretsOf(entries);
+      expect(secrets.length).toBeGreaterThanOrEqual(8);
+      // empty (an optional credential) or a value the services refuse to start with outside dev and test
+      const real = secrets.filter(([, value]) => value !== '' && !value.includes('dev-only'));
+      expect(real).toEqual([]);
+      // the URL that embeds the database password carries the placeholder, too
+      expect(entries.find(([key]) => key === 'DATABASE_URL')?.[1]).toContain('dev-only');
+    },
+  );
+
+  it('declares nothing in .env.local.example that .env.example does not', () => {
+    const known = new Set(parseEnv('.env.example').map(([key]) => key));
+    const extra = parseEnv('.env.local.example').filter(([key]) => !known.has(key));
+    expect(extra).toEqual([]);
   });
 
   it('leaves every secret empty in the staging template', () => {
