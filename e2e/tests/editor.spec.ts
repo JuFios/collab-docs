@@ -19,13 +19,14 @@ const textOf = (page: Page) =>
 
 /**
  * Puts the caret into the `index`-th top-level block, `offset` characters from its start (or at its end). Keys such
- * as Home and End do not move the caret the same way on every platform, and the tests run on more than one.
+ * as Home and End do not move the caret the same way on every platform, and the tests run on more than one. It
+ * returns once the editor has taken the new selection over.
  */
 async function placeCaret(page: Page, index: number, offset: number | 'end'): Promise<void> {
   await editorOf(page)
     .locator(':scope > *')
     .nth(index)
-    .evaluate((block, target) => {
+    .evaluate(async (block, target) => {
       const texts: Text[] = [];
       const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
       for (let node = walker.nextNode(); node; node = walker.nextNode()) texts.push(node as Text);
@@ -44,6 +45,10 @@ async function placeCaret(page: Page, index: number, offset: number | 'end'): Pr
       const selection = window.getSelection();
       selection?.removeAllRanges();
       selection?.addRange(range);
+      // ProseMirror reads the selection from the DOM after it has changed; a key pressed before that acts on the old one
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
     }, offset);
 }
 
