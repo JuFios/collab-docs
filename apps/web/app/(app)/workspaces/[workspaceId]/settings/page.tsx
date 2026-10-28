@@ -37,9 +37,13 @@ function Section({
   );
 }
 
-export default async function SettingsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const workspace = await requireWorkspace(id);
+export default async function SettingsPage({
+  params,
+}: {
+  params: Promise<{ workspaceId: string }>;
+}) {
+  const { workspaceId } = await params;
+  const workspace = await requireWorkspace(workspaceId);
   // the nav hides this page from editors and viewers; opening the URL directly lands here
   if (!roleAtLeast(workspace.role, 'ADMIN')) {
     return (
@@ -48,22 +52,22 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
   }
   const [user, members, invites, usage] = await Promise.all([
     getCurrentUser(),
-    getMembers(id),
-    getInvites(id),
-    getUsage(id),
+    getMembers(workspaceId),
+    getInvites(workspaceId),
+    getUsage(workspaceId),
   ]);
   const slots = usage.members.current + usage.members.pendingInvites;
 
   return (
     <div className="grid gap-6">
       <Section id="rename-heading" title="General">
-        <RenameWorkspaceForm workspaceId={id} name={workspace.name} />
+        <RenameWorkspaceForm workspaceId={workspaceId} name={workspace.name} />
       </Section>
       <Section id="usage-heading" title="Plan and usage">
         <p className="text-sm text-muted-foreground">
           This workspace is on the {PLAN_LABELS[usage.plan]} plan.{' '}
           <Link
-            href={`/w/${id}/billing`}
+            href={`/workspaces/${workspaceId}/billing`}
             className="text-primary underline underline-offset-4 hover:no-underline"
           >
             Manage billing
@@ -88,7 +92,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
           <EmptyState title="No members" />
         ) : (
           <MembersTable
-            workspaceId={id}
+            workspaceId={workspaceId}
             members={members}
             currentUserId={user.id}
             actorRole={workspace.role}
@@ -99,10 +103,10 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
         <p className="text-sm text-muted-foreground">
           {slots} of {usage.members.limit} member slots used, pending invitations included.
         </p>
-        <InviteForm workspaceId={id} />
+        <InviteForm workspaceId={workspaceId} />
       </Section>
       <Section id="pending-heading" title="Pending invitations">
-        <PendingInvites workspaceId={id} invites={invites} />
+        <PendingInvites workspaceId={workspaceId} invites={invites} />
       </Section>
     </div>
   );

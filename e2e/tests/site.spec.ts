@@ -7,8 +7,8 @@ test.describe('site files', () => {
     const response = await request.get('/robots.txt');
     expect(response.status()).toBe(200);
     const body = await response.text();
-    expect(body).toContain('Allow: /p/');
-    for (const path of ['/w/', '/e/', '/invite/', '/api/']) {
+    expect(body).toContain('Allow: /published/');
+    for (const path of ['/workspaces/', '/edit-link/', '/invite/', '/api/']) {
       expect(body).toContain(`Disallow: ${path}`);
     }
   });

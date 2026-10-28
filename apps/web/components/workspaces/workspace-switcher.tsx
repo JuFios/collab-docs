@@ -32,7 +32,7 @@ export function WorkspaceSwitcher({ workspaces }: { workspaces: readonly Workspa
       <DropdownMenuContent align="start" className="min-w-56">
         {workspaces.map((workspace) => (
           <DropdownMenuItem key={workspace.id} asChild>
-            <Link href={`/w/${workspace.id}`}>
+            <Link href={`/workspaces/${workspace.id}`}>
               <span className="flex-1 truncate">{workspace.name}</span>
               {workspace.id === currentId ? (
                 <Check className="h-4 w-4" aria-label="Current" />
@@ -42,7 +42,7 @@ export function WorkspaceSwitcher({ workspaces }: { workspaces: readonly Workspa
         ))}
         {workspaces.length > 0 ? <DropdownMenuSeparator /> : null}
         <DropdownMenuItem asChild>
-          <Link href="/w?all=1">All workspaces</Link>
+          <Link href="/workspaces?all=1">All workspaces</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

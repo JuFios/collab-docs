@@ -4,7 +4,9 @@ import { GET } from './route';
 const ID = '0192f4a8-7a3b-7c11-9d4e-5b2a1c3d4e5f';
 
 const call = (id: string, query: string) =>
-  GET(new Request(`http://web/media/${id}${query}`), { params: Promise.resolve({ id }) });
+  GET(new Request(`http://web/media/${id}${query}`), {
+    params: Promise.resolve({ attachmentId: id }),
+  });
 
 describe('GET /media/:id', () => {
   afterEach(() => vi.restoreAllMocks());

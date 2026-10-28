@@ -48,7 +48,7 @@ async function placeCaret(page: Page, index: number, offset: number | 'end'): Pr
 }
 
 async function openDocument(page: Page, workspaceId: string, documentId: string): Promise<void> {
-  await page.goto(`/w/${workspaceId}/d/${documentId}`);
+  await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
   await expect(editorOf(page)).toBeVisible();
 }
 

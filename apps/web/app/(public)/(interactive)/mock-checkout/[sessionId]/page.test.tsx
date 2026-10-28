@@ -68,7 +68,7 @@ describe('mock checkout page', () => {
     expect(screen.queryByRole('button', { name: /Pay/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to billing' })).toHaveAttribute(
       'href',
-      `/w/${WS}/billing`,
+      `/workspaces/${WS}/billing`,
     );
   });
 

@@ -11,10 +11,10 @@ import { getCurrentUser, getDocument, getTrash } from '@/lib/workspaces/data';
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ docId: string }>;
+  params: Promise<{ documentId: string }>;
 }): Promise<Metadata> {
-  const { docId } = await params;
-  const document = await getDocument(docId).catch(() => null);
+  const { documentId } = await params;
+  const document = await getDocument(documentId).catch(() => null);
   return { title: document ? document.title || 'Untitled' : 'Document' };
 }
 
@@ -24,35 +24,35 @@ export default async function DocumentPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string; docId: string }>;
+  params: Promise<{ workspaceId: string; documentId: string }>;
   searchParams: Promise<{ thread?: string | string[] }>;
 }) {
-  const [{ id, docId }, query] = await Promise.all([params, searchParams]);
+  const [{ workspaceId, documentId }, query] = await Promise.all([params, searchParams]);
   // a link from a notification or an email: `?thread=<id>` opens that thread; anything else is ignored
   const thread = threadParam.safeParse(query.thread);
   let document;
   try {
-    document = await getDocument(docId);
+    document = await getDocument(documentId);
   } catch (error) {
     if (!isApiError(error)) throw error;
     if (error.status === 403) return <ForbiddenState />;
     if (error.status !== 404 && error.status !== 400) throw error;
     // deleted, never existed, or no access: the api answers 404 for all of them. A member can see their own
     // deleted documents in the trash, which is how "deleted" gets its own state.
-    const trash = await getTrash(id).catch(() => null);
-    if (trash?.some((item) => item.id === docId)) {
-      return <DocumentGone workspaceId={id} documentId={docId} member />;
+    const trash = await getTrash(workspaceId).catch(() => null);
+    if (trash?.some((item) => item.id === documentId)) {
+      return <DocumentGone workspaceId={workspaceId} documentId={documentId} member />;
     }
     notFound();
   }
   // a document reached through another workspace's URL is not shown there
-  if (document.workspaceId !== id) notFound();
+  if (document.workspaceId !== workspaceId) notFound();
   // already fetched by the layout; `cache` makes this the same request
   const user = await getCurrentUser();
   return (
     <DocumentShell
       key={document.id}
-      workspaceId={id}
+      workspaceId={workspaceId}
       initial={document}
       viewer={{ id: user.id, name: user.name }}
       initialThreadId={thread.success ? thread.data : null}

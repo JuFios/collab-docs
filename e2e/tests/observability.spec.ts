@@ -42,7 +42,7 @@ test.describe('observability', () => {
 
     // web -> api: the page is rendered on the server, which calls the api on behalf of the visitor
     const pageId = idFor('page');
-    const rendered = await request.get(`/w/${workspaceId}`, {
+    const rendered = await request.get(`/workspaces/${workspaceId}`, {
       headers: { 'x-correlation-id': pageId },
     });
     expect(rendered.status()).toBe(200);

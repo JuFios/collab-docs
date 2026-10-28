@@ -36,7 +36,7 @@ test.describe('document tree', () => {
     await expect(page.getByText('The workspace is empty.')).toBeVisible();
 
     await page.getByRole('button', { name: 'New document' }).click();
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/d/[0-9a-f-]{36}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/documents/[0-9a-f-]{36}$`));
     const title = page.getByRole('textbox', { name: 'Document title' });
     await expect(title).toBeFocused();
     await expect(title).toHaveValue('Untitled');
@@ -68,7 +68,7 @@ test.describe('document tree', () => {
     await createDocument(page, workspaceId, 'Alpha');
     await createDocument(page, workspaceId, 'Beta');
     await createDocument(page, workspaceId, 'Gamma');
-    await page.goto(`/w/${workspaceId}`);
+    await page.goto(`/workspaces/${workspaceId}`);
     expect(await rows(page)).toEqual(['Alpha@1', 'Beta@1', 'Gamma@1']);
 
     const handle = page.getByRole('button', { name: 'Drag Gamma' });
@@ -108,7 +108,7 @@ test.describe('document tree', () => {
     const workspaceId = await createWorkspace(page, 'Keys');
     await createDocument(page, workspaceId, 'One');
     await createDocument(page, workspaceId, 'Two');
-    await page.goto(`/w/${workspaceId}`);
+    await page.goto(`/workspaces/${workspaceId}`);
 
     await page.getByRole('treeitem', { name: 'Two' }).focus();
     await page.keyboard.press('Alt+ArrowUp');
@@ -141,7 +141,7 @@ test.describe('document tree', () => {
   }) => {
     const workspaceId = await createWorkspace(first, 'Live');
     const { page: second, context } = await signedIn(browser, baseURL, user);
-    await second.goto(`/w/${workspaceId}`);
+    await second.goto(`/workspaces/${workspaceId}`);
     await expect(second.getByRole('status').filter({ hasText: 'Live' })).toBeVisible();
     await expect(second.getByRole('treeitem')).toHaveCount(0);
 
@@ -149,7 +149,7 @@ test.describe('document tree', () => {
     await expect(second.getByRole('treeitem', { name: 'Shared note' })).toBeVisible();
 
     // a rename made in the first window reaches the second one too
-    await first.goto(`/w/${workspaceId}`);
+    await first.goto(`/workspaces/${workspaceId}`);
     await first.getByRole('treeitem', { name: 'Shared note' }).focus();
     await first.keyboard.press('F2');
     await first.keyboard.press('ControlOrMeta+a');
@@ -165,7 +165,7 @@ test.describe('document tree', () => {
     const workspaceId = await createWorkspace(page, 'Trash');
     const parent = await createDocument(page, workspaceId, 'Parent');
     await createDocument(page, workspaceId, 'Child', parent);
-    await page.goto(`/w/${workspaceId}/d/${parent}`);
+    await page.goto(`/workspaces/${workspaceId}/documents/${parent}`);
 
     await page.getByRole('treeitem', { name: 'Parent' }).hover();
     await page.getByRole('button', { name: 'Actions for Parent' }).click();
@@ -175,13 +175,13 @@ test.describe('document tree', () => {
     await dialog.getByRole('button', { name: 'Move to trash' }).click();
 
     // the open document was deleted: we are taken to the workspace and the tree is empty
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}$`));
     await expect(page.getByRole('treeitem')).toHaveCount(0);
 
-    await page.goto(`/w/${workspaceId}/d/${parent}`);
+    await page.goto(`/workspaces/${workspaceId}/documents/${parent}`);
     await expect(page.getByRole('heading', { name: 'This document was deleted' })).toBeVisible();
 
-    await page.goto(`/w/${workspaceId}/trash`);
+    await page.goto(`/workspaces/${workspaceId}/trash`);
     const entry = page.getByRole('listitem').filter({ hasText: 'Parent' });
     await expect(entry).toContainText('with 1 subpages');
     await page.getByRole('button', { name: 'Restore' }).click();
@@ -200,7 +200,7 @@ test.describe('document tree', () => {
     const docId = await createDocument(owner, workspaceId, 'Handbook');
     const { page: viewer } = await invitedMember(browser, baseURL, owner, workspaceId, 'Viewer');
 
-    await viewer.goto(`/w/${workspaceId}/d/${docId}`);
+    await viewer.goto(`/workspaces/${workspaceId}/documents/${docId}`);
     await expect(viewer.getByRole('heading', { name: 'Handbook', level: 2 })).toBeVisible();
     await expect(viewer.getByRole('article').getByText('Read-only')).toBeVisible();
     await expect(viewer.getByRole('textbox', { name: 'Document title' })).toHaveCount(0);
@@ -213,9 +213,9 @@ test.describe('document tree', () => {
       newUser('stranger'),
     );
     const { page: outsider } = await signedIn(browser, baseURL, stranger);
-    await outsider.goto(`/w/${workspaceId}/d/${docId}`);
+    await outsider.goto(`/workspaces/${workspaceId}/documents/${docId}`);
     await expect(outsider.getByRole('heading', { name: 'Page not found' })).toBeVisible();
-    await outsider.goto(`/w/${workspaceId}/trash`);
+    await outsider.goto(`/workspaces/${workspaceId}/trash`);
     await expect(outsider.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   });
 
@@ -239,12 +239,12 @@ test.describe('document tree', () => {
     const { page } = await signedIn(browser, baseURL, guest);
     await page.goto('/shared');
     await page.getByRole('link', { name: /For guests/ }).click();
-    await expect(page).toHaveURL(new RegExp(`/w/${workspaceId}/d/${docId}$`));
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/documents/${docId}$`));
     await expect(page.getByRole('heading', { name: 'For guests', level: 2 })).toBeVisible();
     await expect(page.getByRole('article').getByText('Read-only')).toBeVisible();
     await expect(page.getByRole('tree')).toHaveCount(0);
 
-    await page.goto(`/w/${workspaceId}`);
+    await page.goto(`/workspaces/${workspaceId}`);
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   });
 
@@ -252,7 +252,7 @@ test.describe('document tree', () => {
     await page.goto('/shared');
     await expect(page.getByText('Nothing has been shared with you')).toBeVisible();
     const workspaceId = await createWorkspace(page, 'Empty');
-    await page.goto(`/w/${workspaceId}/trash`);
+    await page.goto(`/workspaces/${workspaceId}/trash`);
     await expect(page.getByRole('heading', { name: 'The trash is empty' })).toBeVisible();
   });
 
@@ -266,7 +266,7 @@ test.describe('document tree', () => {
       workspaceId,
       'A rather long title for a narrow screen',
     );
-    await page.goto(`/w/${workspaceId}/d/${docId}`);
+    await page.goto(`/workspaces/${workspaceId}/documents/${docId}`);
     await expect(page.getByRole('textbox', { name: 'Document title' })).toBeVisible();
     // the wide parts of the page (header row, document column) must end inside the 390px viewport
     for (const part of [page.locator('header').first(), page.getByRole('article')]) {

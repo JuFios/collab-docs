@@ -33,7 +33,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           description="This invitation has expired, was revoked, or has already been used. Ask the workspace admin to send a new one."
         >
           <Button asChild variant="outline" className="w-full">
-            <Link href="/w">Go to your workspaces</Link>
+            <Link href="/workspaces">Go to your workspaces</Link>
           </Button>
         </AuthCard>
       );

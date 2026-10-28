@@ -30,17 +30,17 @@ export default async function BillingPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ workspaceId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  const workspace = await requireWorkspace(id);
+  const [{ workspaceId }, query] = await Promise.all([params, searchParams]);
+  const workspace = await requireWorkspace(workspaceId);
   // the nav hides this page from editors and viewers; opening the URL directly lands here
   if (!roleAtLeast(workspace.role, 'ADMIN')) {
     return <ForbiddenState description="Only workspace admins and owners can manage billing." />;
   }
 
-  const billing = await getBilling(id);
+  const billing = await getBilling(workspaceId);
   const returned = parseBillingReturn(query);
   const paid = billing.plan !== 'FREE';
 
@@ -50,7 +50,7 @@ export default async function BillingPage({
         <AwaitingConfirmation
           expectedPlan={returned.awaiting}
           currentPlan={billing.plan}
-          billingPath={billingPath(id)}
+          billingPath={billingPath(workspaceId)}
         />
       ) : null}
       {returned.declined ? (
@@ -98,7 +98,7 @@ export default async function BillingPage({
                   : 'No subscription: the workspace uses the free limits.'}
             </p>
           </div>
-          {paid ? <CancelSubscriptionButton workspaceId={id} /> : null}
+          {paid ? <CancelSubscriptionButton workspaceId={workspaceId} /> : null}
         </div>
       </Section>
 
@@ -111,7 +111,7 @@ export default async function BillingPage({
       </Section>
 
       <Section id="plans-heading" title="Plans">
-        <PlanCards workspaceId={id} currentPlan={billing.plan} />
+        <PlanCards workspaceId={workspaceId} currentPlan={billing.plan} />
       </Section>
 
       <Section id="invoices-heading" title="Invoices">

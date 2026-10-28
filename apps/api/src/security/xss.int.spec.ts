@@ -1,4 +1,4 @@
-import '../test/security-env';
+import '../test/env/security';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import * as Y from 'yjs';
@@ -211,7 +211,7 @@ describe('hostile content through every path that shows it to somebody else', ()
         actorName: text,
         documentTitle: text,
         excerpt: text,
-        link: `https://app.example/w/1/d/2?x=${text}`,
+        link: `https://app.example/workspaces/1/documents/2?x=${text}`,
       });
       const invite = renderInviteEmail({
         workspaceName: text,

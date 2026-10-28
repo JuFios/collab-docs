@@ -7,7 +7,7 @@ const saveStatus = (page: Page) => page.locator('[data-testid="save-status"]:vis
 
 /** The api answers 404 for a page that is not published; the web page is fetched without any session. */
 const pageHtml = async (request: APIRequestContext, slug: string) => {
-  const response = await request.get(`/p/${slug}`);
+  const response = await request.get(`/published/${slug}`);
   return { status: response.status(), body: await response.text(), headers: response.headers() };
 };
 
@@ -18,7 +18,7 @@ async function typeInto(page: Page, text: string): Promise<void> {
 }
 
 async function openEditable(page: Page, workspaceId: string, documentId: string): Promise<void> {
-  await page.goto(`/w/${workspaceId}/d/${documentId}`);
+  await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
   await expect(editorOf(page)).toHaveAttribute('contenteditable', 'true');
   await expect(saveStatus(page)).toHaveText('Saved');
 }
@@ -52,7 +52,7 @@ test.describe('published page', () => {
     await owner.getByRole('button', { name: 'Share' }).click();
     await owner.getByRole('button', { name: 'Publish to web' }).click();
     const address = await owner.getByLabel('Public link').inputValue();
-    const slug = new URL(address).pathname.replace('/p/', '');
+    const slug = new URL(address).pathname.replace('/published/', '');
     expect(slug).toMatch(/^quarterly-plan-[0-9a-f]+$/);
     await owner.keyboard.press('Escape');
 
@@ -64,7 +64,7 @@ test.describe('published page', () => {
     expect(first.body).toContain(
       '<meta name="description" content="We ship the public pages next."',
     );
-    expect(first.body).toContain(`<link rel="canonical" href="${ORIGIN}/p/${slug}"`);
+    expect(first.body).toContain(`<link rel="canonical" href="${ORIGIN}/published/${slug}"`);
     expect(first.body).toContain('<meta property="og:title" content="Quarterly plan"');
     expect(first.body).toContain('name="robots" content="index, follow"');
     expect(first.headers['cache-control']).toContain('s-maxage=3600');
@@ -120,7 +120,7 @@ test.describe('published page', () => {
 
     // the published page is not an editor: no editing surface, no textbox
     const reader = await (await browser.newContext({ baseURL })).newPage();
-    await reader.goto(`/p/${slug}`);
+    await reader.goto(`/published/${slug}`);
     await expect(reader.getByRole('heading', { level: 1, name: 'Roadmap' })).toBeVisible();
     await expect(reader.getByRole('textbox')).toHaveCount(0);
     await reader.context().close();
@@ -144,7 +144,7 @@ test.describe('published page', () => {
       void dialog.dismiss();
     });
     await expect
-      .poll(async () => (await visitor.goto(`/p/${slug}`))?.status(), { timeout: 20_000 })
+      .poll(async () => (await visitor.goto(`/published/${slug}`))?.status(), { timeout: 20_000 })
       .toBe(200);
     await expect(visitor.getByText('window.__xss=1', { exact: false })).toBeVisible();
     // nothing ran: the payload would have set this global
@@ -187,7 +187,7 @@ test.describe('edit link', () => {
     const { id, token } = await createLink(owner, documentId, { mode: 'EDIT' });
 
     const guest = await (await browser.newContext({ baseURL })).newPage();
-    await guest.goto(`/e/${token}`);
+    await guest.goto(`/edit-link/${token}`);
     await expect(guest.getByText('You are editing as a guest')).toBeVisible();
     await expect(editorOf(guest)).toHaveAttribute('contenteditable', 'true');
     await expect(editorOf(guest)).toContainText('owner text');
@@ -232,11 +232,11 @@ test.describe('edit link', () => {
         intervals: [500],
       })
       .toBe(410);
-    await visitor.goto(`/e/${token}`);
+    await visitor.goto(`/edit-link/${token}`);
     await expect(visitor.getByText('This link no longer works')).toBeVisible();
     await expect(visitor.getByRole('textbox')).toHaveCount(0);
 
-    await visitor.goto(`/e/${'A'.repeat(43)}`);
+    await visitor.goto(`/edit-link/${'A'.repeat(43)}`);
     await expect(visitor.getByText('This link does not work')).toBeVisible();
     await visitor.context().close();
   });

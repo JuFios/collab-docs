@@ -58,7 +58,7 @@ export function EditLinkSection({
             {formatExpiry(live.expiresAt)}.
           </p>
           {shown ? (
-            <CopyField label="Edit link" value={`${origin}/e/${shown}`} />
+            <CopyField label="Edit link" value={`${origin}/edit-link/${shown}`} />
           ) : (
             <p className="text-sm text-muted-foreground">
               The address is shown only when the link is created. Regenerate it to get a new one.

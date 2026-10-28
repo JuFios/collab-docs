@@ -24,7 +24,7 @@ export default async function WorkspacesPage({
   const last = cookieStore.get(LAST_WORKSPACE_COOKIE)?.value;
   // straight back to where the user was; `?all` (the switcher's "All workspaces") shows the list instead
   if (all === undefined && last && workspaces.some((workspace) => workspace.id === last)) {
-    redirect(`/w/${last}`);
+    redirect(`/workspaces/${last}`);
   }
 
   return (
@@ -43,7 +43,7 @@ export default async function WorkspacesPage({
             {workspaces.map((workspace) => (
               <li key={workspace.id}>
                 <Link
-                  href={`/w/${workspace.id}`}
+                  href={`/workspaces/${workspace.id}`}
                   className="block rounded-lg border bg-card p-4 transition-colors hover:bg-accent"
                 >
                   <div className="font-medium">{workspace.name}</div>

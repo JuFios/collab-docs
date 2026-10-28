@@ -16,14 +16,14 @@ export default async function WorkspaceLayout({
   params,
 }: {
   children: ReactNode;
-  params: Promise<{ id: string }>;
+  params: Promise<{ workspaceId: string }>;
 }) {
-  const { id } = await params;
+  const { workspaceId } = await params;
   // fetched alongside the workspace; if only the tree fails, the sidebar loads it again on the client
-  const treeRequest = getTree(id).catch(() => undefined);
+  const treeRequest = getTree(workspaceId).catch(() => undefined);
   let workspace;
   try {
-    workspace = await getWorkspace(id);
+    workspace = await getWorkspace(workspaceId);
   } catch (error) {
     if (isApiError(error) && error.status === 400) notFound();
     // Not a member: either a stranger or a guest who was given a share. The frame (sidebar, stream) is for members

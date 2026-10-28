@@ -27,7 +27,7 @@ async function failing(page: Page, url: RegExp) {
 }
 
 async function openEditable(page: Page, workspaceId: string, documentId: string): Promise<void> {
-  await page.goto(`/w/${workspaceId}/d/${documentId}`);
+  await page.goto(`/workspaces/${workspaceId}/documents/${documentId}`);
   await expect(editorOf(page)).toHaveAttribute('contenteditable', 'true');
   await expect(saveStatus(page)).toHaveText('Saved');
 }

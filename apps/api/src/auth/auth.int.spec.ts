@@ -1,4 +1,4 @@
-import '../test/auth-env';
+import '../test/env/auth';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
@@ -245,8 +245,8 @@ describe('auth', () => {
 
     it('rotates the session and redirects to the requested path', async () => {
       const { refresh } = await register();
-      const response = await navigate(refresh, '/w/abc?x=1').expect(302);
-      expect(response.headers.location).toBe('/w/abc?x=1');
+      const response = await navigate(refresh, '/workspaces/abc?x=1').expect(302);
+      expect(response.headers.location).toBe('/workspaces/abc?x=1');
       expect(response.headers['cache-control']).toBe('no-store');
       expect(cookiesOf(response)[ACCESS_COOKIE]).toBeDefined();
       expect(cookiesOf(response)[REFRESH_COOKIE]).toBeDefined();
@@ -257,13 +257,13 @@ describe('auth', () => {
       async (next) => {
         const { refresh } = await register();
         const response = await navigate(refresh, next).expect(302);
-        expect(response.headers.location).toBe('/w');
+        expect(response.headers.location).toBe('/workspaces');
       },
     );
 
     it('sends the browser to the login page and clears cookies when the session is gone', async () => {
-      const response = await navigate('unknown-token', '/w/abc').expect(302);
-      expect(response.headers.location).toBe('/login?next=%2Fw%2Fabc');
+      const response = await navigate('unknown-token', '/workspaces/abc').expect(302);
+      expect(response.headers.location).toBe('/login?next=%2Fworkspaces%2Fabc');
       expect(cookiesOf(response)[REFRESH_COOKIE]).toContain('Expires=Thu, 01 Jan 1970');
       const missing = await navigate(undefined, '/shared').expect(302);
       expect(missing.headers.location).toBe('/login?next=%2Fshared');

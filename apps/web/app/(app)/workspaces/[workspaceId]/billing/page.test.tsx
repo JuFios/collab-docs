@@ -71,7 +71,7 @@ async function show(
   billingData.getBilling.mockResolvedValue(overview);
   render(
     await BillingPage({
-      params: Promise.resolve({ id: WS }),
+      params: Promise.resolve({ workspaceId: WS }),
       searchParams: Promise.resolve(query),
     }),
   );

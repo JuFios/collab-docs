@@ -42,7 +42,7 @@ describe('PlanLimitDialog', () => {
       expect(screen.getByText('Documents: 20 of 20 used on the Free plan.')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Upgrade plan' })).toHaveAttribute(
         'href',
-        `/w/${WS}/billing`,
+        `/workspaces/${WS}/billing`,
       );
     },
   );

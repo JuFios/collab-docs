@@ -5,10 +5,10 @@ import { getTrash, requireWorkspace } from '@/lib/workspaces/data';
 
 export const metadata: Metadata = { title: 'Trash' };
 
-export default async function TrashPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  await requireWorkspace(id);
-  const items = await getTrash(id);
+export default async function TrashPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+  const { workspaceId } = await params;
+  await requireWorkspace(workspaceId);
+  const items = await getTrash(workspaceId);
   return (
     <section aria-labelledby="trash-heading" className="grid gap-4">
       <h2 id="trash-heading" className="text-lg font-semibold">
@@ -20,7 +20,7 @@ export default async function TrashPage({ params }: { params: Promise<{ id: stri
           description="Deleted documents show up here, with their subpages, until you restore them."
         />
       ) : (
-        <TrashList workspaceId={id} items={items} />
+        <TrashList workspaceId={workspaceId} items={items} />
       )}
     </section>
   );

@@ -40,15 +40,17 @@ describe('billing return url', () => {
 
   it('round-trips the plan the page is waiting for', () => {
     const url = billingReturnUrl(WS, { awaiting: 'PRO' });
-    expect(url).toBe(`/w/${WS}/billing?awaiting=PRO`);
+    expect(url).toBe(`/workspaces/${WS}/billing?awaiting=PRO`);
     expect(parseBillingReturn(Object.fromEntries(new URL(url, 'http://x').searchParams))).toEqual({
       awaiting: 'PRO',
     });
   });
 
   it('marks a declined payment and leaves the plain path alone', () => {
-    expect(billingReturnUrl(WS, { declined: true })).toBe(`/w/${WS}/billing?payment=declined`);
-    expect(billingReturnUrl(WS, {})).toBe(`/w/${WS}/billing`);
+    expect(billingReturnUrl(WS, { declined: true })).toBe(
+      `/workspaces/${WS}/billing?payment=declined`,
+    );
+    expect(billingReturnUrl(WS, {})).toBe(`/workspaces/${WS}/billing`);
   });
 
   it('ignores values that are not plans', () => {

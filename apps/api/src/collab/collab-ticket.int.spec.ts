@@ -1,4 +1,4 @@
-import '../test/collab-env';
+import '../test/env/collab';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
-import { securityHeaders } from './lib/security-headers';
+import { securityHeaders } from './lib/security/headers';
 
 // Rewrites are compiled into the routes manifest, so unlike the middleware this destination is fixed at
 // build time (the Dockerfile exposes it as a build arg; the default matches docker compose).

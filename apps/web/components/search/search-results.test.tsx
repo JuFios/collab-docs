@@ -38,7 +38,7 @@ describe('SearchResultList', () => {
   it('links each result to its document and marks the matches', () => {
     render(<SearchResultList workspaceId={WORKSPACE} q="plan" isFirstPage page={page()} />);
     const link = screen.getByRole('link', { name: /Quarterly plan/ });
-    expect(link).toHaveAttribute('href', `/w/${WORKSPACE}/d/${DOCUMENT}`);
+    expect(link).toHaveAttribute('href', `/workspaces/${WORKSPACE}/documents/${DOCUMENT}`);
     expect(link).toHaveAttribute('data-search-result');
     const marks = within(link).getAllByText('plan', { selector: 'mark' });
     expect(marks).toHaveLength(1);
@@ -90,11 +90,11 @@ describe('SearchResultList', () => {
     );
     expect(screen.getByRole('link', { name: 'More results' })).toHaveAttribute(
       'href',
-      `/w/${WORKSPACE}/search?q=plan+%26+more&cursor=abc_-1`,
+      `/workspaces/${WORKSPACE}/search?q=plan+%26+more&cursor=abc_-1`,
     );
     expect(screen.getByRole('link', { name: 'First results' })).toHaveAttribute(
       'href',
-      `/w/${WORKSPACE}/search?q=plan+%26+more`,
+      `/workspaces/${WORKSPACE}/search?q=plan+%26+more`,
     );
   });
 

@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const page = await getPublishedDocument(slug);
   if (!page) return { title: 'Page not found', robots: { index: false } };
   const title = page.title || 'Untitled';
-  const url = `${webOrigin()}/p/${encodeURIComponent(slug)}`;
+  const url = `${webOrigin()}/published/${encodeURIComponent(slug)}`;
   return {
     metadataBase: new URL(webOrigin()),
     // the page belongs to its author: no site suffix

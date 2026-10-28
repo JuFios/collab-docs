@@ -46,7 +46,7 @@ export class MentionMailService {
     }
 
     const link = new URL(
-      `/w/${workspaceId}/d/${documentId}`,
+      `/workspaces/${workspaceId}/documents/${documentId}`,
       this.config.get('WEB_ORIGIN', { infer: true }),
     );
     link.searchParams.set('thread', threadId);

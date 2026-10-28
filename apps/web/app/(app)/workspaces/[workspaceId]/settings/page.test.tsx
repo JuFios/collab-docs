@@ -19,7 +19,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const params = Promise.resolve({ id: '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b' });
+const params = Promise.resolve({ workspaceId: '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b' });
 const workspace = (role: string) => ({
   id: 'w',
   name: 'Acme',

@@ -10,7 +10,7 @@ import { Snippet } from './snippet';
 const searchHref = (workspaceId: string, q: string, cursor?: string) => {
   const params = new URLSearchParams({ q });
   if (cursor) params.set('cursor', cursor);
-  return `/w/${workspaceId}/search?${params.toString()}`;
+  return `/workspaces/${workspaceId}/search?${params.toString()}`;
 };
 
 export function SearchResultsSkeleton() {
@@ -57,7 +57,7 @@ export function SearchResultList({
           <li key={item.id}>
             <Link
               data-search-result
-              href={`/w/${workspaceId}/d/${item.id}`}
+              href={`/workspaces/${workspaceId}/documents/${item.id}`}
               className="grid gap-1 px-4 py-3 outline-none hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <span className="font-medium">{item.title || 'Untitled'}</span>

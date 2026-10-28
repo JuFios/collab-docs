@@ -1,4 +1,4 @@
-import '../test/workspaces-env';
+import '../test/env/workspaces';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';

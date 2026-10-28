@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { roleAtLeast, type Usage, type WorkspaceRole } from '@collab-docs/shared';
-import { dashboardDelay } from '@/lib/dashboard-delay';
+import { dashboardDelay } from '@/lib/dashboard/delay';
 import {
   getMembers,
   getRecentDocuments,
@@ -22,7 +22,7 @@ export async function RecentDocumentsBlock({ workspaceId }: { workspaceId: strin
       {documents.map((document) => (
         <li key={document.id}>
           <Link
-            href={`/w/${workspaceId}/d/${document.id}`}
+            href={`/workspaces/${workspaceId}/documents/${document.id}`}
             className="flex items-center justify-between gap-3 py-2 text-sm hover:underline"
           >
             <span className="truncate">
@@ -65,7 +65,10 @@ export async function MembersBlock({
           {members.length} {members.length === 1 ? 'member' : 'members'}
         </span>
         {roleAtLeast(role, 'ADMIN') ? (
-          <Link className="underline underline-offset-4" href={`/w/${workspaceId}/settings`}>
+          <Link
+            className="underline underline-offset-4"
+            href={`/workspaces/${workspaceId}/settings`}
+          >
             Manage members
           </Link>
         ) : null}
@@ -163,7 +166,7 @@ export async function SharedWithMeBlock({ workspaceId }: { workspaceId: string }
       {shared.map((doc) => (
         <li key={doc.id}>
           <Link
-            href={`/w/${workspaceId}/d/${doc.id}`}
+            href={`/workspaces/${workspaceId}/documents/${doc.id}`}
             className="flex items-center justify-between gap-3 py-2 text-sm hover:underline"
           >
             <span className="truncate">

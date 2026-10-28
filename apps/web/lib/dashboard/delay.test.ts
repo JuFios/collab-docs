@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dashboardDelayMs } from './dashboard-delay';
+import { dashboardDelayMs } from './delay';
 
 const env = (values: Record<string, string>) => values as unknown as NodeJS.ProcessEnv;
 

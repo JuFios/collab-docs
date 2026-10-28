@@ -17,7 +17,11 @@ const actions = vi.hoisted(() => ({
 vi.mock('@/lib/workspaces/actions', () => actions);
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('sonner', () => ({ toast }));
-const navigation = vi.hoisted(() => ({ pathname: '/w/abc', refresh: vi.fn(), push: vi.fn() }));
+const navigation = vi.hoisted(() => ({
+  pathname: '/workspaces/abc',
+  refresh: vi.fn(),
+  push: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => navigation.pathname,
   useRouter: () => ({ refresh: navigation.refresh, push: navigation.push }),
@@ -34,7 +38,7 @@ import { WorkspaceNav } from './workspace-nav';
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  navigation.pathname = '/w/abc';
+  navigation.pathname = '/workspaces/abc';
 });
 
 const WS = '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
@@ -65,14 +69,14 @@ describe('CreateWorkspaceForm', () => {
     actions.createWorkspaceAction.mockResolvedValueOnce({
       ok: true,
       notice: 'Workspace created.',
-      redirectTo: '/w/new-id',
+      redirectTo: '/workspaces/new-id',
     } as never);
     const user = userEvent.setup();
     render(<CreateWorkspaceForm />);
     await user.type(screen.getByLabelText('Workspace name'), 'Acme');
     await user.click(screen.getByRole('button', { name: 'Create workspace' }));
     await waitFor(() => expect(actions.createWorkspaceAction).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/w/new-id'));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/workspaces/new-id'));
     expect(navigation.refresh).toHaveBeenCalled();
   });
 });
@@ -273,7 +277,7 @@ describe('LeaveWorkspaceButton', () => {
     await waitFor(() =>
       expect(actions.removeMemberAction).toHaveBeenCalledWith({ workspaceId: WS, userId }),
     );
-    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/w?all=1'));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/workspaces?all=1'));
     expect(navigation.refresh).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith('You left Acme.');
   });
@@ -311,14 +315,14 @@ describe('WorkspaceNav', () => {
   });
 
   it('shows Settings to admins and marks it when active', () => {
-    navigation.pathname = '/w/abc/settings';
+    navigation.pathname = '/workspaces/abc/settings';
     render(<WorkspaceNav workspaceId="abc" canManage />);
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 
   it('shows Billing to admins and marks it when active', () => {
-    navigation.pathname = '/w/abc/billing';
+    navigation.pathname = '/workspaces/abc/billing';
     render(<WorkspaceNav workspaceId="abc" canManage />);
     expect(screen.getByRole('link', { name: 'Billing' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current');

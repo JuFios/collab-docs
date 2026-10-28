@@ -3,7 +3,7 @@ import { sanitizeNextPath } from './next-path';
 
 describe('sanitizeNextPath', () => {
   it('keeps relative paths with query and hash', () => {
-    expect(sanitizeNextPath('/w/abc?tab=1#x')).toBe('/w/abc?tab=1#x');
+    expect(sanitizeNextPath('/workspaces/abc?tab=1#x')).toBe('/workspaces/abc?tab=1#x');
   });
 
   it.each([
@@ -16,11 +16,11 @@ describe('sanitizeNextPath', () => {
     'w/relative',
     '',
   ])('rejects %j', (value) => {
-    expect(sanitizeNextPath(value)).toBe('/w');
+    expect(sanitizeNextPath(value)).toBe('/workspaces');
   });
 
   it('falls back for missing values and honours a custom fallback', () => {
-    expect(sanitizeNextPath(undefined)).toBe('/w');
+    expect(sanitizeNextPath(undefined)).toBe('/workspaces');
     expect(sanitizeNextPath(null, '/')).toBe('/');
   });
 });

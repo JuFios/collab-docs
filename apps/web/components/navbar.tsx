@@ -23,7 +23,7 @@ export function Navbar({
         aria-label="Main"
       >
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-          <Link href="/w" className="whitespace-nowrap font-semibold">
+          <Link href="/workspaces" className="whitespace-nowrap font-semibold">
             Collab Docs
           </Link>
           {workspaces ? <WorkspaceSwitcher workspaces={workspaces} /> : null}

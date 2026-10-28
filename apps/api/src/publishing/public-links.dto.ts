@@ -16,7 +16,7 @@ export class CreatePublicLinkDto {
   @ApiProperty({
     enum: PUBLIC_LINK_MODES,
     description:
-      'VIEW publishes the page at /p/<slug>; EDIT lets anyone with the secret URL edit the document as a guest',
+      'VIEW publishes the page at /published/<slug>; EDIT lets anyone with the secret URL edit the document as a guest',
   })
   @IsIn(PUBLIC_LINK_MODES)
   mode!: PublicLinkMode;
@@ -45,7 +45,7 @@ export class UpdatePublicLinkDto {
 export class PublicLinkResponse {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ enum: PUBLIC_LINK_MODES }) mode!: PublicLinkMode;
-  @ApiProperty({ nullable: true, description: 'VIEW links: the stable address /p/<slug>' })
+  @ApiProperty({ nullable: true, description: 'VIEW links: the stable address /published/<slug>' })
   slug!: string | null;
   @ApiProperty({ enum: PUBLIC_LINK_STATUSES }) status!: PublicLinkStatus;
   @ApiProperty({ nullable: true }) expiresAt!: string | null;
@@ -57,7 +57,7 @@ export class CreatedPublicLinkResponse extends PublicLinkResponse {
   @ApiProperty({
     nullable: true,
     description:
-      'EDIT links: the secret that goes into /e/<token>. Shown once, only its hash is stored.',
+      'EDIT links: the secret that goes into /edit-link/<token>. Shown once, only its hash is stored.',
   })
   token!: string | null;
 

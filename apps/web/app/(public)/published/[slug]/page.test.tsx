@@ -39,13 +39,13 @@ describe('published page', () => {
     const metadata = await generateMetadata(params('plan-3fa9c1'));
     expect(metadata.title).toEqual({ absolute: 'Quarterly plan' });
     expect(metadata.description).toBe('What we ship next quarter.');
-    expect(metadata.alternates?.canonical).toBe('https://docs.example.com/p/plan-3fa9c1');
+    expect(metadata.alternates?.canonical).toBe('https://docs.example.com/published/plan-3fa9c1');
     expect(metadata.robots).toEqual({ index: true, follow: true });
     expect(metadata.openGraph).toMatchObject({
       type: 'article',
       title: 'Quarterly plan',
       description: 'What we ship next quarter.',
-      url: 'https://docs.example.com/p/plan-3fa9c1',
+      url: 'https://docs.example.com/published/plan-3fa9c1',
       modifiedTime: PAGE.updatedAt,
     });
   });

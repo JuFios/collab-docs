@@ -1,4 +1,4 @@
-import '../test/attachments-env';
+import '../test/env/attachments';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';

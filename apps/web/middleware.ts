@@ -2,7 +2,7 @@ import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs
 import { type NextRequest, NextResponse } from 'next/server';
 import { jwtAccessSecret } from '@/lib/env';
 import { type SessionState, decideRoute } from '@/lib/auth/route-policy';
-import { STRICT_TRANSPORT_SECURITY } from '@/lib/security-headers';
+import { STRICT_TRANSPORT_SECURITY } from '@/lib/security/headers';
 import {
   LAST_WORKSPACE_COOKIE,
   LAST_WORKSPACE_MAX_AGE_SECONDS,
@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
     }
     default: {
       response = NextResponse.next({ request: { headers: requestHeaders } });
-      // remember the workspace the user is looking at, so `/w` can send them back to it
+      // remember the workspace the user is looking at, so `/workspaces` can send them back to it
       const workspaceId = workspaceIdFromPath(pathname);
       if (workspaceId && request.cookies.get(LAST_WORKSPACE_COOKIE)?.value !== workspaceId) {
         response.cookies.set(LAST_WORKSPACE_COOKIE, workspaceId, {

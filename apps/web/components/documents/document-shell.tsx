@@ -157,7 +157,9 @@ function DocumentMenu({
         <DropdownMenuItem
           onSelect={() => {
             void navigator.clipboard
-              ?.writeText(`${window.location.origin}/w/${document.workspaceId}/d/${document.id}`)
+              ?.writeText(
+                `${window.location.origin}/workspaces/${document.workspaceId}/documents/${document.id}`,
+              )
               .then(() => toast.success('Link copied'))
               .catch(() => toast.error('Could not copy the link'));
           }}

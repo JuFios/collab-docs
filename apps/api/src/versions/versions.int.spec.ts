@@ -1,4 +1,4 @@
-import '../test/versions-env';
+import '../test/env/versions';
 import { ConfigService } from '@nestjs/config';
 import { createServer, type AddressInfo } from 'node:net';
 import { ServerTCP } from '@nestjs/microservices';

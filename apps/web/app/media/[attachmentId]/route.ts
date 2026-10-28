@@ -15,17 +15,21 @@ const REDIRECT_CACHE_SECONDS = 120;
  */
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ attachmentId: string }> },
 ): Promise<Response> {
-  const { id } = await params;
+  const { attachmentId } = await params;
   const slug = new URL(request.url).searchParams.get('slug') ?? '';
-  if (!UUID.test(id) || slug.length > PUBLIC_SLUG_MAX_LENGTH || !PUBLIC_SLUG_PATTERN.test(slug)) {
+  if (
+    !UUID.test(attachmentId) ||
+    slug.length > PUBLIC_SLUG_MAX_LENGTH ||
+    !PUBLIC_SLUG_PATTERN.test(slug)
+  ) {
     return new NextResponse(null, { status: 404 });
   }
   let upstream: Response;
   try {
     upstream = await fetch(
-      `${apiInternalUrl()}/api/public/media/${id}?slug=${encodeURIComponent(slug)}`,
+      `${apiInternalUrl()}/api/public/media/${attachmentId}?slug=${encodeURIComponent(slug)}`,
       { redirect: 'manual', cache: 'no-store', headers: { accept: 'application/json' } },
     );
   } catch {

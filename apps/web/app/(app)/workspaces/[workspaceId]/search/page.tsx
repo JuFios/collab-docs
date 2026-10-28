@@ -34,11 +34,11 @@ export default async function SearchPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ workspaceId: string }>;
   searchParams: SearchParams;
 }) {
-  const { id } = await params;
-  await requireWorkspace(id);
+  const { workspaceId } = await params;
+  await requireWorkspace(workspaceId);
   const query = await searchParams;
   const q = first(query.q).trim().slice(0, SEARCH_QUERY_MAX_LENGTH);
   const cursor = first(query.cursor) || undefined;
@@ -49,7 +49,7 @@ export default async function SearchPage({
         Search
       </h2>
       <SearchKeyboardScope>
-        <Form action={`/w/${id}/search`} role="search" className="flex gap-2">
+        <Form action={`/workspaces/${workspaceId}/search`} role="search" className="flex gap-2">
           <label htmlFor="search-q" className="sr-only">
             Search documents
           </label>
@@ -68,7 +68,7 @@ export default async function SearchPage({
         </Form>
         {q ? (
           <Suspense key={`${q}\u0000${cursor ?? ''}`} fallback={<SearchResultsSkeleton />}>
-            <SearchResults workspaceId={id} q={q} cursor={cursor} />
+            <SearchResults workspaceId={workspaceId} q={q} cursor={cursor} />
           </Suspense>
         ) : (
           <EmptyState

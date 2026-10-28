@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contentSecurityPolicy, securityHeaders } from './security-headers';
+import { contentSecurityPolicy, securityHeaders } from './headers';
 
 const env = {
   s3PublicEndpoint: 'http://localhost:9000',

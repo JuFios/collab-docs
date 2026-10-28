@@ -33,7 +33,7 @@ export function DocumentGone({
         {member && trash.isPending ? null : (
           <Button
             variant="outline"
-            onClick={() => router.push(member ? `/w/${workspaceId}` : '/shared')}
+            onClick={() => router.push(member ? `/workspaces/${workspaceId}` : '/shared')}
           >
             {member ? 'Back to the workspace' : 'Back to shared documents'}
           </Button>
@@ -69,7 +69,7 @@ export function DocumentGone({
             {restore.isPending ? 'Restoring…' : 'Restore'}
           </Button>
         ) : null}
-        <Button variant="outline" onClick={() => router.push(`/w/${workspaceId}/trash`)}>
+        <Button variant="outline" onClick={() => router.push(`/workspaces/${workspaceId}/trash`)}>
           Open trash
         </Button>
       </div>

@@ -1,4 +1,4 @@
-import '../test/billing-env';
+import '../test/env/billing';
 import { randomBytes } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';

@@ -17,13 +17,13 @@ afterEach(() => {
 });
 
 const ID = '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
-const params = Promise.resolve({ id: ID });
+const params = Promise.resolve({ workspaceId: ID });
 
 describe('search page', () => {
   it('shows the form and an invitation, and asks nothing, without a query', async () => {
     render(await SearchPage({ params, searchParams: Promise.resolve({}) }));
     const form = screen.getByRole('search');
-    expect(form).toHaveAttribute('action', `/w/${ID}/search`);
+    expect(form).toHaveAttribute('action', `/workspaces/${ID}/search`);
     expect(screen.getByLabelText('Search documents')).toHaveAttribute('name', 'q');
     expect(screen.getByText('Search this workspace')).toBeInTheDocument();
     expect(data.searchDocuments).not.toHaveBeenCalled();

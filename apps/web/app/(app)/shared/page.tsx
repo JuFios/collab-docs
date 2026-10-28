@@ -22,7 +22,7 @@ export default async function SharedPage() {
           {documents.map((document) => (
             <li key={document.id}>
               <Link
-                href={`/w/${document.workspaceId}/d/${document.id}`}
+                href={`/workspaces/${document.workspaceId}/documents/${document.id}`}
                 className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-accent/50"
               >
                 <span className="truncate">

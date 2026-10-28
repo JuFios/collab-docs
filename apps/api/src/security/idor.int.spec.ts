@@ -1,4 +1,4 @@
-import '../test/security-env';
+import '../test/env/security';
 import http from 'node:http';
 import { createServer, type AddressInfo } from 'node:net';
 import { ConfigService } from '@nestjs/config';
