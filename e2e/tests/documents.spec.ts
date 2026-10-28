@@ -261,6 +261,33 @@ test.describe('document tree', () => {
     await expect(page.getByRole('treeitem', { name: 'Child' })).toBeVisible();
   });
 
+  test('the pages beside the tree follow a deletion and a rename made in it', async ({
+    signedInPage: page,
+  }) => {
+    const workspaceId = await createWorkspace(page, 'Beside');
+    await createDocument(page, workspaceId, 'Doomed');
+    await createDocument(page, workspaceId, 'Renamed');
+
+    await page.goto(`/workspaces/${workspaceId}`);
+    const recent = page.getByRole('region', { name: 'Recent documents' });
+    await expect(recent).toContainText('Renamed');
+    await page.getByRole('treeitem', { name: 'Renamed' }).focus();
+    await page.keyboard.press('F2');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Now called this');
+    await page.keyboard.press('Enter');
+    await expect(recent).toContainText('Now called this');
+
+    await page.goto(`/workspaces/${workspaceId}/trash`);
+    await expect(page.getByRole('heading', { name: 'The trash is empty' })).toBeVisible();
+    await page.getByRole('treeitem', { name: 'Doomed' }).hover();
+    await page.getByRole('button', { name: 'Actions for Doomed' }).click();
+    await page.getByRole('menuitem', { name: 'Move to trash' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Move to trash' }).click();
+    await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The trash is empty' })).toHaveCount(0);
+  });
+
   test('a viewer reads but cannot change anything; a stranger gets not-found', async ({
     browser,
     baseURL,

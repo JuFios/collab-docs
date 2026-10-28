@@ -8,6 +8,7 @@ import { useWorkspace } from '@/components/workspaces/workspace-provider';
 import { useCreateDocument, useDeleteDocument, useTree } from '@/lib/documents/queries';
 import { requestTitleFocus } from '@/lib/documents/title-focus';
 import { descendantIds } from '@/lib/documents/tree';
+import { useRefreshListings } from './use-refresh-listings';
 
 /** Create and delete with their navigation and toasts, shared by the tree, its menus and the document header. */
 export function useDocumentActions(onCreated?: (parentId: string) => void) {
@@ -17,6 +18,7 @@ export function useDocumentActions(onCreated?: (parentId: string) => void) {
   const { data: nodes } = useTree();
   const create = useCreateDocument(workspaceId);
   const remove = useDeleteDocument(workspaceId);
+  const refreshListings = useRefreshListings();
 
   const createDocument = useCallback(
     async (parentId?: string) => {
@@ -45,9 +47,10 @@ export function useDocumentActions(onCreated?: (parentId: string) => void) {
       });
       if (params.documentId && gone.has(params.documentId))
         router.push(`/workspaces/${workspaceId}`);
+      else refreshListings();
       return true;
     },
-    [nodes, params.documentId, remove, router, workspaceId],
+    [nodes, params.documentId, refreshListings, remove, router, workspaceId],
   );
 
   return {

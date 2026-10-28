@@ -25,6 +25,7 @@ import { DeleteDocumentDialog } from './delete-document-dialog';
 import { TreeRowItem } from './tree-row';
 import { TreeSkeleton } from './tree-skeleton';
 import { useDocumentActions } from './use-document-actions';
+import { useRefreshListings } from './use-refresh-listings';
 
 interface DropTarget {
   overId: string;
@@ -62,6 +63,7 @@ export function DocumentTree() {
   const actions = useDocumentActions(expand);
   const move = useMoveDocument(workspaceId);
   const rename = useSaveDocumentTitle(workspaceId);
+  const refreshListings = useRefreshListings();
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -106,7 +108,8 @@ export function DocumentTree() {
     setRenamingId(null);
     refocus.current = node.id;
     const next = title.trim();
-    if (next !== node.title) rename.mutate({ id: node.id, title: next });
+    if (next !== node.title)
+      rename.mutate({ id: node.id, title: next }, { onSuccess: refreshListings });
   };
 
   const confirmDelete = async () => {

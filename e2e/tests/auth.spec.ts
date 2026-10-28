@@ -44,6 +44,18 @@ test.describe('authentication', () => {
     await expect(signedInPage).toHaveURL(/\/workspaces$/);
   });
 
+  test('a signed-in visitor to the landing page goes to the workspaces', async ({
+    signedInPage,
+    page,
+  }) => {
+    await signedInPage.goto('/');
+    await expect(signedInPage).toHaveURL(/\/workspaces$/);
+
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
+  });
+
   test('logging out ends the session', async ({ signedInPage }) => {
     await signedInPage.goto('/workspaces');
     await signedInPage.getByRole('button', { name: 'User menu' }).click();

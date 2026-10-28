@@ -18,7 +18,7 @@ describe('decideRoute', () => {
     },
   );
 
-  it.each(['/', '/published/some-slug', '/edit-link/token', '/invite/abc', '/mock-checkout/1'])(
+  it.each(['/published/some-slug', '/edit-link/token', '/invite/abc', '/mock-checkout/1'])(
     'keeps %s public',
     (pathname) => {
       for (const session of ['valid', 'expired', 'none'] as const) {
@@ -26,6 +26,16 @@ describe('decideRoute', () => {
       }
     },
   );
+
+  it('shows the landing page to everyone but a signed-in visitor, who goes to the workspaces', () => {
+    for (const session of ['expired', 'none'] as const) {
+      expect(decideRoute({ pathname: '/', search: '', session })).toEqual({ type: 'next' });
+    }
+    expect(decideRoute({ pathname: '/', search: '', session: 'valid' })).toEqual({
+      type: 'redirect',
+      location: '/workspaces',
+    });
+  });
 
   it('bounces signed-in users away from the guest-only pages', () => {
     expect(decideRoute({ pathname: '/login', search: '', session: 'valid' })).toEqual({

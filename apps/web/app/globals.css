@@ -1,6 +1,26 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/*
+ * A grid whose columns are not declared sizes its single column to the widest word inside it, so one long unbroken
+ * title (a pasted address, a name without spaces) stretches the whole page sideways. Declared columns
+ * (`grid-cols-*`) come later in the cascade and win. Text breaks inside its box when a word does not fit, and headings
+ * may break anywhere, which also lets a heading shrink inside a flex row.
+ */
+@layer base {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body {
+    overflow-wrap: break-word;
+  }
+  h1,
+  h2,
+  h3 {
+    overflow-wrap: anywhere;
+  }
+}
+
 @theme inline {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;

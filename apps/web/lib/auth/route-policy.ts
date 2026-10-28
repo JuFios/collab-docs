@@ -43,6 +43,11 @@ export function decideRoute({ pathname, search, session }: RouteInput): RouteDec
     return { type: 'next' };
   }
 
+  // the landing page offers to sign in or register, which a signed-in visitor has done; this stays at the edge so the
+  // page itself remains static
+  if (pathname === '/' && session === 'valid')
+    return { type: 'redirect', location: DEFAULT_NEXT_PATH };
+
   if (isPublicPath(pathname)) return { type: 'next' };
 
   if (session === 'valid') return { type: 'next' };
