@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 # Build context: repository root (docker build -f apps/api/Dockerfile .)
 FROM node:24-bookworm-slim AS base
+# Prisma looks for libssl when it generates the client and runs the schema engine; the slim image has none
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN npm install -g pnpm@10.26.1

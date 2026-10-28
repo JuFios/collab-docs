@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 # One-shot migration image: applies migrations and (APP_ENV=dev only) seeds. Build context: repository root.
 FROM node:24-bookworm-slim AS base
+# Prisma looks for libssl when it generates the client and runs the schema engine; the slim image has none
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN npm install -g pnpm@10.26.1
@@ -30,6 +34,10 @@ RUN --mount=type=cache,id=pnpm-metadata,target=/root/.cache/pnpm \
   && pnpm --filter @collab-docs/db deploy --legacy --prefer-offline /out
 
 FROM node:24-bookworm-slim AS runtime
+# Prisma looks for libssl when it runs the schema engine; the slim image has none
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 ENV APP_ENV=dev
 WORKDIR /app
 COPY --from=build --chown=node:node /out .
