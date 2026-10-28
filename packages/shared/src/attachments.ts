@@ -17,7 +17,6 @@ export const ATTACHMENT_EXTENSIONS: Record<AttachmentMime, readonly string[]> = 
 };
 
 export const ATTACHMENT_FILENAME_MAX_LENGTH = 255;
-export const DEFAULT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 /** How long an upload policy and a read URL stay valid. */
 export const ATTACHMENT_UPLOAD_TTL_SECONDS = 10 * 60;
 export const ATTACHMENT_READ_TTL_SECONDS = 5 * 60;

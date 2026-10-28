@@ -10,21 +10,6 @@ export const paginationQuerySchema = z.object({
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 
-export const idParamSchema = z.object({ id: z.string().uuid() });
-export type IdParam = z.infer<typeof idParamSchema>;
-
-/** Builds the schema of a paginated list response around an item schema. */
-export function pageSchema<T extends z.ZodType>(item: T) {
-  return z.object({
-    items: z.array(item),
-    page: z.number().int().min(1),
-    pageSize: z.number().int().min(1),
-    total: z.number().int().min(0),
-  });
-}
-
-export type Page<T> = { items: T[]; page: number; pageSize: number; total: number };
-
 const healthIndicatorSchema = z.object({ status: z.enum(['up', 'down']) }).catchall(z.unknown());
 
 /** Body of `/health` and `/ready`: the result object of `@nestjs/terminus`. */
