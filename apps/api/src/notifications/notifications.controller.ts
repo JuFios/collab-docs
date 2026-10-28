@@ -14,15 +14,15 @@ import {
   MarkReadResponse,
   NotificationPageResponse,
   UnreadCountResponse,
-} from './inbox.dto';
-import { InboxService } from './inbox.service';
+} from './notifications.dto';
+import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
 @ApiCookieAuth('access-cookie')
 @Controller('notifications')
-export class InboxController {
-  constructor(private readonly inbox: InboxService) {}
+export class NotificationsController {
+  constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
   @ApiOperation({
@@ -32,14 +32,14 @@ export class InboxController {
   })
   @ApiOkResponse({ type: NotificationPageResponse })
   list(@Query() query: ListNotificationsQueryDto, @CurrentUser() user: RequestUser) {
-    return this.inbox.list(user.id, query);
+    return this.notifications.list(user.id, query);
   }
 
   @Get('unread-count')
   @ApiOperation({ summary: 'Number of unread notifications that the list shows' })
   @ApiOkResponse({ type: UnreadCountResponse })
   async unreadCount(@CurrentUser() user: RequestUser) {
-    return { count: await this.inbox.unreadCount(user.id) };
+    return { count: await this.notifications.unreadCount(user.id) };
   }
 
   @Post('read')
@@ -51,6 +51,6 @@ export class InboxController {
   })
   @ApiOkResponse({ type: MarkReadResponse })
   async markRead(@Body() dto: MarkReadDto, @CurrentUser() user: RequestUser) {
-    return { updated: await this.inbox.markRead(user.id, dto) };
+    return { updated: await this.notifications.markRead(user.id, dto) };
   }
 }

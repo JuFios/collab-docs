@@ -13,12 +13,12 @@ import {
   QueueService,
   logEvent,
 } from '@collab-docs/nest';
-import { MailQueueService } from '../notifications/mail-queue.service';
+import { MailQueueService } from '../mail/mail-queue.service';
 import { viewableDocumentSql } from '../permissions/document-access-sql';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
-import { decodeInboxCursor, encodeInboxCursor } from './inbox-cursor';
-import type { ListNotificationsQueryDto, MarkReadDto } from './inbox.dto';
+import { decodeNotificationCursor, encodeNotificationCursor } from './notification-cursor';
+import type { ListNotificationsQueryDto, MarkReadDto } from './notifications.dto';
 
 export interface MentionNotificationInput {
   commentId: string;
@@ -51,7 +51,7 @@ export const commentMentionKey = (commentId: string, userId: string) =>
  * commits (live event, email), listed with the same access rules as everything else.
  */
 @Injectable()
-export class InboxService {
+export class NotificationsService {
   private readonly createdTotal: Counter<'type'>;
 
   constructor(
@@ -60,7 +60,7 @@ export class InboxService {
     private readonly mail: MailQueueService,
     private readonly queues: QueueService,
     metrics: MetricsService,
-    @InjectPinoLogger(InboxService.name) private readonly logger: PinoLogger,
+    @InjectPinoLogger(NotificationsService.name) private readonly logger: PinoLogger,
   ) {
     this.createdTotal = new Counter({
       name: 'notifications_created_total',
@@ -139,7 +139,7 @@ export class InboxService {
 
   async list(userId: string, dto: ListNotificationsQueryDto): Promise<NotificationPage> {
     // the DTO has validated it
-    const cursor = dto.cursor === undefined ? null : decodeInboxCursor(dto.cursor);
+    const cursor = dto.cursor === undefined ? null : decodeNotificationCursor(dto.cursor);
     const after = cursor
       ? Prisma.sql`AND (n.created_at, n.id) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`
       : Prisma.empty;
@@ -174,7 +174,7 @@ export class InboxService {
       }),
       nextCursor:
         rows.length > dto.limit && last
-          ? encodeInboxCursor({ createdAt: last.created_key, id: last.id })
+          ? encodeNotificationCursor({ createdAt: last.created_key, id: last.id })
           : null,
     };
   }

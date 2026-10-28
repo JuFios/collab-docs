@@ -3199,7 +3199,7 @@
     "/api/notifications": {
       "get": {
         "description": "From every workspace. A notification about a document the caller can no longer open is not listed.",
-        "operationId": "InboxController_list",
+        "operationId": "NotificationsController_list",
         "parameters": [
           {
             "name": "limit",
@@ -3280,7 +3280,7 @@
     },
     "/api/notifications/unread-count": {
       "get": {
-        "operationId": "InboxController_unreadCount",
+        "operationId": "NotificationsController_unreadCount",
         "parameters": [],
         "responses": {
           "200": {
@@ -3331,7 +3331,7 @@
     "/api/notifications/read": {
       "post": {
         "description": "Pass `ids` (up to 100) or `all: true`. Only the caller’s own notifications are affected.",
-        "operationId": "InboxController_markRead",
+        "operationId": "NotificationsController_markRead",
         "parameters": [],
         "requestBody": {
           "required": true,

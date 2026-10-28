@@ -1,12 +1,12 @@
-import { decodeInboxCursor, encodeInboxCursor } from './inbox-cursor';
+import { decodeNotificationCursor, encodeNotificationCursor } from './notification-cursor';
 
 const ID = '0190b1c2-0000-7000-8000-0000000000aa';
 const AT = '2026-10-26 17:47:31.123456+00';
 const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-describe('inbox cursor', () => {
+describe('notification cursor', () => {
   it('round-trips', () => {
-    expect(decodeInboxCursor(encodeInboxCursor({ createdAt: AT, id: ID }))).toEqual({
+    expect(decodeNotificationCursor(encodeNotificationCursor({ createdAt: AT, id: ID }))).toEqual({
       createdAt: AT,
       id: ID,
     });
@@ -21,6 +21,6 @@ describe('inbox cursor', () => {
     ['an id that is not a uuid', encode({ t: AT, i: 'x' })],
     ['missing fields', '{}'],
   ])('rejects %s', (_label, raw) => {
-    expect(decodeInboxCursor(raw)).toBeNull();
+    expect(decodeNotificationCursor(raw)).toBeNull();
   });
 });

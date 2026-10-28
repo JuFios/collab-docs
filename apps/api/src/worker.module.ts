@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { WorkerPlatformModule } from '@collab-docs/nest';
 import { AttachmentsWorkerModule } from './attachments/attachments.module';
 import { BillingWorkerModule } from './billing/billing.module';
-import { MailWorkerModule } from './notifications/notifications.module';
+import { MailWorkerModule } from './mail/mail.module';
 import { PublishingWorkerModule } from './publishing/publishing.module';
 import { SearchWorkerModule } from './search/search.module';
 import { VersionsWorkerModule } from './versions/versions.module';

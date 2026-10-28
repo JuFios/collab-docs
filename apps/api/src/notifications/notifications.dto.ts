@@ -19,13 +19,13 @@ import {
   NOTIFICATION_READ_MAX_IDS,
   NOTIFICATION_TYPES,
 } from '@collab-docs/shared';
-import { decodeInboxCursor } from './inbox-cursor';
+import { decodeNotificationCursor } from './notification-cursor';
 
 /** A cursor ends up in the statement, so only one this module issued is accepted. */
-@ValidatorConstraint({ name: 'inboxCursor', async: false })
-class InboxCursorConstraint implements ValidatorConstraintInterface {
+@ValidatorConstraint({ name: 'notificationCursor', async: false })
+class NotificationCursorConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
-    return typeof value === 'string' && decodeInboxCursor(value) !== null;
+    return typeof value === 'string' && decodeNotificationCursor(value) !== null;
   }
 
   defaultMessage(): string {
@@ -51,7 +51,7 @@ export class ListNotificationsQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(300)
-  @Validate(InboxCursorConstraint)
+  @Validate(NotificationCursorConstraint)
   cursor?: string;
 
   @ApiPropertyOptional({

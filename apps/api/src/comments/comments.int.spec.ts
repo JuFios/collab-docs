@@ -13,11 +13,11 @@ import type {
 } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
-import { InboxService } from '../inbox/inbox.service';
-import { MailQueueService } from '../notifications/mail-queue.service';
-import { MailerService, type MailMessage } from '../notifications/mailer.service';
-import { MailWorkerModule } from '../notifications/notifications.module';
-import { MentionMailService } from '../notifications/mention-mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { MailQueueService } from '../mail/mail-queue.service';
+import { MailerService, type MailMessage } from '../mail/mailer.service';
+import { MailWorkerModule } from '../mail/mail.module';
+import { MentionMailService } from '../mail/mention-mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
@@ -49,7 +49,7 @@ describe('comments and notifications', () => {
   let app: NestExpressApplication;
   let prisma: PrismaClient;
   let writer: DocumentStateWriter;
-  let inbox: InboxService;
+  let notifications: NotificationsService;
   let mailer: MailerService;
   let counter = 0;
   const drafts = new Map<string, Y.Doc>();
@@ -197,7 +197,7 @@ describe('comments and notifications', () => {
     app = await createTestApp([], [MailWorkerModule]);
     prisma = app.get(PrismaService, { strict: false });
     writer = new DocumentStateWriter(prisma);
-    inbox = app.get(InboxService, { strict: false });
+    notifications = app.get(NotificationsService, { strict: false });
     mailer = app.get(MailerService, { strict: false });
     const send = mailer.send.bind(mailer);
     jest.spyOn(mailer, 'send').mockImplementation(async (message) => {
@@ -701,7 +701,7 @@ describe('comments and notifications', () => {
 
       // a redelivered or concurrent write of the same notification creates nothing
       const again = await prisma.$transaction((tx) =>
-        inbox.syncMentions(tx, {
+        notifications.syncMentions(tx, {
           commentId,
           recipientIds: [team.viewer.id],
           payload: original!.payload as never,

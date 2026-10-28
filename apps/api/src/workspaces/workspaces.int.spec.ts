@@ -4,8 +4,8 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { type PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, type WorkspaceRole } from '@collab-docs/shared';
-import { MailQueueService } from '../notifications/mail-queue.service';
-import { MailWorkerModule } from '../notifications/notifications.module';
+import { MailQueueService } from '../mail/mail-queue.service';
+import { MailWorkerModule } from '../mail/mail.module';
 import { createTestApp } from '../test/test-app';
 import { PrismaService } from '../prisma/prisma.service';
 

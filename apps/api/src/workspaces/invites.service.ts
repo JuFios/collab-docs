@@ -8,7 +8,7 @@ import {
   InjectPinoLogger,
   PinoLogger,
 } from '@collab-docs/nest';
-import { MailQueueService } from '../notifications/mail-queue.service';
+import { MailQueueService } from '../mail/mail-queue.service';
 import { notFound } from '../permissions/permissions.service';
 import { INVITE_TOKEN_PATTERN, INVITE_TTL_MS, hashToken, newInviteToken } from './invite-token';
 import { PlanLimitsService } from './plan-limits.service';
