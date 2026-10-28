@@ -12,13 +12,16 @@ export default function RootError({
   reset: () => void;
 }) {
   return (
-    <ErrorState
-      description="An unexpected error occurred while loading this page."
-      correlationId={error.digest}
-    >
-      <Button onClick={reset} variant="outline">
-        Try again
-      </Button>
-    </ErrorState>
+    <main>
+      <ErrorState
+        headingLevel={1}
+        description="An unexpected error occurred while loading this page."
+        correlationId={error.digest}
+      >
+        <Button onClick={reset} variant="outline">
+          Try again
+        </Button>
+      </ErrorState>
+    </main>
   );
 }

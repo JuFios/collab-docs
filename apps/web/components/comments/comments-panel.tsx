@@ -108,9 +108,9 @@ export function CommentsPanel({
     >
       <div className="flex items-center gap-2">
         <MessageSquare className="h-4 w-4" aria-hidden />
-        <h3 ref={heading} tabIndex={-1} className="font-semibold focus-visible:outline-none">
+        <h2 ref={heading} tabIndex={-1} className="font-semibold focus-visible:outline-none">
           Comments{openCount > 0 ? ` (${openCount} open)` : ''}
-        </h3>
+        </h2>
         <Button
           type="button"
           variant="ghost"
@@ -191,7 +191,7 @@ export function CommentsPanel({
           aria-label={`Comments on ${labels[group.blockId] ?? 'a block'}`}
           className="grid gap-2"
         >
-          <h4>
+          <h3>
             <button
               type="button"
               title="Show in the document"
@@ -200,7 +200,7 @@ export function CommentsPanel({
             >
               “{labels[group.blockId] ?? 'Block'}”
             </button>
-          </h4>
+          </h3>
           <ul className="grid gap-2">
             {group.threads.map((thread) => (
               <ThreadCard
@@ -222,7 +222,7 @@ export function CommentsPanel({
 
       {orphaned.length > 0 ? (
         <section aria-label="Comments on deleted blocks" className="grid gap-2">
-          <h4 className="text-xs font-medium text-muted-foreground">Deleted blocks</h4>
+          <h3 className="text-xs font-medium text-muted-foreground">Deleted blocks</h3>
           <p className="text-xs text-muted-foreground">
             The text these threads were about has been removed from the document.
           </p>

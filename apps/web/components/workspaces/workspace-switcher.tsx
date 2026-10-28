@@ -19,11 +19,13 @@ export function WorkspaceSwitcher({ workspaces }: { workspaces: readonly Workspa
   const pathname = usePathname();
   const currentId = workspaceIdFromPath(pathname);
   const current = workspaces.find((workspace) => workspace.id === currentId);
+  const visibleName = current?.name ?? 'Workspaces';
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label="Switch workspace">
-          {current?.name ?? 'Workspaces'}
+        {/* the accessible name has to contain the visible text (WCAG 2.5.3) */}
+        <Button variant="ghost" size="sm" aria-label={`${visibleName}, switch workspace`}>
+          <span className="max-w-[7rem] truncate sm:max-w-[16rem]">{visibleName}</span>
           <ChevronDown className="h-3 w-3" aria-hidden />
         </Button>
       </DropdownMenuTrigger>

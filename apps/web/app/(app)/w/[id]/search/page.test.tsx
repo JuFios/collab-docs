@@ -45,10 +45,10 @@ describe('search page', () => {
     await expect(
       generateMetadata({ searchParams: Promise.resolve({ q: 'plan' }) }),
     ).resolves.toEqual({
-      title: 'plan · Search · Collab Docs',
+      title: 'plan · Search',
     });
     await expect(generateMetadata({ searchParams: Promise.resolve({}) })).resolves.toEqual({
-      title: 'Search · Collab Docs',
+      title: 'Search',
     });
   });
 });

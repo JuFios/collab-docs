@@ -13,6 +13,7 @@ export default function EditLinkError({
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-10">
       <ErrorState
+        headingLevel={1}
         description="The shared document could not be opened right now."
         correlationId={error.digest}
       >

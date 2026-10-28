@@ -8,7 +8,7 @@ import { lookupEditLink } from '@/lib/public/edit-link';
 
 // the address carries a secret: keep it out of search results, referrers and caches
 export const metadata: Metadata = {
-  title: 'Shared document · Collab Docs',
+  title: 'Shared document',
   robots: { index: false, follow: false },
   referrer: 'no-referrer',
 };
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 function Unavailable({ title, description }: { title: string; description: string }) {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-10">
-      <EmptyState title={title} description={description}>
+      <EmptyState headingLevel={1} title={title} description={description}>
         <Button asChild variant="outline">
           <Link href="/">Go to Collab Docs</Link>
         </Button>

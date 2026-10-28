@@ -22,7 +22,7 @@ export async function generateMetadata({
   const q = first((await searchParams).q)
     .trim()
     .slice(0, 60);
-  return { title: q ? `${q} · Search · Collab Docs` : 'Search · Collab Docs' };
+  return { title: q ? `${q} · Search` : 'Search' };
 }
 
 /**

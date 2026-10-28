@@ -83,7 +83,7 @@ export function VersionsPanel({
     >
       <div className="flex items-center gap-2">
         <History className="h-4 w-4" aria-hidden />
-        <h3 className="font-semibold">Version history</h3>
+        <h2 className="font-semibold">Version history</h2>
         <Button
           type="button"
           variant="ghost"
@@ -166,7 +166,7 @@ export function VersionsPanel({
           ) : null}
           {preview.data ? (
             <>
-              <h4 className="truncate font-semibold">{preview.data.title || 'Untitled'}</h4>
+              <h3 className="truncate font-semibold">{preview.data.title || 'Untitled'}</h3>
               <ContentRenderer
                 content={preview.data.content}
                 resolveImageSrc={(id) => imageUrls.get(id)}

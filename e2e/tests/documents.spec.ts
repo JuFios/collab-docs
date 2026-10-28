@@ -50,6 +50,8 @@ test.describe('document tree', () => {
 
     await page.reload();
     await expect(title).toHaveValue('Project plan');
+    // the tab names the document
+    await expect(page).toHaveTitle('Project plan · Collab Docs');
     await expect(page.getByRole('treeitem', { name: 'Project plan' })).toHaveAttribute(
       'aria-current',
       'page',

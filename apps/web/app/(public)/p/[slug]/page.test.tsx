@@ -37,7 +37,7 @@ describe('published page', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(PAGE)));
     const { generateMetadata } = await import('./page');
     const metadata = await generateMetadata(params('plan-3fa9c1'));
-    expect(metadata.title).toBe('Quarterly plan');
+    expect(metadata.title).toEqual({ absolute: 'Quarterly plan' });
     expect(metadata.description).toBe('What we ship next quarter.');
     expect(metadata.alternates?.canonical).toBe('https://docs.example.com/p/plan-3fa9c1');
     expect(metadata.robots).toEqual({ index: true, follow: true });

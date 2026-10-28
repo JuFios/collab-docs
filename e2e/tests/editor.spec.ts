@@ -116,7 +116,7 @@ test.describe('viewer access', () => {
 
     // the history is readable, but offers neither saving nor restoring; sharing is not offered at all
     await expect(viewer.getByRole('button', { name: 'Share' })).toHaveCount(0);
-    await viewer.getByRole('button', { name: 'History' }).click();
+    await viewer.getByRole('button', { name: 'History', exact: true }).click();
     const history = viewer.getByTestId('versions-panel');
     await expect(history.getByRole('button', { name: /checkpoint/ })).toBeVisible();
     await expect(history.getByRole('button', { name: 'Save version' })).toHaveCount(0);
@@ -374,7 +374,7 @@ test.describe('editor features', () => {
     await page.keyboard.type('Version one');
     await expect(saveStatus(page)).toHaveText('Saved');
 
-    await page.getByRole('button', { name: 'History' }).click();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
     const panel = page.getByTestId('versions-panel');
     await panel.getByRole('textbox', { name: 'Version name' }).fill('first draft');
     await panel.getByRole('button', { name: 'Save version' }).click();

@@ -9,7 +9,7 @@ import { getWorkspaces } from '@/lib/workspaces/data';
 import { LAST_WORKSPACE_COOKIE } from '@/lib/workspaces/last-workspace';
 import { ROLE_LABELS } from '@/lib/workspaces/labels';
 
-export const metadata: Metadata = { title: 'Workspaces · Collab Docs' };
+export const metadata: Metadata = { title: 'Workspaces' };
 
 export default async function WorkspacesPage({
   searchParams,

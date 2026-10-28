@@ -22,8 +22,8 @@ export function Navbar({
         className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4"
         aria-label="Main"
       >
-        <div className="flex items-center gap-4">
-          <Link href="/w" className="font-semibold">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <Link href="/w" className="whitespace-nowrap font-semibold">
             Collab Docs
           </Link>
           {workspaces ? <WorkspaceSwitcher workspaces={workspaces} /> : null}
