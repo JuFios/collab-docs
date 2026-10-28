@@ -6,7 +6,7 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "dev": "pnpm build:libs && pnpm -r --parallel --filter './apps/*' dev",
+    "dev": "pnpm build:libs && pnpm -r --parallel --filter './apps/*' run \"/^dev/\"",
     "build:libs": "pnpm --filter './packages/*' --if-present build",
     "build": "pnpm -r build",
     "lint": "eslint .",
