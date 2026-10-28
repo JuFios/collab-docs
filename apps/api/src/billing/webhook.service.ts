@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Counter } from 'prom-client';
+import { Counter } from '@prometheus-io/client';
 import type { Prisma } from '@collab-docs/db';
 import { billingEventSchema } from '@collab-docs/shared';
 import {

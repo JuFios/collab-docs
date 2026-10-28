@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Gauge } from 'prom-client';
+import { Gauge } from '@prometheus-io/client';
 import { MetricsService } from '@collab-docs/nest';
 import { PrismaService } from '../prisma/prisma.service';
 

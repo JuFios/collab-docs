@@ -17,7 +17,7 @@ import type { AppConfig } from './config';
 import { AppException } from './exceptions';
 import { Public } from './public';
 import type { NextFunction, Request, Response } from 'express';
-import { collectDefaultMetrics, Histogram, Registry } from 'prom-client';
+import { collectDefaultMetrics, Histogram, Registry } from '@prometheus-io/client';
 
 @Injectable()
 export class MetricsService {

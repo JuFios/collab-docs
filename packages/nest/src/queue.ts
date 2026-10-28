@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { BullModule, OnWorkerEvent, WorkerHost, getQueueToken } from '@nestjs/bullmq';
 import type { ConnectionOptions, Job, JobsOptions, Queue } from 'bullmq';
-import { Counter, Gauge } from 'prom-client';
+import { Counter, Gauge } from '@prometheus-io/client';
 import type { AppConfig } from './config';
 import { getCorrelationId, runWithCorrelationId } from './correlation';
 import { InjectPinoLogger, PinoLogger, logEvent } from './logger';
