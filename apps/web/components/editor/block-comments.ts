@@ -3,7 +3,7 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey, type Selection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
-export interface BlockCommentsState {
+interface BlockCommentsState {
   /** Open threads per block id. */
   counts: ReadonlyMap<string, number>;
   /** Whether the viewer may start a thread; without it only blocks that already have threads show a marker. */
@@ -40,7 +40,7 @@ export class BlockCommentsController {
 }
 
 /** Blocks a comment can be anchored to: text blocks and images, not the lists that wrap them. */
-export function commentableId(node: ProseMirrorNode): string | null {
+function commentableId(node: ProseMirrorNode): string | null {
   const id: unknown = node.attrs.id;
   return node.isBlock && (node.isTextblock || node.isLeaf) && typeof id === 'string' && id
     ? id
@@ -124,7 +124,7 @@ function marker(
   return wrapper;
 }
 
-export const blockCommentsKey = new PluginKey<DecorationSet>('blockComments');
+const blockCommentsKey = new PluginKey<DecorationSet>('blockComments');
 
 function decorate(doc: ProseMirrorNode, controller: BlockCommentsController): DecorationSet {
   const { counts, canComment, highlighted } = controller.state;

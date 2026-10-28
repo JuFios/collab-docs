@@ -13,7 +13,7 @@ export interface MovePlan {
 export type KeyboardMove = 'up' | 'down' | 'indent' | 'outdent';
 
 /** Fraction of a row's height, from the top and from the bottom, that means "before" and "after". */
-export const EDGE_ZONE_RATIO = 0.25;
+const EDGE_ZONE_RATIO = 0.25;
 
 /**
  * Pointer y for a `dragmove` event. The event is dispatched before the drag operation stores the new position, so

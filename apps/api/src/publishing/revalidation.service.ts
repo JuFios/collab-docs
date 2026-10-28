@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 
 /** Why a page has to be rebuilt although the content did not change. */
-export type RevalidationReason = 'publish' | 'unpublish' | 'expiry';
+type RevalidationReason = 'publish' | 'unpublish' | 'expiry';
 
 /**
  * Asks the `public-revalidate` queue to invalidate the cached page of a document. Content, title, delete and

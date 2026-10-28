@@ -113,7 +113,7 @@ function Meter({
   );
 }
 
-export function usageRows(usage: Usage) {
+function usageRows(usage: Usage) {
   const slots = usage.members.current + usage.members.pendingInvites;
   return {
     members: {

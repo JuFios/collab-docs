@@ -2,7 +2,6 @@ import { accessAtLeast, roleAtLeast, type Access, type WorkspaceRole } from '@co
 import {
   DOCUMENT_ACCESS,
   HAS_SESSION,
-  PERSONAS,
   UNKNOWN_ID,
   UNKNOWN_TOKEN,
   WORKSPACE_ROLE,
@@ -30,7 +29,7 @@ export interface Call {
  * - no access at all (not a member, restricted document without a share) → 404, so existence is not disclosed;
  * - some access, but less than needed → 403.
  */
-export type Policy =
+type Policy =
   | { kind: 'open'; status: number }
   | { kind: 'authenticated'; ok: number }
   | { kind: 'workspace'; min: WorkspaceRole; ok: number }
@@ -39,14 +38,12 @@ export type Policy =
   | { kind: 'link'; live: number; expired: number; unknown: number }
   | { kind: 'explicit'; expect: (variant: Variant) => Record<PersonaName, number> };
 
-export interface Row {
+interface Row {
   policy: Policy;
   /** `open`-variant only: the row aims at no document of the two variants. */
   once?: boolean;
   call: (r: Resources, p: Persona, f: Fixture) => Promise<Call> | Call;
 }
-
-const UNAUTHENTICATED: PersonaName[] = ['anon', 'guestLink', 'expiredLink'];
 
 export function expectedStatus(policy: Policy, persona: PersonaName, variant: Variant): number {
   switch (policy.kind) {
@@ -402,5 +399,3 @@ export const IDOR_TABLE: Record<string, Row> = {
     params: { id: UNKNOWN_ID },
   })),
 };
-
-export { PERSONAS, UNAUTHENTICATED };

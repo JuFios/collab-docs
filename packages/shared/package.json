@@ -41,7 +41,6 @@
   "dependencies": {
     "@tiptap/y-tiptap": "3.0.10",
     "jose": "6.2.13",
-    "lib0": "0.2.119",
     "prosemirror-model": "1.25.12",
     "prosemirror-state": "1.4.4",
     "prosemirror-view": "1.42.8",

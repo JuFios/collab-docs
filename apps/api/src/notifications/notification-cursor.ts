@@ -1,5 +1,5 @@
 /** Keyset position in the list order (newest first: `created_at`, then id, both descending). */
-export interface NotificationCursor {
+interface NotificationCursor {
   /** `created_at` as the text Postgres printed (microseconds), so the round trip is exact. */
   createdAt: string;
   id: string;

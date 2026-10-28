@@ -3,20 +3,20 @@ import type { z } from 'zod';
 import { ApiError } from './errors';
 import { readJson, safeFetch } from './fetch-json';
 
-export interface ClientRequestInit<T> {
+interface ClientRequestInit<T> {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   schema?: z.ZodType<T>;
   signal?: AbortSignal;
 }
 
-export interface ApiClientOptions {
+interface ApiClientOptions {
   fetchImpl?: typeof fetch;
   /** Called once when the session cannot be renewed (refresh failed). */
   onSessionLost?: () => void;
 }
 
-export interface ApiClient {
+interface ApiClient {
   request<T = void>(path: string, init?: ClientRequestInit<T>): Promise<T>;
   /** Single-flight session refresh; concurrent callers share one network request. */
   refresh(): Promise<AuthSession>;

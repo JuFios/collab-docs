@@ -16,7 +16,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { verifyWebhook } from './webhook-signature';
 
-export type WebhookAck = { received: true } | { duplicate: true };
+type WebhookAck = { received: true } | { duplicate: true };
 
 /**
  * Receiving end of the provider's deliveries (spec §8). The event is stored before it is queued, and a repeated

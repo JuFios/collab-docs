@@ -6,7 +6,7 @@ export interface PickedMention {
   name: string;
 }
 
-export interface MentionTrigger {
+interface MentionTrigger {
   /** Index of the `@` in the text. */
   start: number;
   /** What was typed after it, up to the caret. */
@@ -62,8 +62,7 @@ export function serializeBody(text: string, picked: readonly PickedMention[]): s
   });
 }
 
-export type BodyPart =
-  { type: 'text'; text: string } | { type: 'mention'; userId: string; name: string };
+type BodyPart = { type: 'text'; text: string } | { type: 'mention'; userId: string; name: string };
 
 /**
  * Splits a stored body for display. A token is shown as `@Name` only for a user the api listed in `mentions`;

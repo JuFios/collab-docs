@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { PrismaClient } from '@collab-docs/db';
 import type { Access, WorkspaceRole } from '@collab-docs/shared';
 
-export const PASSWORD = 'correct-horse-battery';
+const PASSWORD = 'correct-horse-battery';
 export const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
 /** A well-formed edit token that belongs to no link. */
 export const UNKNOWN_TOKEN = 'A'.repeat(43);
@@ -37,7 +37,7 @@ export interface Persona {
   email?: string;
 }
 
-export interface LinkSet {
+interface LinkSet {
   documentId: string;
   slug: string;
   editToken: string;

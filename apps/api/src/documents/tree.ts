@@ -17,7 +17,7 @@ export interface TreeRow {
   createdBy: string;
 }
 
-export interface TreeNode extends Omit<TreeRow, 'createdBy'> {
+interface TreeNode extends Omit<TreeRow, 'createdBy'> {
   myAccess: Exclude<Access, 'NONE'>;
 }
 

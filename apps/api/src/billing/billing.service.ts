@@ -17,7 +17,7 @@ import { BILLING_PROVIDER, type BillingProvider } from './billing-provider';
 
 const INVOICE_LIMIT = 50;
 
-export interface BillingOverview {
+interface BillingOverview {
   plan: PlanTier;
   status: SubscriptionStatus;
   currentPeriodEnd: string | null;

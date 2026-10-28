@@ -10,7 +10,7 @@ export interface EventSourceLike {
   close(): void;
 }
 
-export interface EventStreamOptions {
+interface EventStreamOptions {
   url: string;
   onEvent: (event: WorkspaceEvent) => void;
   onStatus: (status: StreamStatus) => void;
@@ -24,8 +24,8 @@ export interface EventStreamOptions {
 }
 
 const CLOSED = 2;
-export const MIN_BACKOFF_MS = 1_000;
-export const MAX_BACKOFF_MS = 30_000;
+const MIN_BACKOFF_MS = 1_000;
+const MAX_BACKOFF_MS = 30_000;
 
 /**
  * One SSE connection with reconnects. The browser retries on its own while the connection merely drops; when it

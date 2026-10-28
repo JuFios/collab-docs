@@ -1,6 +1,6 @@
 // Imported by next.config.ts, so it must stay free of path aliases and of anything that needs the Next runtime.
 
-export interface SecurityHeaderEnv {
+interface SecurityHeaderEnv {
   /** Where browsers fetch images from and upload them to (`S3_PUBLIC_ENDPOINT`). */
   s3PublicEndpoint: string;
   /** The WebSocket endpoint of the collab service (`COLLAB_PUBLIC_URL`). */
@@ -9,7 +9,7 @@ export interface SecurityHeaderEnv {
   development: boolean;
 }
 
-export interface HeaderEntry {
+interface HeaderEntry {
   key: string;
   value: string;
 }

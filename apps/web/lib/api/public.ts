@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { apiInternalUrl } from '../env';
 import { readJson, safeFetch } from './fetch-json';
 
-export interface PublicRequestInit<T> {
+interface PublicRequestInit<T> {
   schema: z.ZodType<T>;
   /** ISR options forwarded to Next's fetch cache. */
   next?: { revalidate?: number | false; tags?: string[] };

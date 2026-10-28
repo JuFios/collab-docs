@@ -15,6 +15,33 @@ const webConfigs = compat
   })
   .map((config) => ({ ...config, files: ['apps/web/**/*.{ts,tsx,js,mjs}'] }));
 
+const PACKAGES = ['shared', 'db', 'nest'];
+const APPLICATIONS = ['api', 'collab', 'web'];
+
+/** `forbid` holds names of workspace packages and applications; both import styles are covered. */
+function boundaries(rules) {
+  return rules.map(({ files, forbid, why }) => ({
+    files,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: forbid.flatMap((name) => {
+            const isPackage = PACKAGES.includes(name);
+            const dir = isPackage ? 'packages' : 'apps';
+            return [
+              ...(isPackage
+                ? [{ group: [`@collab-docs/${name}`, `@collab-docs/${name}/*`], message: why }]
+                : []),
+              { group: [`**/${dir}/${name}`, `**/${dir}/${name}/**`], message: why },
+            ];
+          }),
+        },
+      ],
+    },
+  }));
+}
+
 export default tseslint.config(
   {
     ignores: [
@@ -130,19 +157,57 @@ export default tseslint.config(
   ...webConfigs,
   {
     files: ['apps/web/**/*.{ts,tsx}'],
-    rules: {
-      'react/no-danger': 'error',
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@collab-docs/nest', '@collab-docs/db', '@collab-docs/db/*'],
-              message: 'Server-only packages must not be imported into the web app.',
-            },
-          ],
-        },
-      ],
-    },
+    rules: { 'react/no-danger': 'error' },
   },
+  {
+    // a relative path may not leave the package it is written in, whatever the sibling directory is called
+    files: ['apps/**/*.{ts,tsx}', 'packages/**/*.ts'],
+    plugins: { import: importPlugin },
+    settings: {
+      'import/parsers': { '@typescript-eslint/parser': ['.ts', '.tsx'] },
+      'import/resolver': { typescript: { alwaysTryTypes: true } },
+    },
+    rules: { 'import/no-relative-packages': 'error' },
+  },
+  // Module boundaries. The workspace packages form one direction of dependency:
+  //   shared <- nest <- api, collab        shared <- web        db <- api, collab
+  // and the applications know nothing of one another. A package.json that lists a dependency is not enough, as
+  // a relative path can reach any sibling directory.
+  ...boundaries([
+    {
+      files: ['packages/shared/**/*.ts'],
+      forbid: [...PACKAGES.filter((name) => name !== 'shared'), ...APPLICATIONS],
+      why: 'shared is the leaf of the graph: it may not depend on any other package or application.',
+    },
+    {
+      files: ['packages/db/**/*.ts'],
+      forbid: [...PACKAGES.filter((name) => name !== 'db'), ...APPLICATIONS],
+      why: 'db is a leaf: it may not depend on any other package or application.',
+    },
+    {
+      files: ['packages/nest/**/*.ts'],
+      forbid: ['db', ...APPLICATIONS],
+      why: 'nest may use shared only; applications and the database layer sit above it.',
+    },
+    {
+      files: ['apps/web/**/*.{ts,tsx}'],
+      forbid: ['nest', 'db', 'api', 'collab'],
+      why: 'The web app may use shared only; server-only packages and other applications stay out of the browser bundle.',
+    },
+    {
+      files: ['apps/api/**/*.ts'],
+      forbid: ['web', 'collab'],
+      why: 'Applications talk over the network, not by importing each other.',
+    },
+    {
+      files: ['apps/collab/**/*.ts'],
+      forbid: ['web', 'api'],
+      why: 'Applications talk over the network, not by importing each other.',
+    },
+    {
+      files: ['e2e/**/*.ts'],
+      forbid: [...PACKAGES.filter((name) => name !== 'shared'), ...APPLICATIONS],
+      why: 'End-to-end tests drive the running stack; they do not import its code.',
+    },
+  ]),
 );

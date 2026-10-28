@@ -49,7 +49,7 @@ export interface RoomObserver {
   rateLimited(): void;
 }
 
-export interface RoomLogger {
+interface RoomLogger {
   warn(fields: Record<string, unknown>, message: string): void;
 }
 

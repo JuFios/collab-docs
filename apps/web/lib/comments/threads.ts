@@ -5,12 +5,12 @@ export const PENDING_PREFIX = 'pending:';
 export const isPending = (thread: Pick<ThreadResponse, 'id'>): boolean =>
   thread.id.startsWith(PENDING_PREFIX);
 
-export interface BlockGroup {
+interface BlockGroup {
   blockId: string;
   threads: ThreadResponse[];
 }
 
-export interface GroupedThreads {
+interface GroupedThreads {
   /** Threads on blocks that still exist, grouped by block in the order the blocks first got a thread. */
   blocks: BlockGroup[];
   /** Threads whose block was deleted from the document. */

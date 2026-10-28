@@ -96,7 +96,7 @@ export class ThreadResponse {
   @ApiProperty({ type: [CommentResponse] }) comments!: CommentResponse[];
 }
 
-export class MentionWarningResponse {
+class MentionWarningResponse {
   @ApiProperty({
     enum: ['MENTION_IGNORED', 'MENTION_LIMIT'],
     description:

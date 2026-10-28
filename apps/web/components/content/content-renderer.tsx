@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
  * The input is expected to be sanitised already; links are checked again here because a link is the one element
  * where a mistake upstream would become script execution.
  */
-export interface ContentRendererProps {
+interface ContentRendererProps {
   content: { type: 'doc'; content?: unknown[] } | null | undefined;
   resolveImageSrc?: (attachmentId: string) => string | undefined;
   className?: string;

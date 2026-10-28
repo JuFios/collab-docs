@@ -71,7 +71,7 @@ export function useNotificationList({
   });
 }
 
-export type MarkRead = { ids: string[] } | { all: true };
+type MarkRead = { ids: string[] } | { all: true };
 
 function markedRead(data: ListData | undefined, target: MarkRead): ListData | undefined {
   if (!data) return data;

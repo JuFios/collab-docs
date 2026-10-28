@@ -40,7 +40,7 @@ export async function createDocument(
   return ((await response.json()) as { id: string }).id;
 }
 
-export interface InvitedMember {
+interface InvitedMember {
   page: Page;
   context: BrowserContext;
   name: string;

@@ -81,7 +81,7 @@ export async function waitFor(
 
 export const settle = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function makeUser(prisma: PrismaClient): Promise<TestUser> {
+async function makeUser(prisma: PrismaClient): Promise<TestUser> {
   const user = await prisma.user.create({
     data: {
       email: `collab-${randomBytes(6).toString('hex')}@collab-test.example`,

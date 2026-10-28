@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@collab-docs/db';
 import type { PlanTier, SubscriptionStatus } from '@collab-docs/shared';
 
-export interface SubscriptionChange {
+interface SubscriptionChange {
   plan: PlanTier;
   status: SubscriptionStatus;
   currentPeriodEnd: Date | null;

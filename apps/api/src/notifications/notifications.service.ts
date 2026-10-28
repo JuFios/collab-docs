@@ -20,14 +20,14 @@ import { RealtimeEventsService } from '../realtime/realtime-events.service';
 import { decodeNotificationCursor, encodeNotificationCursor } from './notification-cursor';
 import type { ListNotificationsQueryDto, MarkReadDto } from './notifications.dto';
 
-export interface MentionNotificationInput {
+interface MentionNotificationInput {
   commentId: string;
   /** Users to notify; the caller has checked that they may view the document. */
   recipientIds: string[];
   payload: MentionNotificationPayload;
 }
 
-export interface CreatedNotification {
+interface CreatedNotification {
   id: string;
   userId: string;
 }
@@ -43,7 +43,7 @@ interface NotificationRow {
 
 /** Key of a mention in a comment: one notification per comment and user, however often the comment is saved. */
 const commentKeyPrefix = (commentId: string) => `comment:${commentId}:`;
-export const commentMentionKey = (commentId: string, userId: string) =>
+const commentMentionKey = (commentId: string, userId: string) =>
   `${commentKeyPrefix(commentId)}${userId}`;
 
 /**

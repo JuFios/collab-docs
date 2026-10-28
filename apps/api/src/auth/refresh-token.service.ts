@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 /** A just-rotated token may be presented again for this long (parallel requests, several tabs). */
 export const REFRESH_GRACE_MS = 30_000;
 
-export type RefreshResult =
+type RefreshResult =
   /** The presented token was current: it has been rotated, `token` is the replacement. */
   | { kind: 'rotated'; userId: string; token: string }
   /** The presented token was rotated moments ago: only a new access token is warranted. */

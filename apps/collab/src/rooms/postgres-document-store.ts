@@ -33,12 +33,12 @@ export interface PersistenceHooks {
   drain(): Promise<void>;
 }
 
-export interface PersistenceLogger {
+interface PersistenceLogger {
   warn(fields: Record<string, unknown>, message: string): void;
   error(fields: Record<string, unknown>, message: string): void;
 }
 
-export interface PersistenceOptions {
+interface PersistenceOptions {
   /** Quiet period after the last update before a flush. */
   flushIntervalMs: number;
   /** A flush happens at the latest this long after the first buffered update, however busy the document is. */

@@ -29,10 +29,10 @@ import type { DropZone } from '@/lib/documents/move';
 import type { TreeRow } from '@/lib/documents/tree';
 import { cn } from '@/lib/utils';
 
-export const INDENT_PX = 16;
+const INDENT_PX = 16;
 const BASE_PADDING_PX = 4;
 
-export interface TreeRowProps {
+interface TreeRowProps {
   row: TreeRow;
   workspaceId: string;
   role: WorkspaceRole;

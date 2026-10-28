@@ -7,7 +7,7 @@ interface ExpiringLink {
 }
 
 /** One delayed job per (link, expiry): moving the expiry gives the new job a new id. */
-export const expiryJobId = (link: { id: string; expiresAt: Date }): string =>
+const expiryJobId = (link: { id: string; expiresAt: Date }): string =>
   `link-expiry-${link.id}-${link.expiresAt.getTime()}`;
 
 export interface LinkExpiryJob {

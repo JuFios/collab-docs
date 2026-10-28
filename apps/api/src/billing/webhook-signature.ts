@@ -7,7 +7,7 @@ export function signWebhook(secret: string, body: string, nowMs = Date.now()): s
   return `t=${timestamp},v1=${hmac(secret, timestamp, body)}`;
 }
 
-export type SignatureVerdict = 'valid' | 'malformed' | 'mismatch' | 'expired';
+type SignatureVerdict = 'valid' | 'malformed' | 'mismatch' | 'expired';
 
 /**
  * Checks a delivery: the HMAC over the exact bytes received (compared in constant time) and the age of its

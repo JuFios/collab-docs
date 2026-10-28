@@ -2,9 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsString, Length, MaxLength, MinLength } from 'class-validator';
 
-export const PASSWORD_MIN_LENGTH = 10;
+const PASSWORD_MIN_LENGTH = 10;
 // argon2 accepts long inputs, but unbounded ones are a cheap way to burn CPU
-export const PASSWORD_MAX_LENGTH = 128;
+const PASSWORD_MAX_LENGTH = 128;
 
 const normaliseEmail = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;

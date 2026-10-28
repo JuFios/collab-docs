@@ -15,7 +15,7 @@ import { isApiError } from '@/lib/api/errors';
  */
 export const PUBLISHED_PAGE_REVALIDATE_SECONDS = 3600;
 
-export const isPublishedSlug = (slug: string): boolean =>
+const isPublishedSlug = (slug: string): boolean =>
   slug.length <= PUBLIC_SLUG_MAX_LENGTH && PUBLIC_SLUG_PATTERN.test(slug);
 
 /** The sanitised content of a published page, or null for a page that is not (or no longer) available. */

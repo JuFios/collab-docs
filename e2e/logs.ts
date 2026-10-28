@@ -18,7 +18,7 @@ export interface LogLine {
   [field: string]: unknown;
 }
 
-export interface ServiceLogs {
+interface ServiceLogs {
   /** Everything the service printed, as text. */
   raw: string;
   /** The lines that are JSON objects. */
