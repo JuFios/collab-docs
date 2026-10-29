@@ -50,25 +50,42 @@ export class MockProviderService {
     await this.enqueueDelivery(eventId);
   }
 
-  /** A session gets one outcome; paying twice (a double click) is refused instead of producing a second event. */
+  /**
+   * A session gets one outcome; paying twice (a double click) is refused instead of producing a second event. The
+   * session row is locked while the check and the event are written, so two parallel calls cannot both pass.
+   */
   private async settle(
     sessionId: string,
     type: typeof BILLING_EVENT_TYPES.checkoutCompleted | typeof BILLING_EVENT_TYPES.checkoutFailed,
   ): Promise<string> {
-    const session = await this.checkoutSession(sessionId);
-    const issued = await this.prisma.mockProviderEvent.count({
-      where: {
-        checkoutSessionId: sessionId,
-        type: { in: [BILLING_EVENT_TYPES.checkoutCompleted, BILLING_EVENT_TYPES.checkoutFailed] },
-      },
+    const eventId = await this.prisma.$transaction(async (tx) => {
+      const [session] = await tx.$queryRaw<Array<{ status: string }>>`
+        SELECT status::text AS status FROM checkout_sessions WHERE id = ${sessionId}::uuid FOR UPDATE`;
+      if (!session) throw new AppException('NOT_FOUND', 'Checkout session not found');
+      const issued = await tx.mockProviderEvent.count({
+        where: {
+          checkoutSessionId: sessionId,
+          type: { in: [BILLING_EVENT_TYPES.checkoutCompleted, BILLING_EVENT_TYPES.checkoutFailed] },
+        },
+      });
+      if (session.status !== 'PENDING' || issued > 0) {
+        throw new AppException('CONFLICT', 'The checkout session was already settled');
+      }
+      return this.record(tx, type, { checkoutSessionId: sessionId }, sessionId);
     });
-    if (session.status !== 'PENDING' || issued > 0) {
-      throw new AppException('CONFLICT', 'The checkout session was already settled');
-    }
-    return this.emit(type, { checkoutSessionId: sessionId }, sessionId);
+    await this.enqueueDelivery(eventId);
+    return eventId;
   }
 
-  private async emit(
+  private async emit(type: string, data: Record<string, unknown>): Promise<string> {
+    const eventId = await this.record(this.prisma, type, data);
+    await this.enqueueDelivery(eventId);
+    return eventId;
+  }
+
+  /** Stores an issued event (the provider's own log, from which any delivery can be repeated). */
+  private async record(
+    db: Prisma.TransactionClient,
     type: string,
     data: Record<string, unknown>,
     checkoutSessionId?: string,
@@ -79,7 +96,7 @@ export class MockProviderService {
       created: Date.now(),
       data,
     };
-    await this.prisma.mockProviderEvent.create({
+    await db.mockProviderEvent.create({
       data: {
         id: event.id,
         type,
@@ -87,7 +104,6 @@ export class MockProviderService {
         payload: event as unknown as Prisma.InputJsonValue,
       },
     });
-    await this.enqueueDelivery(event.id);
     return event.id;
   }
 

@@ -328,6 +328,21 @@ describe('billing', () => {
       expect(await invoiceCount(workspaceId)).toBe(0);
     });
 
+    it('issues one outcome when a session is paid and declined at the same time', async () => {
+      const { owner, workspaceId } = await setup();
+      const { sessionId } = await checkout(owner, workspaceId, 'PRO');
+      const answers = await Promise.all([
+        provider(`/checkout-sessions/${sessionId}/complete`),
+        provider(`/checkout-sessions/${sessionId}/fail`),
+        provider(`/checkout-sessions/${sessionId}/complete`),
+      ]);
+
+      expect(answers.map((answer) => answer.status).sort()).toEqual([202, 409, 409]);
+      expect(
+        await prisma.mockProviderEvent.count({ where: { checkoutSessionId: sessionId } }),
+      ).toBe(1);
+    });
+
     it('settles a session once: paying it again is refused by the provider', async () => {
       const { owner, workspaceId } = await setup();
       const { sessionId } = await upgrade(owner, workspaceId, 'PRO');
@@ -446,18 +461,18 @@ describe('billing', () => {
 
     it('ignores the older of two events that arrive in the wrong order', async () => {
       const { owner, workspaceId } = await setup();
-      const pro = await checkout(owner, workspaceId, 'PRO');
       const team = await checkout(owner, workspaceId, 'TEAM');
       const now = Date.now();
-      const older = signedEvent(
-        BILLING_EVENT_TYPES.checkoutCompleted,
-        { checkoutSessionId: pro.sessionId },
-        now - 5000,
-      );
       const newer = signedEvent(
         BILLING_EVENT_TYPES.checkoutCompleted,
         { checkoutSessionId: team.sessionId },
         now,
+      );
+      // a cancellation issued before the upgrade, delivered after it
+      const older = signedEvent(
+        BILLING_EVENT_TYPES.subscriptionDeleted,
+        { workspaceId },
+        now - 5000,
       );
 
       await post(newer.text).expect(200);
@@ -467,9 +482,32 @@ describe('billing', () => {
 
       expect(await planOf(workspaceId)).toBe('TEAM');
       expect(await invoiceCount(workspaceId)).toBe(1);
+    });
+
+    it('cancels an open checkout when a new one starts, so only the newer one can be paid', async () => {
+      const { owner, workspaceId } = await setup();
+      const first = await checkout(owner, workspaceId, 'PRO');
+      const second = await checkout(owner, workspaceId, 'PRO');
+
       expect(
-        await prisma.checkoutSession.findUniqueOrThrow({ where: { id: pro.sessionId } }),
-      ).toMatchObject({ status: 'PENDING' });
+        await prisma.checkoutSession.findUniqueOrThrow({ where: { id: first.sessionId } }),
+      ).toMatchObject({ status: 'CANCELED', settledAt: expect.any(Date) });
+      await provider(`/checkout-sessions/${first.sessionId}/complete`).expect(409);
+
+      // an event for the canceled session (sent from elsewhere) does not charge it either
+      const stray = signedEvent(BILLING_EVENT_TYPES.checkoutCompleted, {
+        checkoutSessionId: first.sessionId,
+      });
+      await post(stray.text).expect(200);
+      await processed(stray.id);
+      expect(await invoiceCount(workspaceId)).toBe(0);
+
+      await provider(`/checkout-sessions/${second.sessionId}/complete`).expect(202);
+      await until(
+        () => planOf(workspaceId),
+        (current) => current === 'PRO',
+      );
+      expect(await invoiceCount(workspaceId)).toBe(1);
     });
 
     it('recovers an event whose first delivery found the queue down', async () => {

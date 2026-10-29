@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 const SETTLED = {
   COMPLETED: 'This payment has been completed.',
   FAILED: 'This payment was declined.',
+  CANCELED: 'This checkout was replaced by a newer one and can no longer be paid.',
 } as const;
 
 /**

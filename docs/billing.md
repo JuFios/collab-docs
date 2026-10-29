@@ -28,16 +28,16 @@ sequenceDiagram
   W->>W: one transaction: session PENDING→COMPLETED, plan, invoice, event PROCESSED
 ```
 
-| Route                                                          | Who          | What it does                                                                                                                          |
-| -------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /billing/plans`                                           | signed in    | The plans: price per month in cents, member / document / storage limits (`null` documents = unlimited).                               |
-| `GET /workspaces/:id/billing`                                  | owner, admin | Plan, subscription status, period end, usage against the limits, the figures that are over the limit, invoices (newest first).        |
-| `POST /workspaces/:id/billing/checkout {plan}`                 | owner, admin | Creates a `PENDING` checkout session at the price of `PRO` or `TEAM` and returns `checkoutUrl`. `409` if already on that plan.        |
-| `POST /workspaces/:id/billing/cancel`                          | owner, admin | `202`: asks the provider to end the subscription. `409` on `FREE`. The plan changes when the provider's event is applied.             |
-| `POST /billing/webhooks/mock`                                  | the provider | Public, signed. `200 { received: true }`, or `200 { duplicate: true }`; `401 WEBHOOK_SIGNATURE_INVALID`; `503` if it could not queue. |
-| `GET /mock-provider/checkout-sessions/:id`                     | public       | What the payment page shows (plan, amount, status, workspace).                                                                        |
-| `POST /mock-provider/checkout-sessions/:id/complete`, `…/fail` | public       | The customer pays / the payment is declined. `202 { eventId }`. A session has one outcome; a second call is `409`.                    |
-| `POST /mock-provider/events/:id/redeliver`                     | public       | Delivers an issued event again (the "resend" button of a provider dashboard).                                                         |
+| Route                                                          | Who          | What it does                                                                                                                                                               |
+| -------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /billing/plans`                                           | signed in    | The plans: price per month in cents, member / document / storage limits (`null` documents = unlimited).                                                                    |
+| `GET /workspaces/:id/billing`                                  | owner, admin | Plan, subscription status, period end, usage against the limits, the figures that are over the limit, invoices (newest first).                                             |
+| `POST /workspaces/:id/billing/checkout {plan}`                 | owner, admin | Creates a `PENDING` checkout session at the price of `PRO` or `TEAM` and returns `checkoutUrl`; an earlier open session becomes `CANCELED`. `409` if already on that plan. |
+| `POST /workspaces/:id/billing/cancel`                          | owner, admin | `202`: asks the provider to end the subscription. `409` on `FREE`. The plan changes when the provider's event is applied.                                                  |
+| `POST /billing/webhooks/mock`                                  | the provider | Public, signed. `200 { received: true }`, or `200 { duplicate: true }`; `401 WEBHOOK_SIGNATURE_INVALID`; `503` if it could not queue.                                      |
+| `GET /mock-provider/checkout-sessions/:id`                     | public       | What the payment page shows (plan, amount, status, workspace).                                                                                                             |
+| `POST /mock-provider/checkout-sessions/:id/complete`, `…/fail` | public       | The customer pays / the payment is declined. `202 { eventId }`. A session has one outcome; a second call is `409`.                                                         |
+| `POST /mock-provider/events/:id/redeliver`                     | public       | Delivers an issued event again (the "resend" button of a provider dashboard).                                                                                              |
 
 The mock provider's routes are public like a hosted checkout page is: the id of a checkout session is a random
 UUID v4 and is all it takes to pay for that session. `BILLING_PROVIDER=mock` (the only value, and the default in
@@ -86,8 +86,11 @@ transaction, so a crash in the middle leaves nothing half-applied and the retry 
 `subscriptions.last_event_at` and an event older than that is ignored (`webhook.ignored`, reason `stale`): an old
 cancellation arriving after a newer upgrade does not undo it. The check and the write happen under the workspace
 row lock (the same `FOR UPDATE` the plan limits use). A payment event that is ignored as stale leaves its session
-`PENDING` and creates no invoice; with a real provider that case needs a reconciliation job, here it only happens if
-a person completes two checkouts of one workspace within the delivery delay.
+`PENDING` and creates no invoice; with a real provider that case needs a reconciliation job. Here a workspace has at
+most one open checkout: starting one cancels the previous (`CANCELED`, under the same row lock), the provider refuses to
+settle a canceled session and the webhook cannot complete it, so two tabs or a repeated click never pay twice. The
+provider locks the session row while it decides the outcome, so a payment and a decline sent at once produce one
+event.
 
 **One writer.** `SubscriptionService` is the only code that writes `subscriptions` after the row is created with
 the workspace (nothing else issues `UPDATE subscriptions`), and it is only called by the event processor.

@@ -6419,7 +6419,8 @@
             "enum": [
               "PENDING",
               "COMPLETED",
-              "FAILED"
+              "FAILED",
+              "CANCELED"
             ]
           }
         },

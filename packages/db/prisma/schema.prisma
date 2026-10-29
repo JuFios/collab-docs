@@ -63,6 +63,8 @@ enum CheckoutSessionStatus {
   PENDING
   COMPLETED
   FAILED
+  /** Replaced by a newer checkout of the same workspace before it was paid. */
+  CANCELED
 
   @@map("checkout_session_status")
 }
