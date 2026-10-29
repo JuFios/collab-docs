@@ -336,6 +336,17 @@ describe('auth', () => {
       await refreshWith(cookieValue(issued[0])).expect(200);
     });
 
+    it('revokes the whole family when another client replays a rotated token inside the window', async () => {
+      const { refresh } = await register();
+      const rotated = await refreshWith(refresh).expect(200);
+      const current = cookieValue(cookiesOf(rotated)[REFRESH_COOKIE]);
+
+      // the same cookie, a second later, from another address (the test app trusts X-Forwarded-For)
+      const stolen = await refreshWith(refresh).set('X-Forwarded-For', '198.51.100.77').expect(401);
+      expect(stolen.body.code).toBe('UNAUTHENTICATED');
+      await refreshWith(current).expect(401);
+    });
+
     it('revokes the whole family when a rotated token is replayed after the grace window', async () => {
       const { refresh } = await register();
       const rotated = await refreshWith(refresh).expect(200);
@@ -343,7 +354,7 @@ describe('auth', () => {
 
       await prisma.refreshToken.update({
         where: { tokenHash: hashToken(refresh) },
-        data: { rotatedAt: new Date(Date.now() - 31_000) },
+        data: { rotatedAt: new Date(Date.now() - 11_000) },
       });
       const replay = await refreshWith(refresh).expect(401);
       expect(replay.body.code).toBe('UNAUTHENTICATED');

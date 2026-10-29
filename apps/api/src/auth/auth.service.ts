@@ -72,8 +72,9 @@ export class AuthService {
     return this.start(user);
   }
 
-  async refresh(presented: string): Promise<IssuedSession> {
-    const result = await this.refreshTokens.rotate(presented);
+  /** `client` is `clientFingerprint()` of the request (see the grace window of `RefreshTokenService`). */
+  async refresh(presented: string, client: string): Promise<IssuedSession> {
+    const result = await this.refreshTokens.rotate(presented, client);
     const user = await this.prisma.user.findUnique({ where: { id: result.userId } });
     if (!user) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');
     const session = await this.session(user);

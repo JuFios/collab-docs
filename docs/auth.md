@@ -56,13 +56,20 @@ so a database leak does not yield usable tokens. Passwords use argon2id (`@node-
 parallelism come from `ARGON2_*`, defaults follow the OWASP minimum). A wrong password and an unknown email
 produce the same response and cost the same time.
 
-**Rotation and the 30 s grace.** Each refresh replaces the token (`rotated_at`, `replaced_by`) inside one
+**Rotation and the 10 s grace.** Each refresh replaces the token (`rotated_at`, `replaced_by`) inside one
 family (`family_id`). The rotation claim is a single conditional `UPDATE ... WHERE rotated_at IS NULL`, so of
 two parallel refreshes with the same token exactly one rotates. A rotated token that is presented again within
-30 s (parallel requests, several tabs, a response lost on the wire) only yields a new access token and no
-second rotation, so the user is not logged out by a race. Presented later, a rotated token means it was
-copied: the whole family is revoked, the request gets `401`, and `auth.refresh_reuse_detected` is logged.
-Logout revokes the family too.
+10 s **by the client that rotated it** (parallel requests, several tabs, a response lost on the wire) only yields
+a new access token and no second rotation, so the user is not logged out by a race. The client is the SHA-256
+of the User-Agent and the address the api resolves through its trusted proxies (`rotated_by`; nothing about the
+client is stored in the clear). Presented by another client, or later, a rotated token means it was copied: the
+whole family is revoked, the request gets `401`, and `auth.refresh_reuse_detected` is logged with the reason
+(`other_client` or `after_grace`). Logout revokes the family too.
+
+The trade-off: a thief who copied the cookie and also matches the victim's browser and address (the same network
+behind one NAT) can still use it within those 10 s, and a phone that switches networks in the middle of a refresh
+race is logged out. A shorter window would make the second case likelier without removing the first; binding the
+token to a key held by the browser (DPoP) would remove both and is out of scope.
 
 **CSRF.** `SameSite=Lax` plus a global guard: a state-changing request authenticated by cookies (`cd_at` or
 `cd_rt`, so refresh and logout included) must carry an `Origin` that CORS admits with credentials (`WEB_ORIGIN`
@@ -74,7 +81,7 @@ webhooks.
 expired navigation there, including one that started on another site (a link in an email), so it cannot demand a
 same-origin request. Another site can therefore make a browser rotate its own session with a top-level navigation,
 and gains nothing by it: the new cookies go to that browser, the response is a redirect to a relative path, and a
-second rotation within 30 s falls into the grace window instead of the reuse detection.
+second rotation within 10 s from that browser falls into the grace window instead of the reuse detection.
 
 **Rate limits.** Login: 5/min per (client IP, email) and 20/min per IP; register: 10/h per IP (`RATE_*` in
 `.env.example`). Both login counters are `@nestjs/throttler` guards: the per-IP preset of the global guard and

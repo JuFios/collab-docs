@@ -133,6 +133,8 @@ model RefreshToken {
   tokenHash  String    @unique @map("token_hash")
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
   rotatedAt  DateTime? @map("rotated_at") @db.Timestamptz(6)
+  // clientFingerprint() of the request that rotated it: only that client gets the grace window
+  rotatedBy  String?   @map("rotated_by")
   revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
   replacedBy String?   @map("replaced_by") @db.Uuid
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)

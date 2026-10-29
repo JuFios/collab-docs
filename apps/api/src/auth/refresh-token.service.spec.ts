@@ -1,6 +1,11 @@
 import type { PrismaService } from '../prisma/prisma.service';
 import type { PinoLogger } from '@collab-docs/nest';
-import { REFRESH_GRACE_MS, RefreshTokenService, hashToken } from './refresh-token.service';
+import {
+  REFRESH_GRACE_MS,
+  RefreshTokenService,
+  clientFingerprint,
+  hashToken,
+} from './refresh-token.service';
 
 interface Row {
   id: string;
@@ -9,6 +14,7 @@ interface Row {
   tokenHash: string;
   expiresAt: Date;
   rotatedAt: Date | null;
+  rotatedBy: string | null;
   revokedAt: Date | null;
   replacedBy: string | null;
 }
@@ -28,6 +34,7 @@ function fakePrisma() {
         tokenHash: '',
         expiresAt: new Date(),
         rotatedAt: null,
+        rotatedBy: null,
         revokedAt: null,
         replacedBy: null,
         ...data,
@@ -55,6 +62,8 @@ function fakePrisma() {
 }
 
 const USER = '0190b1c2-0000-7000-8000-000000000001';
+const BROWSER = clientFingerprint({ userAgent: 'Firefox/140', ip: '203.0.113.7' });
+const THIEF = clientFingerprint({ userAgent: 'Firefox/140', ip: '198.51.100.9' });
 const DAY = 24 * 3600 * 1000;
 
 describe('RefreshTokenService', () => {
@@ -83,13 +92,14 @@ describe('RefreshTokenService', () => {
     const { service, rows } = setup();
     const now = new Date();
     const first = await service.issue(USER, now);
-    const result = await service.rotate(first, now);
+    const result = await service.rotate(first, BROWSER, now);
     expect(result.kind).toBe('rotated');
     if (result.kind !== 'rotated') return;
     expect(result.token).not.toBe(first);
     expect(rows).toHaveLength(2);
     const [old, next] = rows;
     expect(old!.rotatedAt).toEqual(now);
+    expect(old!.rotatedBy).toBe(BROWSER);
     expect(old!.replacedBy).toBe(next!.id);
     expect(next!.familyId).toBe(old!.familyId);
     expect(next!.tokenHash).toBe(hashToken(result.token));
@@ -99,27 +109,53 @@ describe('RefreshTokenService', () => {
     const { service, rows } = setup();
     const now = new Date();
     const first = await service.issue(USER, now);
-    await service.rotate(first, now);
-    const replay = await service.rotate(first, new Date(now.getTime() + REFRESH_GRACE_MS));
+    await service.rotate(first, BROWSER, now);
+    const replay = await service.rotate(first, BROWSER, new Date(now.getTime() + REFRESH_GRACE_MS));
     expect(replay).toEqual({ kind: 'grace', userId: USER });
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.revokedAt === null)).toBe(true);
+  });
+
+  it('revokes the whole family when another client replays the token inside the window', async () => {
+    const { service, rows, logger } = setup();
+    const now = new Date();
+    const first = await service.issue(USER, now);
+    await service.rotate(first, BROWSER, now);
+    await expect(
+      service.rotate(first, THIEF, new Date(now.getTime() + 1000)),
+    ).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    expect(rows.every((r) => r.revokedAt !== null)).toBe(true);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'auth.refresh_reuse_detected', reason: 'other_client' }),
+      'auth.refresh_reuse_detected',
+    );
+  });
+
+  it('keeps the window short and the fingerprint opaque', () => {
+    expect(REFRESH_GRACE_MS).toBe(10_000);
+    expect(BROWSER).toMatch(/^[0-9a-f]{64}$/);
+    expect(BROWSER).not.toBe(THIEF);
+    expect(clientFingerprint({ userAgent: 'Firefox/140', ip: '203.0.113.7' })).toBe(BROWSER);
   });
 
   it('revokes the whole family on a replay after the grace window', async () => {
     const { service, rows, logger } = setup();
     const now = new Date();
     const first = await service.issue(USER, now);
-    const second = await service.rotate(first, now);
+    const second = await service.rotate(first, BROWSER, now);
     const late = new Date(now.getTime() + REFRESH_GRACE_MS + 1);
-    await expect(service.rotate(first, late)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(service.rotate(first, BROWSER, late)).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
     expect(rows.every((r) => r.revokedAt !== null)).toBe(true);
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'auth.refresh_reuse_detected', userId: USER }),
       'auth.refresh_reuse_detected',
     );
     if (second.kind === 'rotated') {
-      await expect(service.rotate(second.token, late)).rejects.toMatchObject({
+      await expect(service.rotate(second.token, BROWSER, late)).rejects.toMatchObject({
         code: 'UNAUTHENTICATED',
       });
     }
@@ -137,13 +173,19 @@ describe('RefreshTokenService', () => {
   it('rejects unknown, revoked and expired tokens', async () => {
     const { service } = setup();
     const now = new Date();
-    await expect(service.rotate('unknown', now)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(service.rotate('unknown', BROWSER, now)).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
     const token = await service.issue(USER, now);
-    await expect(service.rotate(token, new Date(now.getTime() + 31 * DAY))).rejects.toMatchObject({
+    await expect(
+      service.rotate(token, BROWSER, new Date(now.getTime() + 31 * DAY)),
+    ).rejects.toMatchObject({
       code: 'UNAUTHENTICATED',
     });
     await service.revokeFamilyOf(token, now);
-    await expect(service.rotate(token, now)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(service.rotate(token, BROWSER, now)).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
   });
 
   it('treats a lost rotation race as a grace replay', async () => {
@@ -157,11 +199,16 @@ describe('RefreshTokenService', () => {
     jest.spyOn(prisma.refreshToken, 'updateMany').mockImplementation(((args: unknown) => {
       if (first) {
         first = false;
+        // the parallel request came from the same browser
         rows[0]!.rotatedAt = now;
+        rows[0]!.rotatedBy = BROWSER;
       }
       return original(args as never);
     }) as never);
-    await expect(service.rotate(token, now)).resolves.toEqual({ kind: 'grace', userId: USER });
+    await expect(service.rotate(token, BROWSER, now)).resolves.toEqual({
+      kind: 'grace',
+      userId: USER,
+    });
     expect(rows).toHaveLength(1);
   });
 });

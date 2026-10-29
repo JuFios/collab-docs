@@ -289,7 +289,7 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "description": "Presenting a token rotated less than 30 s ago returns a new access token without a new rotation; later reuse revokes the whole token family.",
+        "description": "Presenting a token rotated less than 10 s ago, from the same client (User-Agent and address), returns a new access token without a new rotation; any other reuse revokes the whole token family.",
         "operationId": "AuthController_refresh",
         "parameters": [],
         "responses": {

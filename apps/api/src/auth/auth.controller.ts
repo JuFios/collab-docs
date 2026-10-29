@@ -26,6 +26,11 @@ import { type IssuedSession, AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import type { RequestUser } from './auth.types';
 import { clearAuthCookies, readCookie, setAccessCookie, setRefreshCookie } from './cookies';
+import { clientFingerprint } from './refresh-token.service';
+
+/** The client presenting a refresh token; `req.ip` is resolved through the trusted proxies only. */
+const clientOf = (req: Request): string =>
+  clientFingerprint({ userAgent: req.get('user-agent'), ip: req.ip });
 
 @ApiTags('auth')
 @Controller('auth')
@@ -72,8 +77,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Rotate the refresh token (cookie cd_rt) and issue a new access token',
     description:
-      'Presenting a token rotated less than 30 s ago returns a new access token without a new rotation; ' +
-      'later reuse revokes the whole token family.',
+      'Presenting a token rotated less than 10 s ago, from the same client (User-Agent and address), returns a ' +
+      'new access token without a new rotation; any other reuse revokes the whole token family.',
   })
   @ApiOkResponse({ type: AuthSessionResponse })
   async refresh(
@@ -83,7 +88,7 @@ export class AuthController {
     const presented = readCookie(req, REFRESH_COOKIE);
     if (!presented) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');
     try {
-      return this.respond(res, await this.auth.refresh(presented));
+      return this.respond(res, await this.auth.refresh(presented, clientOf(req)));
     } catch (error) {
       if (error instanceof AppException && error.code === 'UNAUTHENTICATED') {
         clearAuthCookies(res, this.cookieEnv);
@@ -119,7 +124,7 @@ export class AuthController {
     const presented = readCookie(req, REFRESH_COOKIE);
     try {
       if (!presented) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');
-      this.respond(res, await this.auth.refresh(presented));
+      this.respond(res, await this.auth.refresh(presented, clientOf(req)));
       res.redirect(302, next);
     } catch (error) {
       if (!(error instanceof AppException) || error.code !== 'UNAUTHENTICATED') throw error;
