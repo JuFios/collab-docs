@@ -22,6 +22,17 @@ export function isPublicPath(pathname: string): boolean {
   );
 }
 
+/** The signed-in app (`app/(app)`): every page there reads the session, so it is rendered per request. */
+const APP_PREFIXES = ['/workspaces', '/notifications', '/shared'];
+
+/**
+ * Pages that can carry a per-request nonce. Only the `(app)` routes qualify: anything else may be prerendered (the
+ * landing page, the 404 page), and its scripts have no nonce to match.
+ */
+export function isPerRequestPage(pathname: string): boolean {
+  return APP_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 interface RouteInput {
   pathname: string;
   search: string;

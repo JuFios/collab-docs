@@ -114,6 +114,33 @@ signedInTest.describe('cross-site requests', () => {
   );
 });
 
+signedInTest.describe('nonce policy on workspace pages', () => {
+  signedInTest(
+    'a workspace page gets its own nonce, every script carries it, and nothing is blocked',
+    async ({ signedInPage }) => {
+      const workspaceId = await createWorkspace(signedInPage, 'Nonce policy');
+      const nonceOf = (policy: string | undefined) => policy?.match(/'nonce-([^']+)'/)?.[1];
+
+      const first = await signedInPage.goto(`/workspaces/${workspaceId}`);
+      const policy = first?.headers()['content-security-policy'];
+      signedInExpect(directive(policy ?? '', 'script-src')).toContain("'strict-dynamic'");
+      signedInExpect(directive(policy ?? '', 'script-src')).not.toContain("'unsafe-inline'");
+      const nonce = nonceOf(policy);
+      signedInExpect(nonce).toBeTruthy();
+      // browsers hide the attribute once the script ran; the property still holds it
+      const scripts = await signedInPage.evaluate(() =>
+        [...document.querySelectorAll('script')].map((script) => script.nonce),
+      );
+      signedInExpect(scripts.length).toBeGreaterThan(0);
+      signedInExpect(scripts.every((value) => value === nonce)).toBe(true);
+      // a blocked script would show up as a policy violation, which fails every signed-in test (fixtures.ts)
+
+      const second = await signedInPage.reload();
+      signedInExpect(nonceOf(second?.headers()['content-security-policy'])).not.toBe(nonce);
+    },
+  );
+});
+
 signedInTest.describe('static policy and cached pages', () => {
   signedInTest(
     'a published page keeps its Content-Security-Policy and is still served from the ISR cache',

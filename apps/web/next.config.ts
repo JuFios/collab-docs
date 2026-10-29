@@ -15,6 +15,11 @@ const csp = {
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // the middleware builds the per-request policy of the workspace pages from the same build-time origins
+  env: {
+    CSP_S3_PUBLIC_ENDPOINT: csp.s3PublicEndpoint,
+    CSP_COLLAB_PUBLIC_URL: csp.collabPublicUrl,
+  },
   // trace workspace packages from the monorepo root so the standalone bundle includes them
   outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,

@@ -1,8 +1,8 @@
 import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs/shared';
 import { type NextRequest, NextResponse } from 'next/server';
 import { jwtAccessSecret } from '@/lib/env';
-import { type SessionState, decideRoute } from '@/lib/auth/route-policy';
-import { STRICT_TRANSPORT_SECURITY } from '@/lib/security/headers';
+import { type SessionState, decideRoute, isPerRequestPage } from '@/lib/auth/route-policy';
+import { STRICT_TRANSPORT_SECURITY, contentSecurityPolicy } from '@/lib/security/headers';
 import {
   LAST_WORKSPACE_COOKIE,
   LAST_WORKSPACE_MAX_AGE_SECONDS,
@@ -23,6 +23,16 @@ async function sessionOf(request: NextRequest): Promise<SessionState> {
   } catch (error) {
     return error instanceof AccessTokenError && error.reason === 'expired' ? 'expired' : 'none';
   }
+}
+
+/** Policy with a fresh nonce for a page rendered for this request; the origins are fixed at build time (next.config). */
+function noncePolicy(): string {
+  return contentSecurityPolicy({
+    s3PublicEndpoint: process.env.CSP_S3_PUBLIC_ENDPOINT ?? 'http://localhost:9000',
+    collabPublicUrl: process.env.CSP_COLLAB_PUBLIC_URL ?? 'ws://localhost:4001',
+    development: process.env.NODE_ENV !== 'production',
+    nonce: btoa(crypto.randomUUID()),
+  });
 }
 
 export async function middleware(request: NextRequest) {
@@ -46,7 +56,11 @@ export async function middleware(request: NextRequest) {
       break;
     }
     default: {
+      // workspace pages are dynamic (they read the session), so they can carry a nonce; the rest may be static
+      const policy = isPerRequestPage(pathname) ? noncePolicy() : null;
+      if (policy) requestHeaders.set('content-security-policy', policy);
       response = NextResponse.next({ request: { headers: requestHeaders } });
+      if (policy) response.headers.set('content-security-policy', policy);
       // remember the workspace the user is looking at, so `/workspaces` can send them back to it
       const workspaceId = workspaceIdFromPath(pathname);
       if (workspaceId && request.cookies.get(LAST_WORKSPACE_COOKIE)?.value !== workspaceId) {

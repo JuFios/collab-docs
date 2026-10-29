@@ -29,7 +29,7 @@ invite of another workspace used through a path of one's own) and expects 404 ev
 
 ## Content-Security-Policy and headers
 
-`next.config.ts` sends the same headers on every response (built in `lib/security/headers.ts`):
+`next.config.ts` sends the same headers on every response (built in `lib/security/headers.ts`), with this policy:
 
 ```
 default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
@@ -43,8 +43,17 @@ middleware adds `Strict-Transport-Security` (browsers ignore it over plain HTTP)
 `S3_PUBLIC_ENDPOINT` and `COLLAB_PUBLIC_URL`; Next compiles headers into the routes manifest, so like the api
 rewrite they are build arguments of the web image (compose passes them on).
 
-**Why not a nonce.** A nonce policy needs a fresh value in every response and in the `<script>` tags of that response,
-which makes each page dynamic. The published pages (`/published/[slug]`) are ISR: they are rendered once and served from the
+**Nonce on workspace pages.** Everything behind sign-in (the `(app)` routes: tree, editor, settings, search) is rendered
+per request anyway, because the layout reads the session. For those paths the edge middleware generates a nonce per
+request and sends a second policy whose `script-src` is `'self' 'nonce-<value>' 'strict-dynamic'` (no `'unsafe-inline'`);
+it puts the same policy on the request, which is where Next reads the nonce from to mark its own scripts. A browser
+enforces every policy it receives, so on these pages an injected inline script is refused even though the static
+policy is sent too. The origins of the nonce policy are the same build-time values (`next.config.ts` passes them to
+the middleware). The e2e suite checks that a workspace page has a fresh nonce on each load and that every script
+carries it.
+
+**Why not a nonce everywhere.** A nonce policy needs a fresh value in every response and in the `<script>` tags of that
+response, which makes each page dynamic. The published pages (`/published/[slug]`) are ISR: they are rendered once and served from the
 cache to everyone, and a per-request nonce would turn them back into server-rendered pages (the e2e suite checks that
 the second request is still an `x-nextjs-cache: HIT` and that the header carries no nonce). The price of the static
 policy is `'unsafe-inline'` for scripts, which Next's hydration data needs. What carries the weight instead: no
@@ -153,4 +162,5 @@ api as well.
 - The mock payment provider (`BILLING_PROVIDER=mock`) is public by design: it stands in for an external service, and
   anyone who knows a checkout session id can complete it. A real provider replaces the module; the webhook behind it
   authenticates by signature either way.
-- `script-src` keeps `'unsafe-inline'` (see above).
+- `script-src` keeps `'unsafe-inline'` on static and published pages (see above); `style-src` keeps it everywhere (the
+  editor and the toasts set inline styles).

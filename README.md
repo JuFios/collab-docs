@@ -227,7 +227,7 @@ invalidation. Editing never waits for any of this: the editor only enqueues. Det
 | Viewer cannot edit    | Enforced in the API and in the gateway (updates from a read-only socket are dropped); tested through the UI, REST and a raw WebSocket.                                                                                                                                                                         |
 | Rate limiting         | Login, registration, public-link creation, guest tickets, search, comments; collab: message rate, update and document size, connections, presence.                                                                                                                                                             |
 | CSRF, sessions        | httpOnly `SameSite=Lax` cookies, `Origin` check on cookie-authenticated writes, rotating refresh tokens with reuse detection.                                                                                                                                                                                  |
-| Headers               | One static Content-Security-Policy and security headers on every response. **No nonce**: a per-request nonce makes every page dynamic and defeats ISR; the price is `'unsafe-inline'` for scripts, offset by a closed origin list and no user-written markup.                                                  |
+| Headers               | Security headers on every response. The signed-in workspace (rendered per request anyway) gets a **nonce** Content-Security-Policy with `'strict-dynamic'` from the edge middleware; static and ISR pages keep a static policy with `'unsafe-inline'`, since a nonce would make them dynamic.                  |
 | Validation            | DTOs with `class-validator` on the API, zod schemas shared with the forms; a parity test keeps them in step.                                                                                                                                                                                                   |
 | Secrets, dependencies | Placeholders only in templates; services refuse `dev-only` secrets in staging; `pnpm audit --prod` in CI; secrets redacted from logs.                                                                                                                                                                          |
 
@@ -423,8 +423,9 @@ than gaps.
 - A per-user cap on WebSocket writes (messages are limited per connection and per document); rate limits on presign
   and checkout; membership is re-checked on each SSE heartbeat, not on every event.
 - `/metrics` shares the application's port and is protected by a bearer token rather than a separate internal port.
-- `'unsafe-inline'` remains in the script CSP _by design_ (a nonce would end ISR, see [Security](docs/security.md)); the
-  invite preview shows the invited email address.
+- Static and published pages keep `'unsafe-inline'` in the script CSP _by design_ (a nonce would end ISR; the
+  signed-in workspace has a nonce policy, see [Security](docs/security.md)); the invite preview shows the invited email
+  address.
 - Access tokens are HS256 with a shared secret; a move to ES256 and a JWKS endpoint is described in [auth](docs/auth.md).
 - The mock payment provider is public by design.
 

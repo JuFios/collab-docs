@@ -47,6 +47,37 @@ describe('middleware', () => {
     }
   });
 
+  it('gives workspace pages a fresh nonce policy and forwards it to the renderer', async () => {
+    const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
+    const nonceOf = (policy: string | null) => policy?.match(/'nonce-([^']+)'/)?.[1];
+    const first = await middleware(request('/workspaces', `cd_at=${token}`));
+    const second = await middleware(request('/workspaces', `cd_at=${token}`));
+
+    const policy = first.headers.get('content-security-policy');
+    expect(policy).toContain("'strict-dynamic'");
+    expect(policy?.split('; ').find((d) => d.startsWith('script-src'))).not.toContain(
+      'unsafe-inline',
+    );
+    // Next reads the nonce from the request's policy to mark its own scripts
+    expect(first.headers.get('x-middleware-request-content-security-policy')).toBe(policy);
+    expect(nonceOf(policy)).toBeTruthy();
+    expect(nonceOf(policy)).not.toBe(nonceOf(second.headers.get('content-security-policy')));
+  });
+
+  it('leaves public and possibly prerendered pages to the static policy', async () => {
+    const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
+    for (const path of [
+      '/',
+      '/login',
+      '/published/some-page-1a2b3c',
+      '/no-such-page',
+      '/workspacesx',
+    ]) {
+      const response = await middleware(request(path, `cd_at=${token}`));
+      expect(response.headers.get('content-security-policy')).toBeNull();
+    }
+  });
+
   it('passes valid sessions through', async () => {
     const { token } = await signAccessToken(SECRET, '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d');
     const response = await middleware(request('/workspaces', `cd_at=${token}`));
