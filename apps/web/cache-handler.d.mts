@@ -5,6 +5,7 @@ export interface Store {
   del(key: string): Promise<unknown>;
   hmget(key: string, ...fields: string[]): Promise<Array<string | null>>;
   hset(key: string, values: Record<string, string | number>): Promise<unknown>;
+  expire(key: string, seconds: number): Promise<unknown>;
 }
 
 export interface CacheEntry {
@@ -22,11 +23,16 @@ export class MemoryStore implements Store {
   del(key: string): Promise<void>;
   hmget(key: string, ...fields: string[]): Promise<Array<string | null>>;
   hset(key: string, values: Record<string, string | number>): Promise<void>;
+  expire(key: string, seconds: number): Promise<void>;
+  readonly expiries: Map<string, number>;
 }
 
 export default class CacheHandler {
   constructor(options?: { serverDistDir?: string }, store?: Store);
-  get(key: string, ctx: { kind?: string; tags?: string[]; softTags?: string[] }): Promise<CacheEntry | null>;
+  get(
+    key: string,
+    ctx: { kind?: string; tags?: string[]; softTags?: string[] },
+  ): Promise<CacheEntry | null>;
   set(key: string, data: unknown): Promise<void>;
   revalidateTag(tags: string | string[]): Promise<void>;
   resetRequestCache(): void;
