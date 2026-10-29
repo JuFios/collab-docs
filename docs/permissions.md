@@ -92,4 +92,6 @@ the action gives `403`. A member of a workspace also gets `403` where a non-memb
 
 Creating a document needs `EDITOR` and `EDIT` on the parent; the child copies the parent's visibility and
 shares at that moment (a snapshot, not live inheritance). Moving needs `EDIT` on the document and on the new
-parent, the same workspace and no cycle. Only `EDITOR` and above can comment.
+parent, the same workspace and no cycle. Commenting needs `EDIT` on the document, whatever grants it: a workspace
+`VIEWER` with an editor share can comment, a reader cannot, and a guest with an edit link cannot either (comments
+need an account).

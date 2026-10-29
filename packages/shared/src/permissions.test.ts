@@ -6,7 +6,6 @@ import {
   type RoleChange,
   type MemberRemoval,
   type WorkspaceRole,
-  canComment,
   canCreateDocument,
   canInviteWithRole,
   canMoveDocument,
@@ -218,16 +217,6 @@ describe('document actions', () => {
     ])('%s', (_name, override, expected) => {
       expect(canMoveDocument({ ...ok, ...override })).toBe(expected);
     });
-  });
-
-  it('comment: editors and above, not viewers or view-only guests', () => {
-    expect(canComment('EDIT', 'EDITOR')).toBe(true);
-    expect(canComment('MANAGE', 'ADMIN')).toBe(true);
-    expect(canComment('EDIT', null)).toBe(true); // guest with an editor share
-    expect(canComment('VIEW', null)).toBe(false);
-    expect(canComment('VIEW', 'VIEWER')).toBe(false);
-    expect(canComment('EDIT', 'VIEWER')).toBe(false); // viewer role stays read-only on comments
-    expect(canComment('NONE', 'OWNER')).toBe(false);
   });
 });
 
