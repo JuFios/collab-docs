@@ -359,6 +359,12 @@ export class DocRoom {
         ? this.reject(state, 'invalid', error)
         : this.refuse(state, 'invalid', error);
     }
+    if (this.pendingBytes() > this.limits.maxUpdateBytes) {
+      // updates whose dependencies never arrive would pile up in memory, unpersisted and outside the size check
+      this.doc.store.pendingStructs = null;
+      this.doc.store.pendingDs = null;
+      return this.refuse(state, 'too_large');
+    }
     if (this.appliedChange) this.observer.updateApplied();
     else {
       this.observer.updateDuplicate();
@@ -370,13 +376,21 @@ export class DocRoom {
   /** Would the document stay within its size limit with `bytes` more? */
   private fitsDocument(bytes: number): boolean {
     const limit = this.limits.maxDocumentBytes;
-    if (this.measuredBytes + this.unmeasuredBytes + bytes <= limit) return true;
+    // held-back updates join the document as soon as what they wait for arrives, so they count already
+    const held = this.pendingBytes();
+    if (this.measuredBytes + this.unmeasuredBytes + held + bytes <= limit) return true;
     // only applied updates make the estimate drift, so a document that really is full is encoded once, not per refusal
     if (this.unmeasuredBytes > 0) {
       this.measuredBytes = Y.encodeStateAsUpdate(this.doc).byteLength;
       this.unmeasuredBytes = 0;
     }
-    return this.measuredBytes + this.unmeasuredBytes + bytes <= limit;
+    return this.measuredBytes + this.unmeasuredBytes + held + bytes <= limit;
+  }
+
+  /** Bytes Yjs holds back because they depend on changes the room has not received (they emit no `update`). */
+  private pendingBytes(): number {
+    const { pendingStructs, pendingDs } = this.doc.store;
+    return (pendingStructs?.update.byteLength ?? 0) + (pendingDs?.byteLength ?? 0);
   }
 
   private handleAwareness(state: ConnectionState, payload: Uint8Array): void {

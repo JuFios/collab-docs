@@ -301,6 +301,42 @@ describe('DocRoom', () => {
       });
     });
 
+    it('counts updates held back for a missing dependency against the document size', () => {
+      const { room, observer } = setup({ maxDocumentBytes: 300 });
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+      client.text().insert(0, 'a');
+      client.text().insert(1, 'b'.repeat(280));
+      // the large update arrives first and waits for the one it builds on
+      client.flushOutbox((messages) => [...messages].reverse());
+      client.settle();
+      expect(observer.rejected).toContain('document_too_large');
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('b');
+    });
+
+    it('drops held-back updates that outgrow the update limit and refuses their sender', () => {
+      const { room, observer } = setup({ maxUpdateBytes: 200 });
+      const sender = new TestClient(room);
+      const other = new TestClient(room);
+      sender.join();
+      other.join();
+      TestClient.settleAll(sender, other);
+      sender.text().insert(0, 'a');
+      const [first] = sender.outbox.splice(0);
+      for (let i = 0; i < 5; i += 1) sender.text().insert(sender.text().length, 'b'.repeat(150));
+      sender.flushOutbox();
+      sender.flushInbox();
+      expect(observer.rejected).toEqual(['too_large']);
+      expect(sender.lastEvent('rejected')).toEqual({ type: 'rejected', reason: 'too_large' });
+      expect(room.doc.store.pendingStructs).toBeNull();
+
+      // the update they waited for arrives after all: nothing that was dropped comes back with it
+      room.receive(other, first!);
+      expect(room.doc.getXmlFragment('content').toString()).toContain('a');
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('b');
+    });
+
     it('tells only the sender about a refused update, once, and ignores what it builds on it', () => {
       const { room, observer } = setup({ maxUpdateBytes: 64 });
       const sender = new TestClient(room);
