@@ -65,7 +65,9 @@ close the socket with 1009.
   `invalid`); the other clients are not told. The refused change stays in the sender's own `Y.Doc`, and every later
   update of that client builds on it, so the room ignores the connection's updates from then on and sends the event
   once. The client recreates its `Y.Doc` from the server state, as after a downgrade, and tells the user that the
-  change was undone.
+  change was undone. The new session reuses the ticket while it is under 30 s old, so a full document refusing every
+  keystroke does not cost a ticket request each. Only refused updates send the event: a malformed message that is not
+  an update is logged as `invalid` and changes nothing else.
 
 ## Presence
 
@@ -85,8 +87,8 @@ Sync step 2 and update messages from a client are applied to the room's `Y.Doc` 
 - the update is at most `COLLAB_MAX_UPDATE_BYTES`, and applying it keeps the document under
   `COLLAB_MAX_DOCUMENT_BYTES`. The room estimates the size as the encoded state at load plus every update applied
   since; that sum also counts deleted content, so before it refuses an update the room encodes the document and
-  measures it again (only once the estimate has drifted by 1/64 of the limit, so a document that really is near
-  its limit is not re-encoded on every keystroke),
+  measures it again whenever an update was applied since the last measurement (a document that really is full is
+  encoded once, not on every refused keystroke),
 - it decodes as a whole before anything is applied, so a malformed update never reaches the document, the other
   clients or the store, and
 - the connection has had no update refused before (see `rejected` above), and
