@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, Res } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
@@ -19,7 +19,6 @@ import { AuthSessionResponse, AuthUserResponse, LoginDto, RegisterDto } from './
 import { type IssuedSession, AuthService } from './auth.service';
 import type { RequestUser } from './auth.types';
 import { clearAuthCookies, readCookie, setAccessCookie, setRefreshCookie } from './cookies';
-import { LoginThrottleGuard } from './login-throttle.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -48,7 +47,6 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  @UseGuards(LoginThrottleGuard)
   @RateLimit.login()
   @ApiOperation({ summary: 'Sign in with email and password' })
   @ApiOkResponse({ type: AuthSessionResponse })

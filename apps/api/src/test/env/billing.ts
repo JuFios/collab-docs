@@ -6,3 +6,5 @@ redisUrl.pathname = '/3';
 process.env.REDIS_URL = redisUrl.toString();
 process.env.ARGON2_MEMORY_KIB = '1024';
 process.env.ARGON2_TIME_COST = '1';
+// the suite pays, declines and re-sends from one address far more often than a person would
+process.env.RATE_MOCK_PROVIDER_PER_MIN_IP = '10000';

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   type ExecutionContext,
   HttpException,
@@ -38,14 +39,21 @@ export function throttlerOptions(
   };
 }
 
-/** Where a preset's counter is kept: per client address, or per signed-in user. */
-type RateScope = 'ip' | 'user';
+/** Where a preset's counter is kept: per client address, per signed-in user, or per address and login email. */
+type RateScope = 'ip' | 'user' | 'ipEmail';
 
 /** Env key holding the limit, the window, the counter's scope and the message of the 429 of each preset. */
 const PRESETS = {
   login: { scope: 'ip', limit: 'RATE_LOGIN_PER_MIN_IP', ttl: seconds(60) },
+  loginAttempt: {
+    scope: 'ipEmail',
+    limit: 'RATE_LOGIN_PER_MIN_IP_EMAIL',
+    ttl: seconds(60),
+    message: 'Too many login attempts, try again later',
+  },
   register: { scope: 'ip', limit: 'RATE_REGISTER_PER_HOUR_IP', ttl: seconds(3600) },
   guestTicket: { scope: 'ip', limit: 'RATE_GUEST_TICKET_PER_MIN_IP', ttl: seconds(60) },
+  mockProvider: { scope: 'ip', limit: 'RATE_MOCK_PROVIDER_PER_MIN_IP', ttl: seconds(60) },
   ticket: {
     scope: 'user',
     limit: 'RATE_TICKET_PER_MIN_USER',
@@ -126,7 +134,7 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
   }
 
   /** The route's preset, if it belongs to this guard's scope. */
-  private presetOf(context: ExecutionContext): RatePreset | undefined {
+  protected presetOf(context: ExecutionContext): RatePreset | undefined {
     const preset = this.reflector.getAllAndOverride<RatePreset | undefined>(RATE_LIMIT_PRESET, [
       context.getHandler(),
       context.getClass(),
@@ -172,13 +180,54 @@ export class UserThrottlerGuard extends ClientIpThrottlerGuard {
 }
 
 /**
- * Per-route presets (limits come from env; see README). `login`, `register` and `guestTicket` count per client IP,
- * `ticket`, `publicLink` and `search` per signed-in user, which needs the route to be authenticated.
+ * Brute-force limit per (client IP, email) on the login route, on top of its per-IP preset. Every attempt counts,
+ * successful or not; the email is normalised like the DTO does and only its hash is part of the key.
+ */
+@Injectable()
+export class LoginThrottlerGuard extends ClientIpThrottlerGuard {
+  protected override readonly scope: RateScope = 'ipEmail';
+  // its own counter headers, so the per-address ones of the same response stay readable; `Retry-After` is shared
+  protected override headerPrefix = 'X-RateLimit-Login';
+
+  constructor(
+    @InjectThrottlerOptions() options: ThrottlerModuleOptions,
+    @InjectThrottlerStorage() storageService: ThrottlerStorage,
+    reflector: Reflector,
+    config: ConfigService<AppConfig, true>,
+    @InjectPinoLogger(LoginThrottlerGuard.name) pino: PinoLogger,
+  ) {
+    super(options, storageService, reflector, config, pino);
+  }
+
+  /** Attached by `RateLimit.login()` only, so its preset does not depend on the route's metadata. */
+  protected override presetOf(): RatePreset {
+    return 'loginAttempt';
+  }
+
+  protected override async getTracker(req: Record<string, unknown>): Promise<string> {
+    const email = (req.body as { email?: unknown } | undefined)?.email;
+    const digest =
+      typeof email === 'string'
+        ? createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
+        : 'none';
+    return `login:${await super.getTracker(req)}:${digest}`;
+  }
+}
+
+/**
+ * Per-route presets (limits come from env; see README). `login`, `register`, `guestTicket` and `mockProvider` count per client IP
+ * (`login` also per IP and email), `ticket`, `publicLink`, `search` and `comment` per signed-in user, which needs
+ * the route to be authenticated.
  */
 export const RateLimit = {
-  login: () => SetMetadata(RATE_LIMIT_PRESET, 'login' satisfies PresetOf<'ip'>),
+  login: () =>
+    applyDecorators(
+      SetMetadata(RATE_LIMIT_PRESET, 'login' satisfies PresetOf<'ip'>),
+      UseGuards(LoginThrottlerGuard),
+    ),
   register: () => SetMetadata(RATE_LIMIT_PRESET, 'register' satisfies PresetOf<'ip'>),
   guestTicket: () => SetMetadata(RATE_LIMIT_PRESET, 'guestTicket' satisfies PresetOf<'ip'>),
+  mockProvider: () => SetMetadata(RATE_LIMIT_PRESET, 'mockProvider' satisfies PresetOf<'ip'>),
   user: (preset: PresetOf<'user'>) =>
     applyDecorators(SetMetadata(RATE_LIMIT_PRESET, preset), UseGuards(UserThrottlerGuard)),
 };

@@ -24,6 +24,9 @@ const PRESETS: Record<string, string> = {
   'POST /api/documents/{id}/threads': 'comment',
   'POST /api/threads/{threadId}/comments': 'comment',
   'PATCH /api/comments/{commentId}': 'comment',
+  'POST /api/mock-provider/checkout-sessions/{id}/complete': 'mockProvider',
+  'POST /api/mock-provider/checkout-sessions/{id}/fail': 'mockProvider',
+  'POST /api/mock-provider/events/{id}/redeliver': 'mockProvider',
 };
 
 /**
