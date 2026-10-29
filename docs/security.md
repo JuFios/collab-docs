@@ -93,16 +93,27 @@ bucket as a direct call).
 
 ## Rate limits
 
-| Preset        | Scope   | Default                                     | Routes                                                                 |
-| ------------- | ------- | ------------------------------------------- | ---------------------------------------------------------------------- |
-| `login`       | address | 20 / min (+ 5 / min per address and e-mail) | `POST /auth/login`                                                     |
-| `register`    | address | 10 / h                                      | `POST /auth/register`                                                  |
-| `guestTicket` | address | 30 / min                                    | `POST /public/links/:token/ticket`                                     |
-| `ticket`      | user    | 30 / min                                    | `POST /documents/:id/collab-ticket`                                    |
-| `publicLink`  | user    | 10 / h                                      | `POST /documents/:id/public-links`                                     |
-| `search`      | user    | 60 / min                                    | `GET /workspaces/:id/search`                                           |
-| `comment`     | user    | 30 / min                                    | thread, reply and edit routes of comments                              |
-| global        | address | 600 / min                                   | every other route (not the event stream and the operational endpoints) |
+| Preset         | Scope   | Default                                     | Routes                                                                 |
+| -------------- | ------- | ------------------------------------------- | ---------------------------------------------------------------------- |
+| `login`        | address | 20 / min (+ 5 / min per address and e-mail) | `POST /auth/login`                                                     |
+| `register`     | address | 10 / h                                      | `POST /auth/register`                                                  |
+| `guestTicket`  | address | 30 / min                                    | `POST /public/links/:token/ticket`                                     |
+| `ticket`       | user    | 30 / min                                    | `POST /documents/:id/collab-ticket`                                    |
+| `publicLink`   | user    | 10 / h                                      | `POST /documents/:id/public-links`                                     |
+| `search`       | user    | 60 / min                                    | `GET /workspaces/:id/search`                                           |
+| `comment`      | user    | 30 / min                                    | thread, reply and edit routes of comments                              |
+| `mockProvider` | address | 30 / min                                    | pay, decline and re-send on the mock payment page                      |
+| global         | address | 600 / min                                   | every other route (not the event stream and the operational endpoints) |
+
+All of them are `@nestjs/throttler` guards over one Redis store; the per-address-and-email login counter is a
+route-level guard (`LoginThrottlerGuard`) whose tracker is the address plus a hash of the normalised e-mail, and
+it reports its counters as `X-RateLimit-Login-*` so they do not hide the per-address ones.
+
+**Which address counts.** `req.ip` honours `X-Forwarded-For` only from `TRUSTED_PROXY_CIDRS`. In compose that is
+exactly the proxy and the web container, which have fixed addresses in the compose subnet (`NETWORK_PREFIX`,
+`10.89.0.10` and `.11`); the proxy overwrites the header, and web passes it on for its server-side calls. A
+request to the api's published development port arrives from the network's gateway, which is not trusted, so a
+spoofed header there changes nothing (`e2e/tests/client-ip.spec.ts` checks both ways in).
 
 A refusal is `429` with `{ code: 'RATE_LIMITED', correlationId }` and a `Retry-After` header. `rate-limits.int.spec.ts`
 reads the preset of every route from the Nest metadata and compares it with this table, then exhausts each limit
@@ -114,13 +125,14 @@ the access decorator on those routes (with a comment: the order is the behaviour
 
 ## Collab abuse limits
 
-| Limit                    | Default                     | Result                                |
-| ------------------------ | --------------------------- | ------------------------------------- |
-| messages per connection  | 200 / 10 s                  | close `4429`                          |
-| one update               | 1 MiB (frame limit in `ws`) | close `1009`                          |
-| a document               | 10 MiB                      | further updates dropped, socket stays |
-| connections per document | 100                         | close `4429` for the extra one        |
-| awareness payload        | 4 KiB                       | dropped                               |
+| Limit                             | Default                     | Result                                |
+| --------------------------------- | --------------------------- | ------------------------------------- |
+| messages per connection           | 200 / 10 s                  | close `4429`                          |
+| one update                        | 1 MiB (frame limit in `ws`) | close `1009`                          |
+| a document                        | 10 MiB                      | further updates dropped, socket stays |
+| updates waiting for a missing one | 1 MiB (the update limit)    | dropped, sender refused (`too_large`) |
+| connections per document          | 100                         | close `4429` for the extra one        |
+| awareness payload                 | 4 KiB                       | dropped                               |
 
 `apps/collab/src/ws/security.int.spec.ts` provokes each of them with raw sockets (the limits are lowered by the suite's
 environment), and checks that presence cannot be spoken for another client or carry an identity the server did
@@ -152,15 +164,24 @@ changed expiry plans the rebuild for the moment the link ends). A route that is 
 - Logs redact `authorization`, cookies, `set-cookie`, the internal and revalidate headers, and the fields `password`,
   `token`, `accessToken`, `refreshToken`, `ticket`, `secret`, `authorization`, `cookie`, both as a field of the line
   and one level down (pino's `*.name` does not reach the top level, which is how the second form was missing).
+- Invite and edit-link tokens travel in the URL path, so the request log of the api masks that segment
+  (`/api/invites/[REDACTED]`) and leaves out query strings (`loggableUrl`), and the proxy's access log does the same
+  for `/invite/…`, `/edit-link/…` and their api routes, without query string and `Referer`. nginx's error log still
+  writes the request line when an upstream fails.
 
-Audit finding fixed on the way: collab served `/metrics` on its public port without any check (its connection and
+Audit findings fixed on the way: Yjs keeps an update whose dependencies have not arrived in memory without emitting
+anything, so such updates were neither persisted nor counted towards the document size, and the missing update
+then brought them all in at once. The room now counts them towards `COLLAB_MAX_DOCUMENT_BYTES`, drops them when
+they outgrow `COLLAB_MAX_UPDATE_BYTES` and refuses their sender (a client on one socket never produces them). An
+attachment's upload form stays valid for ten minutes after the file was checked, so the checked file is now a
+server-side copy the form cannot overwrite ([Storage](storage.md)). And collab served `/metrics` on its public port without any check (its connection and
 room counts, close codes and rejected-update counts were readable by anybody). It now needs `METRICS_TOKEN`, on the
 api as well.
 
 ## Known limits
 
 - The mock payment provider (`BILLING_PROVIDER=mock`) is public by design: it stands in for an external service, and
-  anyone who knows a checkout session id can complete it. A real provider replaces the module; the webhook behind it
+  anyone who knows a checkout session id can complete it (rate limited per address). A real provider replaces the module; the webhook behind it
   authenticates by signature either way.
 - `script-src` keeps `'unsafe-inline'` on static and published pages (see above); `style-src` keeps it everywhere (the
   editor and the toasts set inline styles).

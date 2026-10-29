@@ -186,4 +186,4 @@ export const CONTENT_LIMITS = {
 } as const;
 
 export const BLOCK_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export { UUID_PATTERN } from '../ids';

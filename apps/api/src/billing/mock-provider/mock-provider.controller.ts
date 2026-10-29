@@ -6,14 +6,16 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { ParseUuidPipe } from '@collab-docs/nest';
+import { ParseUuidPipe, RateLimit } from '@collab-docs/nest';
 import { Public } from '../../auth/auth.decorators';
+import { EventIdPipe } from './event-id.pipe';
 import { EventIssuedResponse, MockCheckoutSessionResponse } from './mock-provider.dto';
 import { MockProviderService } from './mock-provider.service';
 
 /**
  * What the hosted checkout page of a real provider does. Public like that page: the checkout session id is an
- * unguessable random UUID and is all it takes to pay for the session, which is how a real checkout link works.
+ * unguessable random UUID and is all it takes to pay for the session, which is how a real checkout link works. The
+ * actions are rate limited per client address, since every one of them queues a delivery.
  */
 @ApiTags('mock-provider')
 @Public()
@@ -30,6 +32,7 @@ export class MockProviderController {
 
   @Post('checkout-sessions/:id/complete')
   @HttpCode(202)
+  @RateLimit.mockProvider()
   @ApiOperation({
     summary: 'Pays the session',
     description:
@@ -44,6 +47,7 @@ export class MockProviderController {
 
   @Post('checkout-sessions/:id/fail')
   @HttpCode(202)
+  @RateLimit.mockProvider()
   @ApiOperation({ summary: 'Declines the payment (`checkout.session.failed`)' })
   @ApiAcceptedResponse({ type: EventIssuedResponse })
   @ApiConflictResponse({ description: 'The session was already settled' })
@@ -53,13 +57,14 @@ export class MockProviderController {
 
   @Post('events/:id/redeliver')
   @HttpCode(202)
+  @RateLimit.mockProvider()
   @ApiOperation({
     summary: 'Delivers an event to the webhook again',
     description:
       'The receiver treats the repeat as a duplicate: the plan and the invoices stay as they are.',
   })
   @ApiAcceptedResponse({ type: EventIssuedResponse })
-  async redeliver(@Param('id') id: string) {
+  async redeliver(@Param('id', EventIdPipe) id: string) {
     await this.provider.redeliver(id);
     return { eventId: id };
   }

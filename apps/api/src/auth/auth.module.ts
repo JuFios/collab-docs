@@ -9,7 +9,6 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CsrfGuard } from './csrf.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { LoginThrottleGuard } from './login-throttle.guard';
 import { PasswordService } from './password.service';
 import { RefreshTokenService } from './refresh-token.service';
 
@@ -30,7 +29,6 @@ import { RefreshTokenService } from './refresh-token.service';
     AuthService,
     PasswordService,
     RefreshTokenService,
-    LoginThrottleGuard,
     { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],

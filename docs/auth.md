@@ -66,7 +66,8 @@ and gains nothing by it: the new cookies go to that browser, the response is a r
 second rotation within 30 s falls into the grace window instead of the reuse detection.
 
 **Rate limits.** Login: 5/min per (client IP, email) and 20/min per IP; register: 10/h per IP (`RATE_*` in
-`.env.example`). Exceeding them returns `429 RATE_LIMITED` with `Retry-After`. The client IP is `req.ip`,
+`.env.example`). Both login counters are `@nestjs/throttler` guards: the per-IP preset of the global guard and
+`LoginThrottlerGuard`, whose tracker is the IP plus a SHA-256 of the normalised email. Exceeding them returns `429 RATE_LIMITED` with `Retry-After`. The client IP is `req.ip`,
 which honours `x-forwarded-for` only from `TRUSTED_PROXY_CIDRS`.
 
 **HS256 vs ES256/JWKS.** HS256 with a dedicated secret (`JWT_ACCESS_SECRET`) is the simplest thing that works

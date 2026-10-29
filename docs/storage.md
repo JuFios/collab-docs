@@ -38,6 +38,12 @@ sequenceDiagram
    first bytes are checked against the magic numbers of the four formats. A text file called `fake.png`
    passes layers 1 and 2 and stops here; the object and its row are deleted.
 
+**The checked file cannot be replaced.** The form stays valid for ten minutes, also after completion. So the browser
+uploads to `uploads/{key}`, and completion copies that object to `{key}` on the server, deletes the upload and
+checks the copy; the file is served from `{key}`, which no form names. Whatever is posted with the form afterwards
+stays under `uploads/`, which a bucket lifecycle rule (set by `minio-init`) expires after a day. A completion that
+stopped after the copy is repeated without an upload and checks the copy again.
+
 **Quota.** `SUM(size)` over the workspace's attachments (completed and pending) has to stay within the plan
 (100 MB / 5 GB / 50 GB). The check and the insert run in one transaction under `SELECT ... FOR UPDATE` on the
 workspace row, the same lock the member and document limits use, so two parallel presigns cannot both take
@@ -47,8 +53,9 @@ the last bytes. `GET /workspaces/:id/usage` reports the same figure.
 browsers are signed for `S3_PUBLIC_ENDPOINT` (`localhost:9000`), because a signature covers the host. The
 bucket's CORS origin is `WEB_ORIGIN` (`MINIO_API_CORS_ALLOW_ORIGIN` in `docker-compose.yml`).
 
-**Lifecycle.** Objects are stored as `ws/{workspaceId}/doc/{documentId}/{uuid}`. A `PENDING` row older than
-`ATTACHMENT_PENDING_TTL_HOURS` (24) is removed by an hourly worker job together with its object. The job
+**Lifecycle.** Objects are stored as `ws/{workspaceId}/doc/{documentId}/{uuid}` (uploaded under the `uploads/`
+prefix first). A `PENDING` row older than `ATTACHMENT_PENDING_TTL_HOURS` (24) is removed by an hourly worker job
+together with its objects. The job
 claims rows with `DELETE ... RETURNING` before touching the bucket, so a completion racing the sweep fails
 with `404` and never leaves a `READY` row without a file. Deleting a document is a soft delete and keeps its
 attachments; purging them is not done (see [Not done](../README.md#not-done)).

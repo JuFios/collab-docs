@@ -1,6 +1,7 @@
 import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -119,6 +120,23 @@ export class S3Storage implements OnModuleDestroy {
     );
     if (!response.Body) return new Uint8Array();
     return response.Body.transformToByteArray();
+  }
+
+  /** Server-side copy that keeps the content type; `false` when the source does not exist. */
+  async copy(sourceKey: string, targetKey: string): Promise<boolean> {
+    try {
+      await this.internal.send(
+        new CopyObjectCommand({
+          Bucket: this.bucket,
+          Key: targetKey,
+          CopySource: `${this.bucket}/${sourceKey.split('/').map(encodeURIComponent).join('/')}`,
+        }),
+      );
+      return true;
+    } catch (error) {
+      if (isMissing(error)) return false;
+      throw error;
+    }
   }
 
   /** Deleting an object that is already gone is not an error. */

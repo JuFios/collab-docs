@@ -9,8 +9,8 @@ export const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
 export const UNKNOWN_TOKEN = 'A'.repeat(43);
 
 /**
- * Everyone who can knock on the api. The first four hold no session at all; `guestLink` and `expiredLink` carry a
- * public link instead (a VIEW slug and an EDIT token), which only the `/public` routes look at.
+ * Everyone who can knock on the api. `anon` holds no session at all; `guestLink` and `expiredLink` carry a public
+ * link instead (a VIEW slug and an EDIT token), which only the `/public` routes look at; the others are signed in.
  */
 export const PERSONAS = [
   'anon',

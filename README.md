@@ -55,7 +55,9 @@ document and type: cursors and edits appear live on both sides. Publish the docu
 | `mailpit`  | http://localhost:8025, SMTP `:1025`         | Catches outgoing email (invitations, mentions)                                           |
 | `migrate`  | -                                           | One-shot job that runs before the apps                                                   |
 
-Host ports can be changed with `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, etc. (see `.env.example`). MinIO's
+Host ports can be changed with `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, etc. (see `.env.example`). The compose network
+uses `10.89.0.0/24`, so that the proxy and web have fixed addresses the api can trust; set `NETWORK_PREFIX` if that
+subnet is taken (an existing stack needs `docker compose down` once to pick up the network). MinIO's
 official images are no longer published, so `docker/minio/Dockerfile` builds the server and the `mc` client from the
 last tagged source releases.
 
@@ -220,16 +222,16 @@ invalidation. Editing never waits for any of this: the editor only enqueues. Det
 
 ## Security
 
-| Concern               | Measure                                                                                                                                                                                                                                                                                                        |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| XSS from user content | One allowlist (`@collab-docs/shared/content`) drives the editor and the server-side sanitiser; every path that shows content (public page, version preview, search, email) goes through `sanitizeContent`, and pages render React elements, never HTML strings. A hostile corpus is tested on every path.      |
-| IDOR / privilege      | Access is resolved from the database for the id in each request. A test calls **every** API route as nine personas (outsider, viewer, editor, admin, owner, document guest, link visitors, anonymous) and compares with a policy table; a route without a policy fails the suite. Cross-tenant ids return 404. |
-| Viewer cannot edit    | Enforced in the API and in the gateway (updates from a read-only socket are dropped); tested through the UI, REST and a raw WebSocket.                                                                                                                                                                         |
-| Rate limiting         | Login, registration, public-link creation, guest tickets, search, comments; collab: message rate, update and document size, connections, presence.                                                                                                                                                             |
-| CSRF, sessions        | httpOnly `SameSite=Lax` cookies, `Origin` check on cookie-authenticated writes, rotating refresh tokens with reuse detection.                                                                                                                                                                                  |
-| Headers               | Security headers on every response. The signed-in workspace (rendered per request anyway) gets a **nonce** Content-Security-Policy with `'strict-dynamic'` from the edge middleware; static and ISR pages keep a static policy with `'unsafe-inline'`, since a nonce would make them dynamic.                  |
-| Validation            | DTOs with `class-validator` on the API, zod schemas shared with the forms; a parity test keeps them in step.                                                                                                                                                                                                   |
-| Secrets, dependencies | Placeholders only in templates; services refuse `dev-only` secrets in staging; `pnpm audit --prod` in CI; secrets redacted from logs.                                                                                                                                                                          |
+| Concern               | Measure                                                                                                                                                                                                                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| XSS from user content | One allowlist (`@collab-docs/shared/content`) drives the editor and the server-side sanitiser; every path that shows content (public page, version preview, search, email) goes through `sanitizeContent`, and pages render React elements, never HTML strings. A hostile corpus is tested on every path.                    |
+| IDOR / privilege      | Access is resolved from the database for the id in each request. A test calls **every** API route as nine personas (outsider, viewer, editor, admin, owner, document guest, link visitors, anonymous) and compares with a policy table; a route without a policy fails the suite. Cross-tenant ids return 404.               |
+| Viewer cannot edit    | Enforced in the API and in the gateway (updates from a read-only socket are dropped); tested through the UI, REST and a raw WebSocket.                                                                                                                                                                                       |
+| Rate limiting         | Login (per address, and per address and email), registration, public-link creation, guest tickets, search, comments, the mock payment actions; collab: message rate, update and document size (updates waiting for a missing one included), connections, presence. `X-Forwarded-For` is trusted from the proxy and web only. |
+| CSRF, sessions        | httpOnly `SameSite=Lax` cookies, `Origin` check on cookie-authenticated writes, rotating refresh tokens with reuse detection.                                                                                                                                                                                                |
+| Headers               | Security headers on every response. The signed-in workspace (rendered per request anyway) gets a **nonce** Content-Security-Policy with `'strict-dynamic'` from the edge middleware; static and ISR pages keep a static policy with `'unsafe-inline'`, since a nonce would make them dynamic.                                |
+| Validation            | DTOs with `class-validator` on the API, zod schemas shared with the forms; a parity test keeps them in step.                                                                                                                                                                                                                 |
+| Secrets, dependencies | Placeholders only in templates; services refuse `dev-only` secrets in staging; `pnpm audit --prod` in CI; secrets redacted from logs, and invite and edit-link tokens masked in the request logs of the api and the proxy.                                                                                                   |
 
 All of it, with the tests that guard each layer: [Security](docs/security.md).
 
@@ -266,7 +268,7 @@ listed here with the reason, so that a reader does not have to rediscover them.
 - **Queues:** `@nestjs/bullmq` (`@Processor`, `@InjectQueue`), with a base class that restores the correlation
   id of the job.
 - **Probes:** `@nestjs/terminus` for `/health` and `/ready`.
-- **Rate limiting:** `@nestjs/throttler` with Redis storage. The per-user limits (collab tickets, public links) are the same throttler with `getTracker` overridden in a route-level guard that runs after authentication.
+- **Rate limiting:** `@nestjs/throttler` with Redis storage. The per-user limits (collab tickets, public links) and the per-address-and-email login limit are the same throttler with `getTracker` overridden in a route-level guard that runs after authentication.
 - **Outgoing HTTP:** `@nestjs/axios` (`HttpModule`) for the worker's call to the web app's revalidation endpoint and the mock provider's webhook deliveries.
 - **Access tokens:** `@nestjs/jwt` in the api.
 - **Logging:** `nestjs-pino`; classes inject `PinoLogger` (`@InjectPinoLogger`).
@@ -352,7 +354,7 @@ and [Search](docs/search.md). After a change to a controller or DTO, `pnpm --fil
 regenerates `docs/openapi.json` (CI fails when it is stale).
 
 **Working on the code with live reload.** Start the infrastructure in Docker and run the apps on the host
-(Node.js >= 22.12, see `.nvmrc`, and pnpm 10):
+(Node.js 24 as in `.nvmrc` and the images, at least 22.12, and pnpm 10):
 
 ```bash
 docker compose up -d postgres redis minio minio-init mailpit
@@ -400,7 +402,9 @@ than gaps.
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.
 - Sharing is not inherited down the tree _by design_: a child copies its parent's visibility and shares when it is created and is independent
-  afterwards. A guest who holds an edit link cannot comment.
+  afterwards. Deleting a document trashes its whole subtree _by design_ (as in Notion), restricted subpages the caller
+  cannot edit or see included; restoring those needs an Owner or Admin, or the author. A guest who holds an edit link
+  cannot comment.
 - Billing is a mock: no renewals, proration, taxes, payment methods, dunning or refunds (a payment overtaken by a newer
   event or checkout is invoiced and logged as `billing.payment_not_applied`, not refunded). The 80 % usage warning is shown on the meters, but nothing warns before the action that would cross it.
 - Search has no typo tolerance and no stemming (Postgres ships no Ukrainian dictionary); a trigram index on titles exists
@@ -411,7 +415,8 @@ than gaps.
 **Data lifecycle and scale**
 
 - No hard purge: deleted documents and their attachments stay (soft delete only); expired invites and refresh tokens are
-  not swept. The tree and the trash are not paginated.
+  not swept. The tree and the trash are not paginated. Creates, moves, deletes and restores in one workspace
+  serialise on the workspace row lock, which is simple and correct but becomes the bottleneck of a very busy workspace.
 - One collab instance _by design_; horizontal scaling needs consistent routing by document id or a Redis fan-out between
   instances ([CRDT](docs/crdt.md#scaling-the-collab-service)). No load test of the gateway and no Lighthouse measurements.
 - Email is delivered at least once, so a retry after a crash can send an invitation twice.
@@ -421,7 +426,7 @@ than gaps.
 **Security beyond the assignment**
 
 - A per-user cap on WebSocket writes (messages are limited per connection and per document); rate limits on presign
-  and checkout; membership is re-checked on each SSE heartbeat, not on every event.
+  and on starting a checkout; membership is re-checked on each SSE heartbeat, not on every event.
 - `/metrics` shares the application's port and is protected by a bearer token rather than a separate internal port.
 - Static and published pages keep `'unsafe-inline'` in the script CSP _by design_ (a nonce would end ISR; the
   signed-in workspace has a nonce policy, see [Security](docs/security.md)); the invite preview shows the invited email

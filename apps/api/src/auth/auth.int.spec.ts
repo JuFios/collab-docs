@@ -1,4 +1,5 @@
 import '../test/env/auth';
+import { randomBytes } from 'node:crypto';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
@@ -421,12 +422,15 @@ describe('auth', () => {
         .get('/api/auth/me')
         .set('Authorization', `Bearer ${login.body.accessToken}`)
         .expect(200);
+      const inviteToken = randomBytes(32).toString('base64url');
+      await http().get(`/api/invites/${inviteToken}`);
       logger[streamSym] = stream;
       (logger as unknown as { level: string }).level = level;
 
       const output = lines.join('');
       expect(output).toContain('auth.refresh_reuse_detected'); // logging was captured at all
       expect(output).toContain('"url":"/api/auth/login"');
+      expect(output).toContain('"url":"/api/invites/[REDACTED]"');
       // business events keep their name and the request's correlation id, and say which class logged them
       const loggedIn = lines
         .map((line) => JSON.parse(line) as Record<string, unknown>)
@@ -443,6 +447,7 @@ describe('auth', () => {
         login.body.accessToken,
         refreshed.body.accessToken,
         cookieValue(cookiesOf(refreshed)[REFRESH_COOKIE]),
+        inviteToken,
       ];
       for (const secret of secrets) expect(output).not.toContain(secret);
     });

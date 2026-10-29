@@ -4,7 +4,12 @@ import { Test } from '@nestjs/testing';
 import { ThrottlerException, ThrottlerModule } from '@nestjs/throttler';
 import { describe, expect, it, vi } from 'vitest';
 import { getLoggerToken } from './logger';
-import { ClientIpThrottlerGuard, RateLimit, UserThrottlerGuard } from './throttle';
+import {
+  ClientIpThrottlerGuard,
+  LoginThrottlerGuard,
+  RateLimit,
+  UserThrottlerGuard,
+} from './throttle';
 
 @Controller()
 class Routes {
@@ -32,16 +37,18 @@ async function setup(limits: Record<string, number> = {}) {
     providers: [
       ClientIpThrottlerGuard,
       UserThrottlerGuard,
+      LoginThrottlerGuard,
       { provide: ConfigService, useValue: { get: (key: string) => limits[key] ?? 2 } },
       { provide: getLoggerToken(ClientIpThrottlerGuard.name), useValue: logger },
       { provide: getLoggerToken(UserThrottlerGuard.name), useValue: logger },
+      { provide: getLoggerToken(LoginThrottlerGuard.name), useValue: logger },
     ],
   }).compile();
   await module.init();
   const headers: Record<string, unknown> = {};
   const context = (
     handler: keyof Routes,
-    request: { ip?: string; user?: { id: string } },
+    request: { ip?: string; user?: { id: string }; body?: unknown },
   ): ExecutionContext =>
     ({
       getHandler: () => Routes.prototype[handler],
@@ -55,6 +62,7 @@ async function setup(limits: Record<string, number> = {}) {
   return {
     ip: module.get(ClientIpThrottlerGuard),
     user: module.get(UserThrottlerGuard),
+    login: module.get(LoginThrottlerGuard),
     context,
     headers,
     logger,
@@ -125,5 +133,29 @@ describe('ClientIpThrottlerGuard', () => {
     );
     const links = context('links', { ip: '3.3.3.3', user: { id: 'u' } });
     for (let i = 0; i < 5; i++) await expect(ip.canActivate(links)).resolves.toBe(true);
+  });
+});
+
+describe('LoginThrottlerGuard', () => {
+  it('limits attempts per address and email, however the email is written', async () => {
+    const { login, context, headers } = await setup({
+      RATE_LOGIN_PER_MIN_IP_EMAIL: 2,
+      RATE_LOGIN_PER_MIN_IP: 100,
+    });
+    const attempt = (ip: string, email: string) =>
+      login.canActivate(context('login', { ip, body: { email, password: 'x' } }));
+    await expect(attempt('1.1.1.1', 'ada@example.test')).resolves.toBe(true);
+    await expect(attempt('1.1.1.1', ' ADA@example.test ')).resolves.toBe(true);
+    const refused = await attempt('1.1.1.1', 'ada@example.test').catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ThrottlerException);
+    expect((refused as ThrottlerException).message).toBe(
+      'Too many login attempts, try again later',
+    );
+    expect(Number(headers['Retry-After'])).toBeGreaterThan(0);
+    expect(headers['X-RateLimit-Login-Remaining']).toBe(0);
+    expect(headers['X-RateLimit-Remaining']).toBeUndefined();
+    // another email from the same address, and the same email from another address, have counters of their own
+    await expect(attempt('1.1.1.1', 'bob@example.test')).resolves.toBe(true);
+    await expect(attempt('2.2.2.2', 'ada@example.test')).resolves.toBe(true);
   });
 });

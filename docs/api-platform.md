@@ -18,7 +18,8 @@ app only plugs the modules in (`PlatformModule` for HTTP services, `WorkerPlatfo
   `TRUSTED_PROXY_CIDRS` (empty means `x-forwarded-for` is never trusted).
 - **Rate limiting**: `@nestjs/throttler` with a Redis store, keyed by the real client IP. A generous global
   limit (`RATE_GLOBAL_PER_MIN_IP`) applies everywhere; `RateLimit.login()`, `.register()` and `.guestTicket()`
-  are per-IP presets whose limits come from the `RATE_*` variables. `RateLimit.user('ticket' | 'publicLink')` counts
+  are per-IP presets whose limits come from the `RATE_*` variables (`.mockProvider()` too); `.login()` also adds
+  `LoginThrottlerGuard`, which counts per address and e-mail. `RateLimit.user('ticket' | 'publicLink')` counts
   per signed-in user instead (the same throttler and Redis store, keyed by `request.user` in a route-level
   `UserThrottlerGuard`), for what people do rather than what addresses do: collab tickets are fetched on every reconnect of every tab, and a person creating public links
   should not get a fresh budget from another IP. If Redis is unavailable both guards fail open and log the error.
@@ -55,7 +56,8 @@ short, log-safe token, otherwise a new UUID. It is stored in `AsyncLocalStorage`
 returned in the `x-correlation-id` response header and in every error body. When code enqueues a job the id
 is written into the job data, and the worker restores it before running the processor, so one id follows a
 change from the browser through the API into background work (and later the collab server). Secrets are
-redacted from logs (`authorization`, `cookie`, `set-cookie`, passwords, tokens). Classes get their logger by
+redacted from logs (`authorization`, `cookie`, `set-cookie`, passwords, tokens), and the logged request URL has no
+query string and a masked invite or edit-link token (`loggableUrl`). Classes get their logger by
 injection (`@InjectPinoLogger(MyService.name)`), which adds a `context` field; business events are logged with
 `logEvent(this.logger, 'document.published', { … })` (an `event` field plus the same name as the message).
 

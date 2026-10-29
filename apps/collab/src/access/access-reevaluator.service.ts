@@ -65,17 +65,35 @@ export class AccessReevaluator implements OnModuleInit, OnApplicationShutdown {
     workspaceId?: string;
   }): Promise<void> {
     const sessions = this.rooms.matching(filter);
+    // the sockets of one room share the read of their document; only the membership is read per socket
+    const documents = new Map<string, ReturnType<AccessService['loadDocument']>>();
+    const documentOf = (documentId: string) => {
+      let document = documents.get(documentId);
+      if (!document) {
+        document = this.access.loadDocument(documentId);
+        documents.set(documentId, document);
+      }
+      return document;
+    };
     for (let i = 0; i < sessions.length; i += BATCH_SIZE) {
-      await Promise.all(sessions.slice(i, i + BATCH_SIZE).map((session) => this.check(session)));
+      await Promise.all(
+        sessions
+          .slice(i, i + BATCH_SIZE)
+          .map((session) => this.check(session, () => documentOf(session.documentId))),
+      );
     }
   }
 
-  private async check(session: Session): Promise<void> {
+  private async check(
+    session: Session,
+    loadDocument: () => ReturnType<AccessService['loadDocument']> = () =>
+      this.access.loadDocument(session.documentId),
+  ): Promise<void> {
     const generation = (this.generations.get(session) ?? 0) + 1;
     this.generations.set(session, generation);
     const { conn, room } = session;
     try {
-      const outcome = await this.access.resolve(session.identity, session.documentId);
+      const outcome = await this.access.resolveFor(session.identity, await loadDocument());
       // a check started after this one owns the decision, whatever order the answers arrive in
       if (this.generations.get(session) !== generation) return;
       switch (outcome.status) {

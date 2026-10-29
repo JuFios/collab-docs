@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@collab-docs/db';
@@ -27,6 +26,7 @@ import { PermissionsService, notFound } from '../permissions/permissions.service
 import { S3Storage } from '../storage/s3.service';
 import { PlanLimitsService } from '../workspaces/plan-limits.service';
 import type { AttachmentRow } from './attachment-access';
+import { attachmentKey, uploadKeyOf } from './attachment-keys';
 import { PrismaService } from '../prisma/prisma.service';
 
 const present = (row: AttachmentRow): Attachment => ({
@@ -40,9 +40,6 @@ const present = (row: AttachmentRow): Attachment => ({
 
 const unprocessable = (reason: string, message: string) =>
   new AppException('VALIDATION_FAILED', message, { status: 422, details: { reason } });
-
-const attachmentKey = (workspaceId: string, documentId: string): string =>
-  `ws/${workspaceId}/doc/${documentId}/${randomUUID()}`;
 
 /**
  * Image uploads (spec §3, §6). Files go straight from the browser to the bucket through a presigned POST;
@@ -110,7 +107,7 @@ export class AttachmentsService {
     );
 
     const post = await this.s3.presignPost({
-      key: attachment.key,
+      key: uploadKeyOf(attachment.key),
       contentType: input.mime,
       size: input.size,
       expiresInSeconds: ATTACHMENT_UPLOAD_TTL_SECONDS,
@@ -124,12 +121,17 @@ export class AttachmentsService {
   }
 
   /**
-   * The caller needs EDIT on the attachment's document (checked by `@AttachmentAccess`). Checks what is really in the bucket (size, type, magic number);
-   * an object that does not match is deleted along with its row and the call fails with 422.
+   * The caller needs EDIT on the attachment's document (checked by `@AttachmentAccess`). Moves the upload to the key
+   * it is served from, where the upload form cannot replace it, and checks that copy (size, type, magic number); an
+   * object that does not match is deleted along with its row and the call fails with 422.
    */
   async complete(row: AttachmentRow): Promise<Attachment> {
     if (row.status === 'READY') return present(row);
 
+    // without an upload, a copy made by a completion that stopped halfway is checked again
+    if (await this.s3.copy(uploadKeyOf(row.key), row.key)) {
+      await this.s3.delete(uploadKeyOf(row.key));
+    }
     const info = await this.s3.head(row.key);
     if (!info) throw unprocessable('not_uploaded', 'The file has not been uploaded');
     if (info.size !== row.size) {
@@ -173,6 +175,7 @@ export class AttachmentsService {
 
   private async reject(row: AttachmentRow, reason: string, message: string): Promise<never> {
     await this.s3.delete(row.key);
+    await this.s3.delete(uploadKeyOf(row.key));
     await this.prisma.attachment.deleteMany({ where: { id: row.id, status: 'PENDING' } });
     logEvent(this.logger, 'attachment.rejected', { attachmentId: row.id, reason });
     throw unprocessable(reason, message);

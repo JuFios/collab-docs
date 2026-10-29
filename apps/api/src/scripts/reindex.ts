@@ -2,12 +2,12 @@ import 'reflect-metadata';
 import { parseArgs } from 'node:util';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { UUID_PATTERN } from '@collab-docs/shared';
 import { WorkerPlatformModule } from '@collab-docs/nest';
 import { SearchIndexModule } from '../search/search.module';
 import { SearchIndexService } from '../search/search-index.service';
 
 const USAGE = 'usage: reindex --workspace=<uuid> | --all\n';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The pieces the command needs, without the queue processors: nothing here consumes jobs. */
 @Module({ imports: [WorkerPlatformModule.forRoot(), SearchIndexModule] })
@@ -25,7 +25,10 @@ async function reindex(): Promise<void> {
     options: { workspace: { type: 'string' }, all: { type: 'boolean' } },
   });
   const workspaceId = values.workspace;
-  if (Boolean(workspaceId) === Boolean(values.all) || (workspaceId && !UUID.test(workspaceId))) {
+  if (
+    Boolean(workspaceId) === Boolean(values.all) ||
+    (workspaceId && !UUID_PATTERN.test(workspaceId))
+  ) {
     process.stderr.write(USAGE);
     process.exitCode = 2;
     return;

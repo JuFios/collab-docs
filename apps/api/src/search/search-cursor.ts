@@ -1,3 +1,5 @@
+import { UUID_PATTERN } from '@collab-docs/shared';
+
 /** Keyset position in the result order (rank, then id, both descending). */
 export interface SearchCursor {
   /** `ts_rank_cd` as the text Postgres printed, so the round trip is exact. */
@@ -6,7 +8,6 @@ export interface SearchCursor {
 }
 
 const RANK = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function encodeCursor(cursor: SearchCursor): string {
   return Buffer.from(JSON.stringify({ r: cursor.rank, i: cursor.id })).toString('base64url');
@@ -18,7 +19,7 @@ export function decodeCursor(raw: string): SearchCursor | null {
     const value: unknown = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
     if (typeof value !== 'object' || value === null) return null;
     const { r, i } = value as Record<string, unknown>;
-    return typeof r === 'string' && RANK.test(r) && typeof i === 'string' && UUID.test(i)
+    return typeof r === 'string' && RANK.test(r) && typeof i === 'string' && UUID_PATTERN.test(i)
       ? { rank: r, id: i }
       : null;
   } catch {
