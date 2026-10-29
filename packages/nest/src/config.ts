@@ -7,6 +7,16 @@ const url = z.string().url();
 const secret = z.string().min(16, 'must be at least 16 characters');
 const positiveInt = z.coerce.number().int().positive();
 
+/** `*`, a bare host or anything else `new URL` cannot place on an http(s) origin would match nothing, or `null`. */
+function isHttpOrigin(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export const envSchema = z.object({
   APP_ENV: z.enum(['dev', 'staging', 'test']).default('dev'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -43,8 +53,19 @@ export const envSchema = z.object({
   COLLAB_INTERNAL_URL: z.string().regex(/^tcp:\/\/[^/:]+:\d+$/, 'must look like tcp://host:port'),
   COLLAB_PUBLIC_URL: z.string().regex(/^wss?:\/\//, 'must start with ws:// or wss://'),
   TRUSTED_PROXY_CIDRS: z.string().default(''),
-  /** Comma-separated extra CORS origins; WEB_ORIGIN is always allowed. */
-  CORS_ALLOWED_ORIGINS: z.string().default(''),
+  /** Comma-separated extra CORS origins (`https://host[:port]`); WEB_ORIGIN is always allowed. */
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .default('')
+    .refine(
+      (value) =>
+        value
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .every(isHttpOrigin),
+      'must be a comma-separated list of http(s) origins, e.g. https://app.example.com',
+    ),
   HTTP_BODY_LIMIT: z
     .string()
     .regex(/^\d+(kb|mb)$/i, 'e.g. 1mb')

@@ -61,6 +61,7 @@ describe('mock checkout page', () => {
   it.each([
     ['COMPLETED', 'This payment has been completed.'],
     ['FAILED', 'This payment was declined.'],
+    ['CANCELED', 'This checkout was replaced by a newer one and can no longer be paid.'],
   ])('shows a %s session as settled, with a way back', async (status, text) => {
     apiPublic.mockResolvedValue(session(status));
     render(await open());

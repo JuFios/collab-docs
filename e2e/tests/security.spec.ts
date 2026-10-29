@@ -193,11 +193,16 @@ signedInTest.describe('client address behind Server Actions', () => {
           reset: Number(headers['x-ratelimit-reset']),
         };
       };
-      // start early in a window: a bucket that starts over between the two readings would look like it never moved
+      // start early in a window: a bucket that starts over between the two readings would look like it never moved.
+      // Wait for the next window rather than polling, which would spend the bucket it measures
       let before = await attempt();
-      await signedInExpect
-        .poll(async () => (before = await attempt()).reset, { timeout: 70_000, intervals: [1000] })
-        .toBeGreaterThanOrEqual(40);
+      if (before.reset < 40) {
+        const nextWindow = Date.now() + (before.reset + 1) * 1000;
+        await signedInExpect
+          .poll(() => Date.now(), { timeout: 70_000, intervals: [1000] })
+          .toBeGreaterThanOrEqual(nextWindow);
+        before = await attempt();
+      }
       const stranger = newUser('stranger');
       for (let i = 0; i < 3; i += 1) {
         await loginThroughUi(page, stranger);

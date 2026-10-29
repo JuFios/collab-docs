@@ -78,7 +78,8 @@ export class BillingService {
 
   /**
    * Starts a checkout and cancels the ones still open for the workspace, so that two tabs or a repeated click cannot
-   * end in two payments: the provider refuses to settle a canceled session, and the webhook cannot complete it either.
+   * end in two payments: the provider refuses to settle a canceled session. A session paid before it was canceled
+   * still reaches the webhook, which records the payment without applying it (`BillingEventsService`).
    */
   async checkout(workspaceId: string, plan: CheckoutPlan): Promise<CheckoutStarted> {
     const session = await this.prisma.$transaction(async (tx) => {

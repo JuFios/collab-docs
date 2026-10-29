@@ -347,6 +347,49 @@ describe('DocRoom', () => {
       expect(client.lastEvent('rejected')).toBeUndefined();
       expect(room.doc.getXmlFragment('content').toString()).toContain('kept');
     });
+
+    it('measures a document again after deletions, even when it was measured close to its limit', () => {
+      const { room } = setup({ maxDocumentBytes: 2000 });
+      const writer = new TestClient(room);
+      const other = new TestClient(room);
+      writer.join();
+      other.join();
+      writer.settle();
+      other.settle();
+      writer.text().insert(0, 'x'.repeat(1900));
+      writer.settle();
+      other.settle();
+      // refused, and the room now knows the document is nearly full
+      other.text().insert(0, 'y'.repeat(200));
+      other.settle();
+      expect(other.lastEvent('rejected')).toEqual({
+        type: 'rejected',
+        reason: 'document_too_large',
+      });
+
+      writer.text().delete(0, 1800);
+      writer.settle();
+      writer.text().insert(0, 'z'.repeat(300));
+      writer.settle();
+
+      expect(writer.lastEvent('rejected')).toBeUndefined();
+      expect(room.doc.getXmlFragment('content').toString()).toContain('z'.repeat(300));
+    });
+
+    it('does not mark a connection refused for a malformed message that is not an update', () => {
+      const { room, observer } = setup();
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+      // sync message with an unknown sub-type
+      room.receive(client, new Uint8Array([0, 9]));
+      client.text().insert(0, 'still saved');
+      client.settle();
+
+      expect(observer.rejected).toEqual(['invalid']);
+      expect(client.lastEvent('rejected')).toBeUndefined();
+      expect(room.doc.getXmlFragment('content').toString()).toContain('still saved');
+    });
   });
 
   describe('persistence hand-over', () => {
@@ -669,6 +712,10 @@ describe('DocRoom', () => {
       now += 11_000;
       client.sendRaw(Uint8Array.of(COLLAB_MESSAGE.queryAwareness));
       expect(client.closed).toHaveLength(1);
+      // the socket is closing: what it still delivers in a later window changes nothing
+      client.text().insert(0, 'after the close');
+      client.settle();
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('after');
     });
 
     it('refuses connections beyond the limit', () => {

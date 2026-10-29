@@ -11,7 +11,7 @@ import { Providers } from '@/components/providers';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api/client';
-import { rejectionMessage } from '@/lib/collab/errors';
+import { REJECTION_TOAST_ID, rejectionMessage } from '@/lib/collab/errors';
 import { deriveSaveStatus } from '@/lib/collab/save-status';
 import { useCollabConnection } from '@/lib/collab/use-collab-connection';
 import { useOnlineStatus } from '@/lib/collab/use-online-status';
@@ -59,7 +59,7 @@ function GuestSession({
   );
   const connection = useCollabConnection(documentId, {
     fetchTicket,
-    onRejected: ({ reason }) => toast.warning(rejectionMessage(reason)),
+    onRejected: ({ reason }) => toast.warning(rejectionMessage(reason), { id: REJECTION_TOAST_ID }),
   });
   const presence = usePresence(connection.provider);
   const status = deriveSaveStatus({

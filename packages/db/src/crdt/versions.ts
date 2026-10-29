@@ -68,9 +68,10 @@ export class DocumentVersions {
       return this.prisma.documentVersion.create({ data, select: INFO });
     }
     const { maxManual } = params;
-    // the count and the insert run under the document row lock, so parallel requests cannot pass the cap together
+    // the count and the insert run under the document row lock, so parallel requests cannot pass the cap together;
+    // NO KEY UPDATE serialises them without blocking rows that only reference the document (its updates, comments)
     return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT 1 FROM documents WHERE id = ${params.documentId}::uuid FOR UPDATE`;
+      await tx.$executeRaw`SELECT 1 FROM documents WHERE id = ${params.documentId}::uuid FOR NO KEY UPDATE`;
       const manual = await tx.documentVersion.count({
         where: { documentId: params.documentId, kind: 'MANUAL' },
       });

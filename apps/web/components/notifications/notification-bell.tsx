@@ -2,7 +2,7 @@
 
 import { Bell, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -31,6 +31,13 @@ export function NotificationBell({ initialCount }: { initialCount?: number }) {
   const markRead = useMarkRead();
   const count = unread.data?.count ?? 0;
   const items = list.data?.pages.flatMap((page) => page.items).slice(0, MENU_SIZE) ?? [];
+  const errorId = useId();
+  const retryRef = useRef<HTMLDivElement>(null);
+  // the open menu hides everything around it from assistive technology, so no live region outside it is heard:
+  // focusing the retry, which the error describes, is what announces the failure
+  useEffect(() => {
+    if (open && list.isError) retryRef.current?.focus();
+  }, [open, list.isError]);
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -80,10 +87,12 @@ export function NotificationBell({ initialCount }: { initialCount?: number }) {
         ) : null}
         {list.isError ? (
           <>
-            <DropdownMenuLabel className="font-normal text-destructive">
+            <DropdownMenuLabel id={errorId} className="font-normal text-destructive">
               Could not load notifications.
             </DropdownMenuLabel>
             <DropdownMenuItem
+              ref={retryRef}
+              aria-describedby={errorId}
               onSelect={(event) => {
                 // keeps the menu open, so the list replaces the error in place
                 event.preventDefault();
@@ -95,9 +104,9 @@ export function NotificationBell({ initialCount }: { initialCount?: number }) {
           </>
         ) : null}
         {list.data && items.length === 0 ? (
-          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+          <DropdownMenuLabel className="py-6 text-center font-normal text-muted-foreground">
             You&apos;re all caught up.
-          </p>
+          </DropdownMenuLabel>
         ) : null}
         {items.map((notification) => (
           <DropdownMenuItem

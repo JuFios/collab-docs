@@ -19,6 +19,12 @@ interface HeaderEntry {
   value: string;
 }
 
+/** Origins the policies name when the build sets none (they match docker compose). */
+export const CSP_DEFAULT_ORIGINS = {
+  s3PublicEndpoint: 'http://localhost:9000',
+  collabPublicUrl: 'ws://localhost:4001',
+} as const;
+
 const originOf = (url: string): string => new URL(url).origin;
 
 /**

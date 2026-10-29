@@ -21,8 +21,13 @@ interface PlanChange {
   checkoutSessionId?: string;
 }
 
-/** A payment that was collected but arrived after a newer event: it is recorded, the plan stays as it is. */
+/**
+ * A payment that was collected but must not change the plan: it arrived after a newer event (`stale`), or its session
+ * had been replaced by a newer checkout before the event was applied (`session_canceled`). It is recorded; the plan
+ * stays as it is.
+ */
 interface UnappliedPayment {
+  reason: 'stale' | 'session_canceled';
   workspaceId: string;
   checkoutSessionId: string;
   plan: PlanTier;
@@ -79,11 +84,7 @@ export class BillingEventsService {
         break;
       case 'payment_not_applied':
         // a real provider would refund it; here the invoice and this event are what an operator acts on
-        logEvent(this.logger, 'billing.payment_not_applied', {
-          eventId,
-          reason: 'stale',
-          ...outcome.payment,
-        });
+        logEvent(this.logger, 'billing.payment_not_applied', { eventId, ...outcome.payment });
         break;
       case 'ignored':
         logEvent(this.logger, 'webhook.ignored', { eventId, type, reason: outcome.reason });
@@ -123,12 +124,22 @@ export class BillingEventsService {
     if (!session) return { result: 'ignored', reason: 'unknown_session' };
 
     await this.planLimits.lockWorkspace(tx, session.workspaceId);
+    // read again under the lock: a new checkout may have canceled the session since (it takes the same lock)
+    const current = await tx.checkoutSession.findUnique({
+      where: { id: session.id },
+      select: { status: true },
+    });
+    const status = current?.status;
+    if (status !== 'PENDING' && status !== 'CANCELED') {
+      return { result: 'ignored', reason: 'session_already_settled' };
+    }
     const eventAt = new Date(event.created);
     const stale = await this.subscriptions.isStale(tx, session.workspaceId, eventAt);
 
-    // the money was collected either way: the session is settled and invoiced exactly once
+    // the money was collected either way, even for a session a newer checkout replaced while this event was on its
+    // way: the session is settled and invoiced exactly once
     const settled = await tx.checkoutSession.updateMany({
-      where: { id: session.id, status: 'PENDING' },
+      where: { id: session.id, status },
       data: { status: 'COMPLETED', settledAt: new Date() },
     });
     if (settled.count !== 1) return { result: 'ignored', reason: 'session_already_settled' };
@@ -142,11 +153,13 @@ export class BillingEventsService {
       },
     });
 
-    // a newer event (a cancellation, another payment) already decided the plan; this one must not undo it
-    if (stale) {
+    // a newer event (a cancellation, another payment) already decided the plan, or the customer started another
+    // checkout after this one: the payment must not change the plan
+    if (stale || status === 'CANCELED') {
       return {
         result: 'payment_not_applied',
         payment: {
+          reason: stale ? 'stale' : 'session_canceled',
           workspaceId: session.workspaceId,
           checkoutSessionId: session.id,
           plan: session.plan,

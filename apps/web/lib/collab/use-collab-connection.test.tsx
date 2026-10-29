@@ -26,7 +26,12 @@ class FakeProvider {
     readonly url: string,
     readonly room: string,
     readonly doc: Y.Doc,
-    readonly options: { params: Record<string, string>; connect: boolean; disableBc: boolean },
+    readonly options: {
+      params: Record<string, string>;
+      connect: boolean;
+      disableBc: boolean;
+      shouldReconnect: (event: { code: number }) => boolean;
+    },
   ) {
     this.params = { ...options.params };
     FakeProvider.instances.push(this);
@@ -279,6 +284,40 @@ describe('useCollabConnection', () => {
     await waitFor(() => expect(result.current.provider).toBe(current()));
     expect(result.current.ydoc).not.toBe(firstDoc);
     expect(result.current.error).toBeNull();
+  });
+
+  it('drops a change too large for the socket instead of resending it on every reconnect', async () => {
+    const onRejected = vi.fn();
+    const { result } = await connected({ onRejected });
+    const first = current();
+    const firstDoc = result.current.ydoc;
+    // y-websocket emits `closed` only for a close it does not reconnect after on its own
+    expect(first.options.shouldReconnect({ code: COLLAB_CLOSE.messageTooBig })).toBe(false);
+    act(() => {
+      first.emit('closed', { code: COLLAB_CLOSE.messageTooBig, reason: '' });
+      // what the closing provider still reports changes nothing
+      first.emit('closed', { code: COLLAB_CLOSE.messageTooBig, reason: '' });
+    });
+
+    expect(first.disconnect).toHaveBeenCalled();
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    expect(onRejected).toHaveBeenCalledWith({ reason: 'too_large' });
+    await waitFor(() => expect(FakeProvider.instances).toHaveLength(2));
+    await waitFor(() => expect(result.current.provider).toBe(current()));
+    expect(result.current.ydoc).not.toBe(firstDoc);
+    expect(current().params.ticket).toBe('t1');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('opens the replacing session with the still fresh ticket instead of asking for another', async () => {
+    await connected();
+    const first = current();
+    expect(first.params.ticket).toBe('t1');
+    act(() => first.roomEvent({ type: 'rejected', reason: 'document_too_large' }));
+
+    await waitFor(() => expect(FakeProvider.instances).toHaveLength(2));
+    expect(current().params.ticket).toBe('t1');
+    expect(request).toHaveBeenCalledTimes(1);
   });
 
   it('does not recreate the document for a viewer that was always read-only', async () => {

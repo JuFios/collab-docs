@@ -23,7 +23,7 @@ export class CsrfGuard implements CanActivate {
       corsOrigins({
         WEB_ORIGIN: config.get('WEB_ORIGIN', { infer: true }),
         CORS_ALLOWED_ORIGINS: config.get('CORS_ALLOWED_ORIGINS', { infer: true }),
-      }).map((origin) => new URL(origin).origin),
+      }),
     );
   }
 

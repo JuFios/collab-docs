@@ -131,7 +131,8 @@ if its node and mark names, or any node attribute, differ from the model. Undo a
 | Any other close           | Left to `y-websocket`'s own reconnect loop; a ticket that expired meanwhile ends in 4401 above                                                                                                                        |
 | Ticket request fails      | 403 / 404 stop with the same screens; 429, 5xx and network errors back off, other errors stop with "Could not connect"                                                                                                |
 | `access` event, downgrade | A client that could edit and now cannot discards its `Y.Doc` and starts a new session from the server state (a warning toast says whether unsaved edits were dropped); an upgrade rebuilds the editor as editable     |
-| `rejected` event          | The server refused a local change: the client discards its `Y.Doc` and starts a new session from the server state, and a warning toast says the change was undone                                                     |
+| `rejected` event          | The server refused a local change: the client discards its `Y.Doc` and starts a new session from the server state (with the same ticket while it is under 30 s old), and one warning toast says the change was undone |
+| Close 1009                | The change was too large for the socket: handled like `rejected` with `too_large` (the provider alone would resend it on every reconnect)                                                                             |
 | `persisted` event         | Recomputes `hasUnsyncedChanges` (below)                                                                                                                                                                               |
 
 The hook returns `{ ydoc, provider, status, synced, hasUnsyncedChanges, accessLevel, error, retry }`.
