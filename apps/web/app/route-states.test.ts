@@ -19,7 +19,7 @@ const WITHOUT_LOADING: Record<string, string> = {
 const CACHED = new Set(['(public)/published/[slug]/page.tsx']);
 
 /**
- * Pages whose forms post to Server Actions and must work without JavaScript. A `loading.tsx` (or any Suspense
+ * Pages whose forms post to Server Actions (or that act on the server when opened) and must work without JavaScript. A `loading.tsx` (or any Suspense
  * boundary) makes Next stream the page: the content arrives in a hidden element that a script reveals, so without
  * JavaScript only the skeleton shows. These pages render in one piece instead; with JavaScript, the link that leads
  * to them shows the wait (`useLinkStatus`).
@@ -30,6 +30,8 @@ const FORM_PAGES: Record<string, string> = {
   '(app)/workspaces/[workspaceId]/billing/page.tsx': 'checkout, cancel',
   '(public)/(interactive)/invite/[token]/page.tsx': 'accept an invitation',
   '(public)/(interactive)/mock-checkout/[sessionId]/page.tsx': 'pay or decline',
+  '(public)/(interactive)/verify-email/[token]/page.tsx':
+    'confirms on the server, the result must show',
 };
 
 function pagesUnder(dir: string): string[] {
