@@ -4,6 +4,7 @@ import {
   REFRESH_GRACE_MS,
   RefreshTokenService,
   clientFingerprint,
+  networkOf,
   hashToken,
 } from './refresh-token.service';
 
@@ -138,6 +139,20 @@ describe('RefreshTokenService', () => {
     expect(BROWSER).toMatch(/^[0-9a-f]{64}$/);
     expect(BROWSER).not.toBe(THIEF);
     expect(clientFingerprint({ userAgent: 'Firefox/140', ip: '203.0.113.7' })).toBe(BROWSER);
+  });
+
+  it('treats addresses of one network as one client, and other networks as another', () => {
+    const at = (ip: string) => clientFingerprint({ userAgent: 'Firefox/140', ip });
+    expect(at('203.0.113.7')).toBe(at('203.0.113.200'));
+    expect(at('::ffff:203.0.113.7')).toBe(at('203.0.113.7'));
+    expect(at('203.0.113.7')).not.toBe(at('203.0.114.7'));
+    expect(at('2001:db8:1:2:aaaa::1')).toBe(at('2001:db8:1:2:bbbb:cccc:dddd:eeee'));
+    expect(at('2001:db8:1:2::')).toBe(at('2001:db8:1:2:0:0:0:9'));
+    expect(at('2001:db8:1:3::1')).not.toBe(at('2001:db8:1:2::1'));
+    expect(at('2001:DB8:1:2::1')).toBe(at('2001:db8:1:2::1'));
+    expect(at('::1')).toBe(at('::2'));
+    expect(networkOf(undefined)).toBe('');
+    expect(networkOf('not-an-address')).toBe('not-an-address');
   });
 
   it('revokes the whole family on a replay after the grace window', async () => {

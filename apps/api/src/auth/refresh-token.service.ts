@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { isIPv4, isIPv6 } from 'node:net';
 import { Injectable } from '@nestjs/common';
 import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
@@ -22,12 +23,38 @@ export function hashToken(token: string): string {
 }
 
 /**
- * Who presented a token, for the grace window: the SHA-256 of the User-Agent and the client address (the one the
- * api resolves after its trusted proxies). Both can be forged by a thief who knows them, which is why the window is
- * also short; nothing about the client is stored in the clear.
+ * The part of an address that stays put while one device is online: the /24 of an IPv4 address and the /64 of an IPv6
+ * one (the rest is the host part, which privacy extensions rotate and carrier pools reassign between requests).
+ * An address that is neither is kept as it is; an IPv4 address in its IPv6 form (`::ffff:a.b.c.d`) counts as IPv4.
+ * The two families are never merged: a browser that reaches the api over both stays two clients.
+ */
+export function networkOf(ip: string | undefined): string {
+  if (!ip) return '';
+  const address = ip.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  if (isIPv4(address)) return `${address.split('.').slice(0, 3).join('.')}.0/24`;
+  if (isIPv6(address)) {
+    const [head = '', tail] = address.split('::');
+    const written = head === '' ? [] : head.split(':');
+    const after = tail === undefined || tail === '' ? [] : tail.split(':');
+    const groups =
+      tail === undefined
+        ? written
+        : [...written, ...Array<string>(8 - written.length - after.length).fill('0'), ...after];
+    return `${groups
+      .slice(0, 4)
+      .map((group) => Number.parseInt(group, 16).toString(16))
+      .join(':')}::/64`;
+  }
+  return address;
+}
+
+/**
+ * Who presented a token, for the grace window: the SHA-256 of the User-Agent and the network of the client address
+ * (the address the api resolves after its trusted proxies). Both can be forged by a thief who knows them, which is
+ * why the window is also short; nothing about the client is stored in the clear.
  */
 export function clientFingerprint(client: { userAgent?: string; ip?: string }): string {
-  return hashToken(`${client.userAgent ?? ''}\n${client.ip ?? ''}`);
+  return hashToken(`${client.userAgent ?? ''}\n${networkOf(client.ip)}`);
 }
 
 /** Opaque 256-bit token; only its SHA-256 is stored. */
