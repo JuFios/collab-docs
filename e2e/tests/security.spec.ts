@@ -180,14 +180,24 @@ signedInTest.describe('client address behind Server Actions', () => {
     async ({ page, request }) => {
       // The api limits logins per client address. If the Server Action did not pass the visitor's address on, its
       // attempts would be counted against the web container instead and this bucket would not move.
+      signedInTest.setTimeout(120_000);
       const attempt = async () => {
         const response = await request.post('/api/auth/login', {
           data: { email: `nobody-${Date.now()}@example.test`, password: 'irrelevant-password' },
         });
         signedInExpect(response.status()).toBe(401);
-        return Number(response.headers()['x-ratelimit-remaining']);
+        const headers = response.headers();
+        return {
+          remaining: Number(headers['x-ratelimit-remaining']),
+          // seconds until the one-minute bucket starts over
+          reset: Number(headers['x-ratelimit-reset']),
+        };
       };
-      const before = await attempt();
+      // start early in a window: a bucket that starts over between the two readings would look like it never moved
+      let before = await attempt();
+      await signedInExpect
+        .poll(async () => (before = await attempt()).reset, { timeout: 70_000, intervals: [1000] })
+        .toBeGreaterThanOrEqual(40);
       const stranger = newUser('stranger');
       for (let i = 0; i < 3; i += 1) {
         await loginThroughUi(page, stranger);
@@ -197,8 +207,9 @@ signedInTest.describe('client address behind Server Actions', () => {
           .waitFor();
       }
       const after = await attempt();
+      signedInExpect(after.reset).toBeLessThanOrEqual(before.reset);
       // three form submissions and one more direct call; other tests add to it, none takes away from it
-      signedInExpect(after).toBeLessThanOrEqual(before - 4);
+      signedInExpect(after.remaining).toBeLessThanOrEqual(before.remaining - 4);
     },
   );
 });
