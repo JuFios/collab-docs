@@ -545,8 +545,13 @@ describe('collab gateway', () => {
 
     it('closes the socket of a removed member who held a share, once the share goes with the membership', async () => {
       const { editor, workspace, documentId } = await setup();
-      await prisma.document.update({ where: { id: documentId }, data: { visibility: 'RESTRICTED' } });
-      await prisma.documentShare.create({ data: { documentId, userId: editor.id, role: 'EDITOR' } });
+      await prisma.document.update({
+        where: { id: documentId },
+        data: { visibility: 'RESTRICTED' },
+      });
+      await prisma.documentShare.create({
+        data: { documentId, userId: editor.id, role: 'EDITOR' },
+      });
       const client = await connect(editor, documentId);
       await waitFor(() => client.synced, 'sync');
       // what the api's removal does in one transaction
@@ -753,6 +758,13 @@ describe('collab gateway', () => {
         async () => (await count(documentId, 'AUTO')) === 1,
         'the first automatic version',
       );
+      // it keeps the document as it was before the change, so restoring it undoes the editing session
+      const first = await prisma.documentVersion.findFirstOrThrow({
+        where: { documentId, kind: 'AUTO' },
+      });
+      const before = new Y.Doc();
+      Y.applyUpdate(before, new Uint8Array(first.state));
+      expect(before.getXmlFragment('content').toString()).not.toContain('<paragraph>a');
       client.paragraph().insert(1, 'b');
       await settle(300);
       expect(await count(documentId, 'AUTO')).toBe(1);

@@ -33,6 +33,8 @@ interface CreateVersionParams {
   kind: DocumentVersionKind;
   label?: string | null;
   createdBy?: string | null;
+  /** The content to keep, as one Yjs update; by default the stored content. */
+  state?: Uint8Array;
 }
 
 export class DocumentVersions {
@@ -42,14 +44,15 @@ export class DocumentVersions {
   ) {}
 
   /**
-   * Snapshots the stored content of a document (what is in the database, not what a room still buffers). With
-   * `maxManual`, a manual snapshot is refused (`null`) when the document already has that many.
+   * Snapshots the stored content of a document (what is in the database, not what a room still buffers), or the
+   * `state` given (collab hands over the content just before a change). With `maxManual`, a manual snapshot is
+   * refused (`null`) when the document already has that many.
    */
   create(params: CreateVersionParams & { maxManual: number }): Promise<VersionInfo | null>;
   create(params: CreateVersionParams): Promise<VersionInfo>;
   async create(params: CreateVersionParams & { maxManual?: number }): Promise<VersionInfo | null> {
     const [stored, document] = await Promise.all([
-      this.reader.read(params.documentId),
+      params.state ? { update: params.state } : this.reader.read(params.documentId),
       this.prisma.document.findUniqueOrThrow({
         where: { id: params.documentId },
         select: { title: true },

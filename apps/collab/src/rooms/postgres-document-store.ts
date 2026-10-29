@@ -23,10 +23,12 @@ export interface PersistenceObserver {
   badLogRows(count: number): void;
 }
 
-/** Things that happen after a successful write; both are fire-and-forget and must never fail a flush. */
+/** Things that happen around writes; all are fire-and-forget and must never fail a flush. */
 export interface PersistenceHooks {
   /** Called after the commit that stored new content, with the new `documents.revision`. */
   contentPersisted(documentId: string, revision: number): void;
+  /** A change is about to be applied to a document whose state before it is `stateBefore` (automatic versions). */
+  changeStarting(documentId: string, stateBefore: Uint8Array): void;
   /** The document's in-memory bookkeeping is dropped. */
   released(documentId: string): void;
   /** Resolves when the work started by `contentPersisted` is done; called at shutdown, before connections close. */
@@ -146,6 +148,10 @@ export class PostgresDocumentStore implements DocumentStore {
       set.delete(listener);
       if (set.size === 0) this.listeners.delete(documentId);
     };
+  }
+
+  changeStarting(documentId: string, stateBefore: Uint8Array): void {
+    this.hooks.changeStarting(documentId, stateBefore);
   }
 
   flush(documentId: string): Promise<void> {

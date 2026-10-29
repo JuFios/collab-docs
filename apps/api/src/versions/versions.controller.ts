@@ -34,7 +34,7 @@ export class VersionsController {
   @ApiOperation({
     summary: 'Version history, newest first',
     description:
-      'Automatic snapshots (every 10 minutes while the document changes, 50 kept), manual ones and the ' +
+      'Automatic snapshots (the content before the first change after a pause, at most every 10 minutes, 50 kept), manual ones and the ' +
       'snapshots taken before a restore.',
   })
   @ApiOkResponse({ type: [VersionResponse] })

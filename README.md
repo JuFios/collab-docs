@@ -180,7 +180,8 @@ flowchart LR
 - **"Saved" means durable.** After each flush the server acknowledges what is stored (`persisted {sv, saved}`); the
   editor says "Saving…" until then, and **publishing waits for it**, which closes the "publish with unsaved local changes"
   edge case. The loss window after a hard kill is at most the 5 s buffer, and the author's open tab still holds it.
-- **Versions.** Automatic snapshots every 10 min when changed, manual ones on demand, and one before every restore. A
+- **Versions.** Automatic snapshots of the state before the first change after a pause (at most every 10 min), manual
+  ones on demand, and one before every restore. A
   restore is a server-made Yjs transaction applied to the live room, so connected clients converge and the restore can
   itself be undone.
 - **Delete while editing.** The gateway writes its buffer, tells the clients (`deleted`) and closes the sockets with

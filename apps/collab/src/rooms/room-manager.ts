@@ -48,6 +48,7 @@ export class RoomManager implements BeforeApplicationShutdown {
       maxDocumentBytes: config.get('COLLAB_MAX_DOCUMENT_BYTES', { infer: true }),
       maxConnections: config.get('COLLAB_MAX_CONNECTIONS_PER_DOCUMENT', { infer: true }),
       maxAwarenessBytes: config.get('COLLAB_MAX_AWARENESS_BYTES', { infer: true }),
+      snapshotIntervalMs: config.get('AUTO_VERSION_INTERVAL_MS', { infer: true }),
     };
     this.idleMs = config.get('COLLAB_ROOM_IDLE_MS', { infer: true });
     metrics.bind(this);

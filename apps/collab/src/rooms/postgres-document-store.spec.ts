@@ -90,6 +90,7 @@ function setup(overrides: Partial<ConstructorParameters<typeof PostgresDocumentS
   } satisfies PersistenceObserver;
   const hooks = {
     contentPersisted: jest.fn(),
+    changeStarting: jest.fn(),
     released: jest.fn(),
     drain: jest.fn(() => Promise.resolve()),
   } satisfies PersistenceHooks;
