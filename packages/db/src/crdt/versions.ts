@@ -28,19 +28,26 @@ const INFO = {
   createdAt: true,
 } as const;
 
+interface CreateVersionParams {
+  documentId: string;
+  kind: DocumentVersionKind;
+  label?: string | null;
+  createdBy?: string | null;
+}
+
 export class DocumentVersions {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly reader: DocumentStateReader,
   ) {}
 
-  /** Snapshots the stored content of a document (what is in the database, not what a room still buffers). */
-  async create(params: {
-    documentId: string;
-    kind: DocumentVersionKind;
-    label?: string | null;
-    createdBy?: string | null;
-  }): Promise<VersionInfo> {
+  /**
+   * Snapshots the stored content of a document (what is in the database, not what a room still buffers). With
+   * `maxManual`, a manual snapshot is refused (`null`) when the document already has that many.
+   */
+  create(params: CreateVersionParams & { maxManual: number }): Promise<VersionInfo | null>;
+  create(params: CreateVersionParams): Promise<VersionInfo>;
+  async create(params: CreateVersionParams & { maxManual?: number }): Promise<VersionInfo | null> {
     const [stored, document] = await Promise.all([
       this.reader.read(params.documentId),
       this.prisma.document.findUniqueOrThrow({
@@ -49,16 +56,26 @@ export class DocumentVersions {
       }),
     ]);
     const state = stored.update ?? Y.encodeStateAsUpdate(new Y.Doc());
-    return this.prisma.documentVersion.create({
-      data: {
-        documentId: params.documentId,
-        state: Buffer.from(state),
-        kind: params.kind,
-        label: params.label ?? null,
-        title: document.title,
-        createdBy: params.createdBy ?? null,
-      },
-      select: INFO,
+    const data = {
+      documentId: params.documentId,
+      state: Buffer.from(state),
+      kind: params.kind,
+      label: params.label ?? null,
+      title: document.title,
+      createdBy: params.createdBy ?? null,
+    };
+    if (params.kind !== 'MANUAL' || params.maxManual === undefined) {
+      return this.prisma.documentVersion.create({ data, select: INFO });
+    }
+    const { maxManual } = params;
+    // the count and the insert run under the document row lock, so parallel requests cannot pass the cap together
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM documents WHERE id = ${params.documentId}::uuid FOR UPDATE`;
+      const manual = await tx.documentVersion.count({
+        where: { documentId: params.documentId, kind: 'MANUAL' },
+      });
+      if (manual >= maxManual) return null;
+      return tx.documentVersion.create({ data, select: INFO });
     });
   }
 

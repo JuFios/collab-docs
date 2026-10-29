@@ -80,19 +80,19 @@ export class VersionsService {
 
   /** A named snapshot of the stored content, taken after asking collab to write its buffer. */
   async createManual(documentId: string, userId: string, label?: string): Promise<CreatedVersion> {
-    if ((await this.versions.countManual(documentId)) >= MAX_VERSIONS) {
-      throw new AppException(
-        'CONFLICT',
-        `A document can have at most ${MAX_VERSIONS} saved versions`,
-      );
-    }
+    const tooMany = () =>
+      new AppException('CONFLICT', `A document can have at most ${MAX_VERSIONS} saved versions`);
+    // a quick answer before asking collab to flush; the cap itself is enforced when the row is written
+    if ((await this.versions.countManual(documentId)) >= MAX_VERSIONS) throw tooMany();
     const flushed = await this.collab.flush(documentId);
     const info = await this.versions.create({
       documentId,
       kind: 'MANUAL',
       label: label || null,
       createdBy: userId,
+      maxManual: MAX_VERSIONS,
     });
+    if (!info) throw tooMany();
     const row = await this.prisma.documentVersion.findUniqueOrThrow({
       where: { id: info.id },
       select: SELECT,
