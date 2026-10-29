@@ -83,6 +83,8 @@ interface ConnectionState {
   readOnly: boolean;
   /** An update of this connection was refused; its later ones depend on it and are ignored until it reconnects. */
   rejected: boolean;
+  /** Closed by the server (`closeAll`, `kick`); a socket that is still closing may deliver messages, which change nothing. */
+  closing: boolean;
   /** Awareness client ids this connection owns; it may only change those. */
   readonly awarenessIds: Set<number>;
   windowStart: number;
@@ -181,6 +183,7 @@ export class DocRoom {
       access,
       readOnly: !accessAtLeast(access, 'EDIT'),
       rejected: false,
+      closing: false,
       awarenessIds: new Set(),
       windowStart: this.clock(),
       messages: 0,
@@ -237,6 +240,7 @@ export class DocRoom {
   /** Sends `event` (if any) to every connection and closes them with `code`. */
   closeAll(code: number, reason: string, event?: CollabRoomEvent): void {
     for (const state of [...this.connections.values()]) {
+      state.closing = true;
       if (event) this.sendEvent(state, event);
       state.conn.close(code, reason);
     }
@@ -265,6 +269,7 @@ export class DocRoom {
   kick(conn: RoomConnection, code: number, reason: string, event?: CollabRoomEvent): void {
     const state = this.connections.get(conn.id);
     if (!state) return;
+    state.closing = true;
     if (event) this.sendEvent(state, event);
     conn.close(code, reason);
   }
@@ -272,7 +277,7 @@ export class DocRoom {
   /** Processes one binary message from `conn`. Never throws: a hostile client must not take the room down. */
   receive(conn: RoomConnection, data: Uint8Array): void {
     const state = this.connections.get(conn.id);
-    if (!state || !this.allowMessage(state)) return;
+    if (!state || state.closing || !this.allowMessage(state)) return;
     try {
       const decoder = decoding.createDecoder(data);
       switch (decoding.readVarUint(decoder)) {

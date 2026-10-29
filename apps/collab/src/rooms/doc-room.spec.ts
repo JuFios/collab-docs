@@ -625,6 +625,27 @@ describe('DocRoom', () => {
       expect(a.lastEvent('deleted')).toEqual({ type: 'deleted' });
     });
 
+    it('ignores what a socket it closed still delivers while closing', () => {
+      const { room, store } = setup();
+      const a = new TestClient(room);
+      const b = new TestClient(room);
+      a.join();
+      b.join();
+      a.settle();
+      b.settle();
+      const enqueue = jest.spyOn(store, 'enqueue');
+
+      room.kick(a, COLLAB_CLOSE.forbidden, 'access revoked');
+      a.text().insert(0, 'after the kick');
+      a.settle();
+      room.closeAll(COLLAB_CLOSE.deleted, 'deleted', { type: 'deleted' });
+      b.text().insert(0, 'after the close');
+      b.settle();
+
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('after');
+      expect(enqueue).not.toHaveBeenCalled();
+    });
+
     it('closes a connection that floods the room, once per window', () => {
       let now = 1_000;
       const store = new InMemoryDocumentStore();
