@@ -8,7 +8,8 @@ side builds on it.
 
 1. `POST /api/documents/:id/collab-ticket` (cookie session, at least `VIEW`) returns
    `{ ticket, wsUrl }`. The ticket is a JWT (HS256, `aud=collab`, 60 s) with the document id and the user id. It
-   only says who is asking: the collab service reads the permissions from the database when the socket opens, so
+   is not single-use: within its 60 s it can open more sockets for the same document and identity, which grants
+   nothing the holder could not get with a new ticket. It only says who is asking: the collab service reads the permissions from the database when the socket opens, so
    a viewer receives a read-only connection from the same kind of ticket as an editor. `wsUrl` comes from the
    runtime variable `COLLAB_PUBLIC_URL` (`ws://host:4001/ws`). A guest with an edit link gets the same kind of
    ticket from `POST /api/public/links/:token/ticket`, carrying `{docId, linkId}` instead of a user id; the api
@@ -119,8 +120,9 @@ collab service subscribes and re-reads the permissions of the affected sockets f
 turns a socket read-only (and sends `access`), a grant makes it editable again, lost access closes it with 4403,
 a deleted document is flushed, announced with `deleted` and closed with 4410. Every socket is also re-evaluated
 every `COLLAB_ACCESS_RECHECK_MS` (60 s), which covers a lost Redis message. Revoking or replacing an EDIT link
-publishes `perm.changed` (reason `link_changed`) for the document, and the job that runs when a link expires
-does the same, so guests are cut off at once; the 60 s check remains the fallback.
+publishes `perm.changed` (reason `link_changed`) for the document, and so do changing the expiry of an EDIT link
+(its guests re-arm their expiry timer) and the job that runs when a link expires, so guests are cut off at once;
+the 60 s check remains the fallback.
 
 ## Rooms
 

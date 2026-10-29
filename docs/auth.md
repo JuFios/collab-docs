@@ -54,9 +54,16 @@ copied: the whole family is revoked, the request gets `401`, and `auth.refresh_r
 Logout revokes the family too.
 
 **CSRF.** `SameSite=Lax` plus a global guard: a state-changing request authenticated by cookies (`cd_at` or
-`cd_rt`, so refresh and logout included) must carry `Origin` equal to `WEB_ORIGIN`, otherwise `403
-CSRF_REJECTED`. Bearer requests are exempt (browsers do not attach that header on their own), as are
-requests without auth cookies such as login and webhooks.
+`cd_rt`, so refresh and logout included) must carry an `Origin` that CORS admits with credentials (`WEB_ORIGIN`
+and `CORS_ALLOWED_ORIGINS`, one list for both), otherwise `403 CSRF_REJECTED`. Bearer requests are exempt
+(browsers do not attach that header on their own), as are requests without auth cookies such as login and
+webhooks.
+
+`GET /api/auth/refresh` rotates the session although it is a `GET`, deliberately: the edge middleware sends an
+expired navigation there, including one that started on another site (a link in an email), so it cannot demand a
+same-origin request. Another site can therefore make a browser rotate its own session with a top-level navigation,
+and gains nothing by it: the new cookies go to that browser, the response is a redirect to a relative path, and a
+second rotation within 30 s falls into the grace window instead of the reuse detection.
 
 **Rate limits.** Login: 5/min per (client IP, email) and 20/min per IP; register: 10/h per IP (`RATE_*` in
 `.env.example`). Exceeding them returns `429 RATE_LIMITED` with `Retry-After`. The client IP is `req.ip`,
