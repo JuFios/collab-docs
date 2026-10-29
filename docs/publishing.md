@@ -23,7 +23,8 @@ document's author, like sharing. Everything below is API; the pages that use it 
 | `POST /public/links/:token/ticket`           | collab ticket for a guest (`{docId, linkId}`, no user); **30 per minute per IP** (`RATE_GUEST_TICKET_PER_MIN_IP`)                                                           |
 
 **Life cycle of a link.** The `VIEW` slug is created once and never changes: unpublishing sets `revoked_at`,
-publishing again clears it, so the address (and whatever links to it) comes back. Renaming the document does not
+publishing again clears it, so the address (and whatever links to it) comes back. The slug is a public address, not a
+secret: an unpublished page is protected by `revoked_at`, never by the slug being hard to guess. Renaming the document does not
 move the page. The `EDIT` link is the opposite: enabling it always creates a **new row with a new secret** and drops
 the old one, whether the old one was live, revoked or expired. A leaked URL therefore never comes back to life, and
 because collab ties a guest's socket to the link id, the sockets opened through the old URL are closed at once

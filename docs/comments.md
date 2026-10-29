@@ -62,9 +62,11 @@ not email me" setting. A job that could not be queued is logged (`mail.enqueue_f
 `queue_enqueue_failures_total`; the notification itself is stored and listed regardless.
 
 **Orphaned threads.** The text of a document lives in the CRDT state, not in a table, so a block cannot be a foreign
-key. On every list the api reads the stored state (`DocumentStateReader`), collects the block ids
+key. The api reads the stored state (`DocumentStateReader`), collects the block ids
 (`extractBlockIds`) and marks the threads whose block is absent as `orphaned: true`; an unreadable state leaves
-the flags off instead of failing the list. Creating a thread does **not** require the block to exist in the
+the flags off instead of failing the list. The ids are cached in Redis under the document's `revision`
+(`comment-blocks:{documentId}:{revision}`), which every stored change bumps, so a list decodes the document only
+after it changed (`CommentBlocksService`; without Redis it reads the state every time). Creating a thread does **not** require the block to exist in the
 stored state, because that state trails the editor by a few seconds and a comment on a paragraph typed a moment
 ago must not be refused; such a thread shows as orphaned until the next flush.
 

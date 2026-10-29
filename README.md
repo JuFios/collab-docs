@@ -42,18 +42,18 @@ To see the product work, sign in as Alice in one browser and as Bob in another (
 document and type: cursors and edits appear live on both sides. Publish the document from **Share** and open the
 `/published/<slug>` address in a window where nobody is signed in.
 
-| Service    | URL / port                                  | Notes                                                                                    |
-| ---------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `proxy`    | http://localhost:3000                       | nginx, the only public HTTP entry point; sets `X-Forwarded-For` for `web`                |
-| `web`      | - (behind `proxy`)                          | Next.js                                                                                  |
-| `api`      | http://localhost:4000 (`/health`, `/ready`) | NestJS REST API; **Swagger UI at http://localhost:4000/docs**                            |
-| `worker`   | -                                           | Background jobs (same image as `api`)                                                    |
-| `collab`   | `localhost:4001` (`/health`)                | Public WebSocket port. Internal port `4002` is only reachable inside the compose network |
-| `postgres` | `localhost:5432`                            | Database `collab`                                                                        |
-| `redis`    | `localhost:6379`                            |                                                                                          |
-| `minio`    | http://localhost:9000, console `:9001`      | S3 storage; bucket created by `minio-init`                                               |
-| `mailpit`  | http://localhost:8025, SMTP `:1025`         | Catches outgoing email (invitations, mentions)                                           |
-| `migrate`  | -                                           | One-shot job that runs before the apps                                                   |
+| Service    | URL / port                                  | Notes                                                                                                                            |
+| ---------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `proxy`    | http://localhost:3000                       | nginx, the public HTTP entry point (dev also publishes the api and infrastructure ports below); sets `X-Forwarded-For` for `web` |
+| `web`      | - (behind `proxy`)                          | Next.js                                                                                                                          |
+| `api`      | http://localhost:4000 (`/health`, `/ready`) | NestJS REST API; **Swagger UI at http://localhost:4000/docs**                                                                    |
+| `worker`   | -                                           | Background jobs (same image as `api`)                                                                                            |
+| `collab`   | `localhost:4001` (`/health`)                | Public WebSocket port. Internal port `4002` is only reachable inside the compose network                                         |
+| `postgres` | `localhost:5432`                            | Database `collab`                                                                                                                |
+| `redis`    | `localhost:6379`                            |                                                                                                                                  |
+| `minio`    | http://localhost:9000, console `:9001`      | S3 storage; bucket created by `minio-init`                                                                                       |
+| `mailpit`  | http://localhost:8025, SMTP `:1025`         | Catches outgoing email (invitations, mentions)                                                                                   |
+| `migrate`  | -                                           | One-shot job that runs before the apps                                                                                           |
 
 Host ports can be changed with `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, etc. (see `.env.example`). The compose network
 uses `10.89.0.0/24`, so that the proxy and web have fixed addresses the api can trust; set `NETWORK_PREFIX` if that
@@ -222,16 +222,16 @@ invalidation. Editing never waits for any of this: the editor only enqueues. Det
 
 ## Security
 
-| Concern               | Measure                                                                                                                                                                                                                                                                                                                      |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| XSS from user content | One allowlist (`@collab-docs/shared/content`) drives the editor and the server-side sanitiser; every path that shows content (public page, version preview, search, email) goes through `sanitizeContent`, and pages render React elements, never HTML strings. A hostile corpus is tested on every path.                    |
-| IDOR / privilege      | Access is resolved from the database for the id in each request. A test calls **every** API route as nine personas (outsider, viewer, editor, admin, owner, document guest, link visitors, anonymous) and compares with a policy table; a route without a policy fails the suite. Cross-tenant ids return 404.               |
-| Viewer cannot edit    | Enforced in the API and in the gateway (updates from a read-only socket are dropped); tested through the UI, REST and a raw WebSocket.                                                                                                                                                                                       |
-| Rate limiting         | Login (per address, and per address and email), registration, public-link creation, guest tickets, search, comments, the mock payment actions; collab: message rate, update and document size (updates waiting for a missing one included), connections, presence. `X-Forwarded-For` is trusted from the proxy and web only. |
-| CSRF, sessions        | httpOnly `SameSite=Lax` cookies, `Origin` check on cookie-authenticated writes, rotating refresh tokens with reuse detection.                                                                                                                                                                                                |
-| Headers               | Security headers on every response. The signed-in workspace (rendered per request anyway) gets a **nonce** Content-Security-Policy with `'strict-dynamic'` from the edge middleware; static and ISR pages keep a static policy with `'unsafe-inline'`, since a nonce would make them dynamic.                                |
-| Validation            | DTOs with `class-validator` on the API, zod schemas shared with the forms; a parity test keeps them in step.                                                                                                                                                                                                                 |
-| Secrets, dependencies | Placeholders only in templates; services refuse `dev-only` secrets in staging; `pnpm audit --prod` in CI; secrets redacted from logs, and invite and edit-link tokens masked in the request logs of the api and the proxy.                                                                                                   |
+| Concern               | Measure                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| XSS from user content | One allowlist (`@collab-docs/shared/content`) drives the editor and the server-side sanitiser; every path that shows content (public page, version preview, search, email) goes through `sanitizeContent`, and pages render React elements, never HTML strings. A hostile corpus is tested on every path.                                                                                                             |
+| IDOR / privilege      | Access is resolved from the database for the id in each request. A test calls **every** API route as nine personas (outsider, viewer, editor, admin, owner, document guest, link visitors, anonymous) and compares with a policy table; a route without a policy fails the suite. Cross-tenant ids return 404.                                                                                                        |
+| Viewer cannot edit    | Enforced in the API and in the gateway (updates from a read-only socket are dropped); tested through the UI, REST and a raw WebSocket.                                                                                                                                                                                                                                                                                |
+| Rate limiting         | Login (per address, and per address and email), registration, public-link creation, guest tickets, search, comments, invitations and shares (each invitation is an email; an unknown share address is a 404), the mock payment actions; collab: message rate, update and document size (updates waiting for a missing one included), connections, presence. `X-Forwarded-For` is trusted from the proxy and web only. |
+| CSRF, sessions        | httpOnly `SameSite=Lax` cookies, `Origin` check on cookie-authenticated writes, rotating refresh tokens with reuse detection.                                                                                                                                                                                                                                                                                         |
+| Headers               | Security headers on every response. The signed-in workspace (rendered per request anyway) gets a **nonce** Content-Security-Policy with `'strict-dynamic'` from the edge middleware; static and ISR pages keep a static policy with `'unsafe-inline'`, since a nonce would make them dynamic.                                                                                                                         |
+| Validation            | DTOs with `class-validator` on the API, zod schemas shared with the forms; a parity test keeps them in step.                                                                                                                                                                                                                                                                                                          |
+| Secrets, dependencies | Placeholders only in templates; services refuse `dev-only` secrets in staging; `pnpm audit --prod` in CI; secrets redacted from logs, and invite and edit-link tokens masked in the request logs of the api and the proxy.                                                                                                                                                                                            |
 
 All of it, with the tests that guard each layer: [Security](docs/security.md).
 
@@ -397,7 +397,10 @@ than gaps.
 **Product**
 
 - Email verification at sign-up, password reset and "sign out everywhere"; the access token cannot be revoked before it
-  expires (15 minutes).
+  expires (15 minutes). Without verification an address belongs to whoever registered it first, and sharing by email
+  grants access to that account at once (invitations to a workspace are safe: they need the token from the email).
+  The share dialog shows the account's name, which is the only check; verification, or shares that wait for a
+  link from the email, would close it.
 - Mentions in the **body** of a document (only comments carry @mentions); editing and deleting one's own comment from the
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.
@@ -427,6 +430,9 @@ than gaps.
 
 - A per-user cap on WebSocket writes (messages are limited per connection and per document); rate limits on presign
   and on starting a checkout; membership is re-checked on each SSE heartbeat, not on every event.
+- A published page keeps its slug for good _by design_ (it is the page's public address): publishing again after
+  unpublishing brings the old URL back, and the slug (title words plus 6 hex digits) is not a secret. Invitation and
+  mention emails quote names that users chose (escaped, so text only).
 - `/metrics` shares the application's port and is protected by a bearer token rather than a separate internal port.
 - Static and published pages keep `'unsafe-inline'` in the script CSP _by design_ (a nonce would end ISR; the
   signed-in workspace has a nonce policy, see [Security](docs/security.md)); the invite preview shows the invited email

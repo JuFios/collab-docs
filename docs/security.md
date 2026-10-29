@@ -93,17 +93,19 @@ bucket as a direct call).
 
 ## Rate limits
 
-| Preset         | Scope   | Default                                     | Routes                                                                 |
-| -------------- | ------- | ------------------------------------------- | ---------------------------------------------------------------------- |
-| `login`        | address | 20 / min (+ 5 / min per address and e-mail) | `POST /auth/login`                                                     |
-| `register`     | address | 10 / h                                      | `POST /auth/register`                                                  |
-| `guestTicket`  | address | 30 / min                                    | `POST /public/links/:token/ticket`                                     |
-| `ticket`       | user    | 30 / min                                    | `POST /documents/:id/collab-ticket`                                    |
-| `publicLink`   | user    | 10 / h                                      | `POST /documents/:id/public-links`                                     |
-| `search`       | user    | 60 / min                                    | `GET /workspaces/:id/search`                                           |
-| `comment`      | user    | 30 / min                                    | thread, reply and edit routes of comments                              |
-| `mockProvider` | address | 30 / min                                    | pay, decline and re-send on the mock payment page                      |
-| global         | address | 600 / min                                   | every other route (not the event stream and the operational endpoints) |
+| Preset         | Scope   | Default                                     | Routes                                                                      |
+| -------------- | ------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| `login`        | address | 20 / min (+ 5 / min per address and e-mail) | `POST /auth/login`                                                          |
+| `register`     | address | 10 / h                                      | `POST /auth/register`                                                       |
+| `guestTicket`  | address | 30 / min                                    | `POST /public/links/:token/ticket`                                          |
+| `ticket`       | user    | 30 / min                                    | `POST /documents/:id/collab-ticket`                                         |
+| `publicLink`   | user    | 10 / h                                      | `POST /documents/:id/public-links`                                          |
+| `search`       | user    | 60 / min                                    | `GET /workspaces/:id/search`                                                |
+| `comment`      | user    | 30 / min                                    | thread, reply and edit routes of comments                                   |
+| `mockProvider` | address | 30 / min                                    | pay, decline and re-send on the mock payment page                           |
+| `invite`       | user    | 20 / h                                      | `POST /workspaces/:id/invites` (every call, a re-issue too, sends an email) |
+| `share`        | user    | 30 / min                                    | `POST /documents/:id/shares` (an unknown address answers `404`)             |
+| global         | address | 600 / min                                   | every other route (not the event stream and the operational endpoints)      |
 
 All of them are `@nestjs/throttler` guards over one Redis store; the per-address-and-email login counter is a
 route-level guard (`LoginThrottlerGuard`) whose tracker is the address plus a hash of the normalised e-mail, and
@@ -179,6 +181,12 @@ room counts, close codes and rejected-update counts were readable by anybody). I
 api as well.
 
 ## Known limits
+
+- Email addresses are not verified (P11), so an address belongs to whoever registered it first. A workspace invitation
+  is safe, it needs the token from the email; a share by email is not: it is granted to the registered account at
+  once. The `share` limit bounds probing which addresses have an account; the dialog shows the account's name.
+- A published page's slug is its permanent public address: it is not a secret (title words and 6 hex digits), and
+  publishing again after unpublishing brings the same URL back.
 
 - The mock payment provider (`BILLING_PROVIDER=mock`) is public by design: it stands in for an external service, and
   anyone who knows a checkout session id can complete it (rate limited per address). A real provider replaces the module; the webhook behind it
