@@ -26,7 +26,12 @@ class FakeProvider {
     readonly url: string,
     readonly room: string,
     readonly doc: Y.Doc,
-    readonly options: { params: Record<string, string>; connect: boolean; disableBc: boolean },
+    readonly options: {
+      params: Record<string, string>;
+      connect: boolean;
+      disableBc: boolean;
+      shouldReconnect: (event: { code: number }) => boolean;
+    },
   ) {
     this.params = { ...options.params };
     FakeProvider.instances.push(this);
@@ -278,6 +283,29 @@ describe('useCollabConnection', () => {
     expect(first.destroy).toHaveBeenCalled();
     await waitFor(() => expect(result.current.provider).toBe(current()));
     expect(result.current.ydoc).not.toBe(firstDoc);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('drops a change too large for the socket instead of resending it on every reconnect', async () => {
+    const onRejected = vi.fn();
+    const { result } = await connected({ onRejected });
+    const first = current();
+    const firstDoc = result.current.ydoc;
+    // y-websocket emits `closed` only for a close it does not reconnect after on its own
+    expect(first.options.shouldReconnect({ code: COLLAB_CLOSE.messageTooBig })).toBe(false);
+    act(() => {
+      first.emit('closed', { code: COLLAB_CLOSE.messageTooBig, reason: '' });
+      // what the closing provider still reports changes nothing
+      first.emit('closed', { code: COLLAB_CLOSE.messageTooBig, reason: '' });
+    });
+
+    expect(first.disconnect).toHaveBeenCalled();
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    expect(onRejected).toHaveBeenCalledWith({ reason: 'too_large' });
+    await waitFor(() => expect(FakeProvider.instances).toHaveLength(2));
+    await waitFor(() => expect(result.current.provider).toBe(current()));
+    expect(result.current.ydoc).not.toBe(firstDoc);
+    expect(current().params.ticket).toBe('t1');
     expect(result.current.error).toBeNull();
   });
 

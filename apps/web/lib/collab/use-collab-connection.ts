@@ -23,6 +23,7 @@ import {
   collabError,
   decideOnClose,
   decideOnTicketError,
+  shouldReconnect,
 } from './errors';
 
 /**
@@ -225,9 +226,15 @@ export function useCollabConnection(
         if (isSynced) failedRounds = 0;
       });
       created.on('closed', ({ code }) => {
+        if (restarting) return;
         const decision = decideOnClose(code);
         if (decision.action === 'stop') giveUp(decision.error);
-        else if (decision.action !== 'reconnect') recoverWith(decision.action);
+        else if (decision.action === 'start-over') {
+          // the provider would reconnect and send the same change again; drop it with this document instead
+          created.disconnect();
+          onRejected.current?.({ reason: decision.reason });
+          restart(true);
+        } else if (decision.action !== 'reconnect') recoverWith(decision.action);
       });
       created.messageHandlers[COLLAB_MESSAGE.roomEvent] = (_encoder, decoder) =>
         handleRoomEvent(readVarString(decoder));
@@ -262,6 +269,8 @@ export function useCollabConnection(
           params: { ticket },
           // updates must reach the server, which owns permissions and persistence, never only another tab
           disableBc: true,
+          // a close the provider would only repeat (1009 resends the same change) is decided here instead
+          shouldReconnect,
         });
         attach(provider);
         patch({ ydoc, provider });

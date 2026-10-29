@@ -26,6 +26,11 @@ type RecoveryDecision =
   | { action: 'new-ticket' }
   /** The server asked for less traffic: wait before trying again. */
   | { action: 'backoff' }
+  /**
+   * A local change was too large for the server to read (1009): resending it would close the socket again, so the
+   * change is dropped and the session starts over from the server's state.
+   */
+  | { action: 'start-over'; reason: CollabRejectReason }
   /** A transient close; the provider's own reconnect loop handles it. */
   | { action: 'reconnect' };
 
@@ -51,6 +56,15 @@ const stopped = (kind: CollabErrorKind): RecoveryDecision => ({
  * The single place that turns a WebSocket close code into behaviour (spec §5). `y-websocket` 3.x already treats
  * 4400-4499 as permanent and reports them through its `closed` event; the decision here says what each code means.
  */
+/**
+ * Whether the provider reconnects on its own after the server closed the socket (`shouldReconnect` of y-websocket).
+ * Like its default, not for 4400-4499; nor for 1009, whose change it would send again. For those it emits `closed`
+ * instead, and `decideOnClose` says what to do.
+ */
+export function shouldReconnect({ code }: { code: number }): boolean {
+  return !(code >= 4400 && code < 4500) && code !== COLLAB_CLOSE.messageTooBig;
+}
+
 export function decideOnClose(code: number): RecoveryDecision {
   if (COLLAB_FINAL_CLOSE_CODES.includes(code)) {
     if (code === COLLAB_CLOSE.forbidden) return stopped('forbidden');
@@ -59,6 +73,7 @@ export function decideOnClose(code: number): RecoveryDecision {
   }
   if (code === COLLAB_CLOSE.ticketInvalid) return { action: 'new-ticket' };
   if (code === COLLAB_CLOSE.rateLimited) return { action: 'backoff' };
+  if (code === COLLAB_CLOSE.messageTooBig) return { action: 'start-over', reason: 'too_large' };
   return { action: 'reconnect' };
 }
 

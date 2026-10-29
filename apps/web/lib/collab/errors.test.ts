@@ -1,7 +1,7 @@
 import { COLLAB_CLOSE } from '@collab-docs/shared';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
-import { backoffDelay, decideOnClose, decideOnTicketError } from './errors';
+import { backoffDelay, decideOnClose, decideOnTicketError, shouldReconnect } from './errors';
 
 describe('decideOnClose', () => {
   it.each([
@@ -22,8 +22,25 @@ describe('decideOnClose', () => {
     expect(decideOnClose(COLLAB_CLOSE.rateLimited)).toEqual({ action: 'backoff' });
   });
 
-  it.each([1000, 1006, 1009, 1011])('leaves %i to the provider', (code) => {
+  it('starts over without the change on 1009, which the provider would only resend', () => {
+    expect(decideOnClose(COLLAB_CLOSE.messageTooBig)).toEqual({
+      action: 'start-over',
+      reason: 'too_large',
+    });
+  });
+
+  it.each([1000, 1006, 1011])('leaves %i to the provider', (code) => {
     expect(decideOnClose(code)).toEqual({ action: 'reconnect' });
+  });
+});
+
+describe('shouldReconnect', () => {
+  it.each([1000, 1006, 1011])('lets the provider reconnect after %i', (code) => {
+    expect(shouldReconnect({ code })).toBe(true);
+  });
+
+  it.each([1009, 4401, 4403, 4404, 4410, 4429])('hands %i to decideOnClose', (code) => {
+    expect(shouldReconnect({ code })).toBe(false);
   });
 });
 

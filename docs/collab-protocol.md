@@ -38,7 +38,9 @@ Binary frames; the first varuint is the message type.
 | `100` | room event      | server    | `varString` of JSON, see below; register `provider.messageHandlers[100]` to receive it |
 
 Text frames are ignored. A frame larger than `COLLAB_MAX_UPDATE_BYTES` (+ framing) makes the WebSocket layer
-close the socket with 1009.
+close the socket with 1009 before the room sees it. A provider would reconnect and send the same change again, so the
+client treats 1009 like a `too_large` refusal: it drops the change with its `Y.Doc` and starts over from the server
+state.
 
 ### Room events (type 100)
 
@@ -102,7 +104,7 @@ database call on this path. A connection sending more than `COLLAB_MAX_MESSAGES_
 
 | Code | Meaning                                                            | Client action                           |
 | ---- | ------------------------------------------------------------------ | --------------------------------------- |
-| 1009 | Frame too large                                                    | Do not resend; reconnect                |
+| 1009 | Frame too large                                                    | Drop the change; start a new session    |
 | 4401 | Ticket missing, malformed, expired or for another document         | Fetch a new ticket and reconnect        |
 | 4403 | No access (also: access revoked while connected, guest link ended) | `provider.disconnect()`; show a message |
 | 4404 | The document does not exist (or the path is not a document id)     | `provider.disconnect()`                 |
