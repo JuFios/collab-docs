@@ -245,6 +245,8 @@ model Document {
   @@index([workspaceId, parentId, position], map: "documents_tree_idx")
   @@index([workspaceId, deletedAt])
   @@index([parentId])
+  // partial in the migration: WHERE deleted_root_id IS NOT NULL (the trash and restore look a deletion up by it)
+  @@index([deletedRootId])
   @@map("documents")
 }
 

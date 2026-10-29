@@ -971,7 +971,7 @@
     },
     "/api/workspaces/{workspaceId}/invites": {
       "post": {
-        "description": "Re-inviting a pending email issues a new token. Counts against the plan member limit (403 PLAN_LIMIT_EXCEEDED); an existing member gives 409.",
+        "description": "Re-inviting a pending email issues a new token. Counts against the plan member limit (403 PLAN_LIMIT_EXCEEDED); an existing member gives 409. Every call sends an email: 20 per hour per user.",
         "operationId": "InvitesController_create",
         "parameters": [
           {
@@ -1013,6 +1013,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
           },
           "default": {
             "description": "Error; see `code` for the reason",
@@ -1970,7 +1973,7 @@
         ]
       },
       "post": {
-        "description": "Unknown email: 404. An existing share is updated. Shares are not inherited.",
+        "description": "Unknown email: 404. An existing share is updated. Shares are not inherited. 30 per minute per user.",
         "operationId": "SharesController_add",
         "parameters": [],
         "requestBody": {
@@ -2003,6 +2006,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
           },
           "default": {
             "description": "Error; see `code` for the reason",

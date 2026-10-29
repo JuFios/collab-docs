@@ -15,3 +15,6 @@ process.env.RATE_TICKET_PER_MIN_USER = '3';
 process.env.RATE_GUEST_TICKET_PER_MIN_IP = '3';
 process.env.RATE_SEARCH_PER_MIN_USER = '3';
 process.env.RATE_COMMENT_PER_MIN_USER = '3';
+process.env.RATE_MOCK_PROVIDER_PER_MIN_IP = '3';
+process.env.RATE_INVITE_PER_HOUR_USER = '3';
+process.env.RATE_SHARE_PER_MIN_USER = '3';

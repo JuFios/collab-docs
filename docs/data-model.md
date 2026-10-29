@@ -40,10 +40,11 @@ Notes:
 - **`revision`** is incremented atomically on every change that derived data (search index, public
   pages) must follow.
 - **Indexes**: the tree listing uses a partial index `documents_tree_idx (workspace_id, parent_id,
-position) WHERE deleted_at IS NULL`; the rest are plain b-tree indexes on foreign keys and unique
+position) WHERE deleted_at IS NULL` and the trash a partial index on `deleted_root_id` (only deleted documents carry
+  it), which counts and restores a deletion without a scan of the table; the rest are plain b-tree indexes on foreign keys and unique
   lookups (emails, slugs, token hashes, one share per user and document, one public link per document
   and mode). Partial indexes, `COLLATE "C"` and the `pg_trgm`/`unaccent` extensions are written by hand
-  in the first migration; the partial index keeps the name declared in the schema, so
+  in the migrations; the partial indexes keep the name declared in the schema, so
   `pnpm --filter @collab-docs/db db:drift` still reports no drift. The search migration adds the
   `cd_unaccent` function, the generated `tsv` column of `document_search` and the `cd_headline` text search
   configuration by hand, and the schema mirrors the generated column (`dbgenerated`) for the same reason

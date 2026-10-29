@@ -7,8 +7,9 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
-import { ParseUuidPipe } from '@collab-docs/nest';
+import { ParseUuidPipe, RateLimit } from '@collab-docs/nest';
 import { CurrentUser } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { CurrentDocumentAccess, DocumentAccess } from '../permissions/permissions.decorators';
@@ -45,11 +46,15 @@ export class SharesController {
 
   @Post('documents/:id/shares')
   @DocumentAccess('EDIT', { param: 'id' })
+  // below the access decorator on purpose: guards run bottom-up, and a probe of somebody else's id must count
+  @RateLimit.user('share')
   @ApiOperation({
     summary: 'Share with a registered user by email',
-    description: 'Unknown email: 404. An existing share is updated. Shares are not inherited.',
+    description:
+      'Unknown email: 404. An existing share is updated. Shares are not inherited. 30 per minute per user.',
   })
   @ApiCreatedResponse({ type: ShareResponse })
+  @ApiTooManyRequestsResponse({ description: 'RATE_LIMITED' })
   add(
     @Body() dto: CreateShareDto,
     @CurrentUser() user: RequestUser,

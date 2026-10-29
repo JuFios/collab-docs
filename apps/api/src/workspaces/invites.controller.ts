@@ -7,8 +7,9 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
-import { ParseUuidPipe } from '@collab-docs/nest';
+import { ParseUuidPipe, RateLimit } from '@collab-docs/nest';
 import { CurrentUser, Public } from '../auth/auth.decorators';
 import { type RequestUser } from '../auth/auth.types';
 import { WorkspaceRole } from '../permissions/permissions.decorators';
@@ -27,15 +28,18 @@ export class InvitesController {
 
   @Post('workspaces/:workspaceId/invites')
   @WorkspaceRole('ADMIN')
+  // below the access decorator on purpose: guards run bottom-up, and a probe of somebody else's id must count
+  @RateLimit.user('invite')
   @ApiBearerAuth()
   @ApiCookieAuth('access-cookie')
   @ApiOperation({
     summary: 'Invite an email to the workspace (emailed, valid 7 days)',
     description:
       'Re-inviting a pending email issues a new token. Counts against the plan member limit ' +
-      '(403 PLAN_LIMIT_EXCEEDED); an existing member gives 409.',
+      '(403 PLAN_LIMIT_EXCEEDED); an existing member gives 409. Every call sends an email: 20 per hour per user.',
   })
   @ApiCreatedResponse({ type: InviteResponse })
+  @ApiTooManyRequestsResponse({ description: 'RATE_LIMITED' })
   create(
     @Param('workspaceId') workspaceId: string,
     @Body() dto: CreateInviteDto,

@@ -24,6 +24,8 @@ const PRESETS: Record<string, string> = {
   'POST /api/documents/{id}/threads': 'comment',
   'POST /api/threads/{threadId}/comments': 'comment',
   'PATCH /api/comments/{commentId}': 'comment',
+  'POST /api/workspaces/{workspaceId}/invites': 'invite',
+  'POST /api/documents/{id}/shares': 'share',
   'POST /api/mock-provider/checkout-sessions/{id}/complete': 'mockProvider',
   'POST /api/mock-provider/checkout-sessions/{id}/fail': 'mockProvider',
   'POST /api/mock-provider/events/{id}/redeliver': 'mockProvider',
@@ -185,6 +187,14 @@ describe('rate limits', () => {
       expectRefusal(refused, 60);
     });
 
+    it('refuses repeated mock payment actions', async () => {
+      const ip = '203.0.113.35';
+      const refused = await exhaust(() =>
+        send('post', `/api/mock-provider/checkout-sessions/${UNKNOWN_ID}/complete`, ip),
+      );
+      expectRefusal(refused, 60);
+    });
+
     it('limits everything else per address as well', async () => {
       const ip = '203.0.113.40';
       let refused: request.Response | undefined;
@@ -203,6 +213,8 @@ describe('rate limits', () => {
       ['public links', 'post', `/api/documents/${UNKNOWN_ID}/public-links`, 3600],
       ['searches', 'get', `/api/workspaces/${UNKNOWN_ID}/search?q=anything`, 60],
       ['comments', 'post', `/api/documents/${UNKNOWN_ID}/threads`, 60],
+      ['invitations', 'post', `/api/workspaces/${UNKNOWN_ID}/invites`, 3600],
+      ['shares', 'post', `/api/documents/${UNKNOWN_ID}/shares`, 60],
     ];
 
     it.each(cases)(
