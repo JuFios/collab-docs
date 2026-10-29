@@ -38,6 +38,34 @@ export const REDACT_PATHS = [
   ...SECRET_FIELDS.map((name) => `*.${name}`),
 ];
 
+/** Routes whose path carries a capability secret (an invite or edit-link token) right after this prefix. */
+const SECRET_PATH = /^(\/api\/(?:invites|public\/links)\/)[^/]+/;
+
+/**
+ * The request URL as it may be logged: the secret segment of an invite or edit-link route is masked, and the query
+ * string is dropped (it can hold a `next` path with such a token, or search text).
+ */
+export function loggableUrl(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  const path = url.split(/[?#]/, 1)[0] ?? '';
+  return path.replace(SECRET_PATH, '$1[REDACTED]');
+}
+
+interface SerializedRequest {
+  id?: unknown;
+  method?: string;
+  url?: string;
+  headers?: unknown;
+  remoteAddress?: string;
+  remotePort?: number;
+}
+
+/** The request as the request log writes it. */
+export function loggableRequest(req: SerializedRequest): SerializedRequest {
+  const { id, method, url, headers, remoteAddress, remotePort } = req;
+  return { id, method, url: loggableUrl(url), headers, remoteAddress, remotePort };
+}
+
 export function createRootLogger(level: string, destination?: DestinationStream): Logger {
   return pino(
     {
@@ -79,6 +107,8 @@ export const platformLoggerModule = (): DynamicModule =>
           genReqId: (req) => req.correlationId ?? getCorrelationId() ?? '',
           customProps: (req) => ({ correlationId: req.id }),
           autoLogging: { ignore: (req) => SILENT_PATHS.test(req.url ?? '') },
+          // pino-http hands over its serialised request; `query` and `params` are left out, as they repeat the URL
+          serializers: { req: loggableRequest },
         },
       };
     },
