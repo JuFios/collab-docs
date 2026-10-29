@@ -28,7 +28,9 @@ x-app-env: &app-env
   API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
   COLLAB_INTERNAL_URL: ${COLLAB_INTERNAL_URL:-tcp://collab:4002}
   COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:-ws://localhost:4001}
-  TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
+  # exactly the two hops that set X-Forwarded-For (proxy, then web); not the network's gateway, through which a
+  # published port (api :4000 in development) is reached, so a direct call cannot pick its own address
+  TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-${NETWORK_PREFIX:-10.89.0}.10/32,${NETWORK_PREFIX:-10.89.0}.11/32}
   BILLING_PROVIDER: ${BILLING_PROVIDER:-mock}
   # per-IP limits; the e2e suite raises them because every test user registers from the same address
   RATE_LOGIN_PER_MIN_IP: ${RATE_LOGIN_PER_MIN_IP:-20}
@@ -212,6 +214,9 @@ services:
     # not published: browsers reach it through `proxy`, which owns X-Forwarded-For
     expose:
       - '3000'
+    networks:
+      default:
+        ipv4_address: ${NETWORK_PREFIX:-10.89.0}.11
     depends_on:
       api:
         condition: service_healthy
@@ -227,6 +232,9 @@ services:
       - '${WEB_PORT:-3000}:80'
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      default:
+        ipv4_address: ${NETWORK_PREFIX:-10.89.0}.10
     depends_on:
       web:
         condition: service_healthy
@@ -235,6 +243,15 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+# A fixed subnet gives proxy and web fixed addresses, which TRUSTED_PROXY_CIDRS names. Every other container gets
+# an address from the upper half. Set NETWORK_PREFIX if 10.89.0.0/24 is taken by another Docker network.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${NETWORK_PREFIX:-10.89.0}.0/24
+          ip_range: ${NETWORK_PREFIX:-10.89.0}.128/25
 
 volumes:
   postgres-data:
