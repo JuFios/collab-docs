@@ -2,11 +2,13 @@ import { Processor } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { type JobEnvelope, QUEUE_NAMES, QueueProcessor } from '@collab-docs/nest';
 import { renderInviteEmail } from './invite-email';
+import { renderVerifyEmail } from './verify-email';
 import {
   MAIL_JOBS,
   type InviteMailJob,
   type MailJob,
   type MentionMailJob,
+  type VerifyEmailMailJob,
 } from './mail-queue.service';
 import { MailerService } from './mailer.service';
 import { MentionMailService } from './mention-mail.service';
@@ -26,6 +28,11 @@ export class MailProcessor extends QueueProcessor<MailJob> {
       case MAIL_JOBS.invite: {
         const { to, ...data } = job.data as InviteMailJob;
         await this.mailer.send({ to, ...renderInviteEmail(data) });
+        return;
+      }
+      case MAIL_JOBS.verifyEmail: {
+        const { to, ...data } = job.data as VerifyEmailMailJob;
+        await this.mailer.send({ to, ...renderVerifyEmail(data) });
         return;
       }
       case MAIL_JOBS.mention:

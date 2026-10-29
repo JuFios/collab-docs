@@ -85,6 +85,13 @@ const PRESETS = {
     ttl: seconds(3600),
     message: 'Too many invitations sent, try again later',
   },
+  // each one is an email
+  verifyEmail: {
+    scope: 'user',
+    limit: 'RATE_VERIFY_EMAIL_PER_HOUR_USER',
+    ttl: seconds(3600),
+    message: 'Too many confirmation emails, try again later',
+  },
   // an unknown address answers 404, so the limit also bounds probing which emails have an account
   share: {
     scope: 'user',
@@ -230,7 +237,7 @@ export class LoginThrottlerGuard extends ClientIpThrottlerGuard {
 
 /**
  * Per-route presets (limits come from env; see README). `login`, `register`, `guestTicket` and `mockProvider` count per client IP
- * (`login` also per IP and email), `ticket`, `publicLink`, `search`, `comment`, `invite` and `share` per signed-in user, which needs
+ * (`login` also per IP and email), `ticket`, `publicLink`, `search`, `comment`, `invite`, `verifyEmail` and `share` per signed-in user, which needs
  * the route to be authenticated.
  */
 export const RateLimit = {

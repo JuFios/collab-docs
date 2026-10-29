@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, newUser, registerViaApi, test } from '../fixtures';
+import { confirmEmail } from '../mailpit';
 import { ORIGIN, createDocument, createWorkspace, invitedMember, signedIn } from '../workspace';
 
 /** Runs `action` and waits for the matching api call to succeed, so a following reload sees persisted data. */
@@ -341,10 +342,15 @@ test.describe('document tree', () => {
   }) => {
     const workspaceId = await createWorkspace(owner, 'Guests');
     const docId = await createDocument(owner, workspaceId, 'For guests');
-    const guest = await registerViaApi(
-      (await browser.newContext({ baseURL })).request,
-      newUser('guest'),
-    );
+    const guestRequest = (await browser.newContext({ baseURL })).request;
+    const guest = await registerViaApi(guestRequest, newUser('guest'));
+    // a document can be shared only with a confirmed address
+    const early = await owner.request.post(`/api/documents/${docId}/shares`, {
+      data: { email: guest.email, role: 'VIEWER' },
+      headers: { origin: ORIGIN },
+    });
+    expect(early.status()).toBe(409);
+    await confirmEmail(guestRequest, guest.email);
     const share = await owner.request.post(`/api/documents/${docId}/shares`, {
       data: { email: guest.email, role: 'VIEWER' },
       headers: { origin: ORIGIN },

@@ -104,6 +104,7 @@ export const envSchema = z.object({
   RATE_COMMENT_PER_MIN_USER: positiveInt.default(30),
   RATE_MOCK_PROVIDER_PER_MIN_IP: positiveInt.default(30),
   RATE_INVITE_PER_HOUR_USER: positiveInt.default(20),
+  RATE_VERIFY_EMAIL_PER_HOUR_USER: positiveInt.default(5),
   RATE_SHARE_PER_MIN_USER: positiveInt.default(30),
   COLLAB_MAX_MESSAGES_PER_10S: positiveInt.default(200),
   COLLAB_MAX_UPDATE_BYTES: positiveInt.default(1024 * 1024),

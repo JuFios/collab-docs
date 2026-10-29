@@ -1,4 +1,5 @@
 import { expect, loginThroughUi, newUser, test } from '../fixtures';
+import { confirmationLinkFor } from '../mailpit';
 
 test.describe('authentication', () => {
   test('an anonymous visit to /workspaces redirects to the login page and remembers the target', async ({
@@ -32,6 +33,15 @@ test.describe('authentication', () => {
     await page.getByLabel('Password').fill(user.password);
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page).toHaveURL(/\/workspaces$/);
+
+    // until the address is confirmed nobody can share a document with it, and the app says so
+    const notice = page.getByRole('status').filter({ hasText: 'Confirm your email address' });
+    await expect(notice).toContainText(user.email);
+    await page.goto(await confirmationLinkFor(user.email));
+    await expect(page.getByText('Email address confirmed')).toBeVisible();
+    await page.getByRole('link', { name: 'Go to your workspaces' }).click();
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(notice).toHaveCount(0);
   });
 
   test('unsafe next values are ignored after signing in', async ({ page, user }) => {

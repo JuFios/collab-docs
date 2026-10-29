@@ -8,12 +8,15 @@ import { AccessTokenService } from './access-token.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CsrfGuard } from './csrf.guard';
+import { EmailVerificationService } from './email-verification.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PasswordService } from './password.service';
 import { RefreshTokenService } from './refresh-token.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
+    MailModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<AppConfig, true>) => ({
@@ -27,6 +30,7 @@ import { RefreshTokenService } from './refresh-token.service';
   providers: [
     AccessTokenService,
     AuthService,
+    EmailVerificationService,
     PasswordService,
     RefreshTokenService,
     { provide: APP_GUARD, useClass: CsrfGuard },

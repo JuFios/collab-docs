@@ -15,8 +15,15 @@ import type { Request, Response } from 'express';
 import { type AuthSession, REFRESH_COOKIE, sanitizeNextPath } from '@collab-docs/shared';
 import { AppException, type AppConfig, RateLimit } from '@collab-docs/nest';
 import { CurrentUser, Public } from './auth.decorators';
-import { AuthSessionResponse, AuthUserResponse, LoginDto, RegisterDto } from './auth.dto';
+import {
+  AuthSessionResponse,
+  AuthUserResponse,
+  LoginDto,
+  RegisterDto,
+  VerifyEmailDto,
+} from './auth.dto';
 import { type IssuedSession, AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
 import type { RequestUser } from './auth.types';
 import { clearAuthCookies, readCookie, setAccessCookie, setRefreshCookie } from './cookies';
 
@@ -25,6 +32,7 @@ import { clearAuthCookies, readCookie, setAccessCookie, setRefreshCookie } from 
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly verification: EmailVerificationService,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
@@ -129,6 +137,28 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.auth.logout(readCookie(req, REFRESH_COOKIE));
     clearAuthCookies(res, this.cookieEnv);
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Confirm the email address of an account with the token from the confirmation email',
+  })
+  @ApiNoContentResponse()
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+    await this.verification.verify(dto.token);
+  }
+
+  @Post('verify-email/resend')
+  @HttpCode(204)
+  @RateLimit.user('verifyEmail')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access-cookie')
+  @ApiOperation({ summary: 'Email a new confirmation link to the signed-in user' })
+  @ApiNoContentResponse()
+  async resendVerification(@CurrentUser() user: RequestUser): Promise<void> {
+    await this.verification.resend(user.id);
   }
 
   @Get('me')

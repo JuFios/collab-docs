@@ -17,6 +17,7 @@ import { createTestApp } from '../test/test-app';
 import { CurrentUser, Public } from './auth.decorators';
 import type { RequestUser } from './auth.types';
 import { hashToken } from './refresh-token.service';
+import { MailQueueService } from '../mail/mail-queue.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const ORIGIN = 'http://localhost:3000';
@@ -63,6 +64,9 @@ describe('auth', () => {
       .post(path)
       .set('X-Forwarded-For', `10.1.${Math.floor(ipCounter / 250)}.${(ipCounter++ % 250) + 1}`);
   const newEmail = () => `user-${Date.now()}-${counter++}${EMAIL_DOMAIN}`;
+  // the latest confirmation link mailed to each address
+  const confirmationLinks = new Map<string, string>();
+  const tokenOf = (email: string) => confirmationLinks.get(email)!.split('/verify-email/')[1]!;
 
   async function register(email = newEmail(), name = 'Ada') {
     const response = await fresh('/api/auth/register')
@@ -89,6 +93,10 @@ describe('auth', () => {
     redis.disconnect();
     app = await createTestApp([ProtectedController]);
     prisma = app.get(PrismaService);
+    const mailQueue = app.get(MailQueueService, { strict: false });
+    jest.spyOn(mailQueue, 'sendVerifyEmail').mockImplementation(async (job) => {
+      confirmationLinks.set(job.to, job.link);
+    });
   });
 
   afterAll(async () => {
@@ -162,6 +170,53 @@ describe('auth', () => {
       const user = await prisma.user.findUniqueOrThrow({ where: { email } });
       expect(user.passwordHash).toMatch(/^\$argon2id\$/);
       expect(user.passwordHash).not.toContain(PASSWORD);
+    });
+  });
+
+  describe('email confirmation', () => {
+    const verify = (token: string) => fresh('/api/auth/verify-email').send({ token });
+    const me = (access: string) =>
+      http().get('/api/auth/me').set('Authorization', `Bearer ${access}`).expect(200);
+
+    it('starts unconfirmed, mails a link, and the link confirms the address (twice is fine)', async () => {
+      const { email, body } = await register();
+      expect(body.user.emailVerified).toBe(false);
+      expect(confirmationLinks.get(email)).toMatch(
+        /^http:\/\/localhost:3000\/verify-email\/[\w-]{43}$/,
+      );
+      const stored = await prisma.emailVerification.findUniqueOrThrow({
+        where: { userId: body.user.id },
+      });
+      expect(stored.tokenHash).toBe(hashToken(tokenOf(email)));
+
+      await verify(tokenOf(email)).expect(204);
+      expect((await me(body.accessToken)).body).toMatchObject({ emailVerified: true });
+      await verify(tokenOf(email)).expect(204);
+    });
+
+    it('refuses a wrong, malformed or expired token without confirming anything', async () => {
+      const { email, body } = await register();
+      for (const token of ['', 'nope', randomBytes(32).toString('base64url')]) {
+        await verify(token).expect(400);
+      }
+      await prisma.emailVerification.update({
+        where: { userId: body.user.id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      await verify(tokenOf(email)).expect(400);
+      expect((await me(body.accessToken)).body).toMatchObject({ emailVerified: false });
+    });
+
+    it('sends a new link that replaces the old one, and nothing once confirmed', async () => {
+      const { email, body } = await register();
+      const first = tokenOf(email);
+      const resend = () =>
+        fresh('/api/auth/verify-email/resend').set('Authorization', `Bearer ${body.accessToken}`);
+      await resend().expect(204);
+      expect(tokenOf(email)).not.toBe(first);
+      await verify(first).expect(400);
+      await verify(tokenOf(email)).expect(204);
+      await resend().expect(409);
     });
   });
 

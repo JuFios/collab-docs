@@ -8,7 +8,10 @@ import type { ShareResponse, SharedDocumentResponse } from './documents.dto';
 import { TreeCacheService } from './tree-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-/** Sharing by email, for registered users only (P2). Managing shares needs MANAGE, or EDIT for the author. */
+/**
+ * Sharing by email, for registered users with a confirmed address only (P2). Managing shares needs MANAGE, or EDIT
+ * for the author.
+ */
 @Injectable()
 export class SharesService {
   constructor(
@@ -47,11 +50,18 @@ export class SharesService {
     this.assertCanManage(userId, current);
     const target = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, emailVerifiedAt: true },
     });
     if (!target) throw notFound('User');
     if (target.id === userId) {
       throw new AppException('BAD_REQUEST', 'You cannot share a document with yourself');
+    }
+    // anyone can register any address; a share is granted only once the owner of the address has confirmed it
+    if (!target.emailVerifiedAt) {
+      throw new AppException(
+        'CONFLICT',
+        `${target.name} has not confirmed their email address yet; share the document once they have`,
+      );
     }
     const documentId = current.document.id;
     await this.prisma.documentShare.upsert({

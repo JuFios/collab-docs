@@ -24,9 +24,9 @@ in `documents.position` (`COLLATE "C"`), so a reorder rewrites one row and never
   room under the plan's document limit (`403 PLAN_LIMIT_EXCEEDED`), and returns the document to the root when its
   parent is still deleted. Only a deletion root can be restored; restoring a node that was deleted with its
   parent is `409`.
-- **Sharing** is by email for registered users only (`404` for unknown addresses). A guest sees only the
-  documents shared with them (`GET /me/shared-documents`), not the tree or the workspace. A share overrides the
-  workspace role in both directions.
+- **Sharing** is by email for registered users with a confirmed address only (`404` for unknown addresses, `409`
+  for an unconfirmed one). A guest sees only the documents shared with them (`GET /me/shared-documents`), not the
+  tree or the workspace. A share overrides the workspace role in both directions.
 - **Recent documents** (`GET /workspaces/:id/documents/recent?limit=`, default 8, max 20) feed the dashboard:
   newest change first, where an edit of the content counts as much as a rename or a move (the later of
   `updated_at` and `content_updated_at`, as in search), visibility filtered in SQL so the limit applies to

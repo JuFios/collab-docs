@@ -2,14 +2,16 @@
 
 Own JWT auth in the API (`apps/api/src/auth`), no external identity provider.
 
-| Endpoint                  | Purpose                                                                                       |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| `POST /api/auth/register` | Create an account and sign in (409 if the email exists)                                       |
-| `POST /api/auth/login`    | Sign in                                                                                       |
-| `POST /api/auth/refresh`  | Rotate the refresh token, issue a new access token                                            |
-| `GET /api/auth/refresh`   | Same rotation for browser navigations; `302` to `?next=` (relative paths only) or to `/login` |
-| `POST /api/auth/logout`   | Revoke the refresh-token family, clear the cookies                                            |
-| `GET /api/auth/me`        | The signed-in user (read from the database)                                                   |
+| Endpoint                             | Purpose                                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `POST /api/auth/register`            | Create an account and sign in (409 if the email exists)                                         |
+| `POST /api/auth/login`               | Sign in                                                                                         |
+| `POST /api/auth/refresh`             | Rotate the refresh token, issue a new access token                                              |
+| `GET /api/auth/refresh`              | Same rotation for browser navigations; `302` to `?next=` (relative paths only) or to `/login`   |
+| `POST /api/auth/logout`              | Revoke the refresh-token family, clear the cookies                                              |
+| `GET /api/auth/me`                   | The signed-in user (read from the database)                                                     |
+| `POST /api/auth/verify-email`        | Confirm the address with the token from the confirmation email (public: the token is the proof) |
+| `POST /api/auth/verify-email/resend` | Email a new confirmation link (`409` once confirmed; `RATE_VERIFY_EMAIL_PER_HOUR_USER`)         |
 
 Register, login and refresh answer `{ user, accessToken, expiresIn }` and set two cookies. The access token
 is also accepted as `Authorization: Bearer` (Swagger, tests, non-browser clients).
@@ -21,6 +23,15 @@ is also accepted as `Authorization: Bearer` (Swagger, tests, non-browser clients
 
 Both are `Secure` when `APP_ENV=staging`. The browser reaches the API same-origin through the web app's
 `/api/*` rewrite, so the cookie paths match.
+
+**Email confirmation.** Anybody can register any address, so an account proves that it owns its address before
+a document can be shared with it. Registration emails a link to `/verify-email/<token>` (256 random bits, valid
+for 48 hours, one per account, only its SHA-256 stored in `email_verifications`); opening the page confirms the
+address (`users.email_verified_at`), with or without a session, and opening it again while it is valid says the
+same. Sending a new link replaces the old one. Accepting a workspace invitation confirms the address too: its token
+came by email to that address. Until then the account works normally, the app shows a notice with a button to send
+the link again, and `POST /documents/:id/shares` answers `409` for it. Accounts that existed before confirmation
+was introduced were marked confirmed by the migration (`0009_email_verification`).
 
 For other modules: every route requires a valid access token unless it is marked `@Public()`; the user is
 available through `@CurrentUser()` (`{ id, jti }`). The guard verifies the JWT locally and never touches the

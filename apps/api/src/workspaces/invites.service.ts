@@ -188,6 +188,11 @@ export class InvitesService {
       await tx.workspaceMember.create({
         data: { workspaceId: invite.workspaceId, userId, role: invite.role },
       });
+      // the token came by email to this very address, which confirms it
+      await tx.user.updateMany({
+        where: { id: userId, emailVerifiedAt: null },
+        data: { emailVerifiedAt: new Date() },
+      });
     });
     logEvent(this.logger, 'invite.accepted', {
       workspaceId: invite.workspaceId,

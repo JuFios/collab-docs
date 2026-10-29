@@ -12,6 +12,7 @@ import {
 import type { SearchPage, SnippetPart } from '@collab-docs/shared';
 import { MetricsService, QueueService, emitDocumentChanged } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { confirmEmail } from '../test/confirm-email';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAX_INDEXED_BODY_CHARS, SearchIndexService } from './search-index.service';
 import { SearchWorkerModule } from './search.module';
@@ -57,6 +58,7 @@ describe('search', () => {
       .set('X-Forwarded-For', `10.5.${counter % 250}.${(counter * 7) % 250}`)
       .send({ email, password: PASSWORD, name: label })
       .expect(201);
+    await confirmEmail(prisma, response.body.user.id);
     return { id: response.body.user.id, email, token: response.body.accessToken };
   }
 

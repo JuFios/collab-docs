@@ -13,6 +13,8 @@ export const authUserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   name: z.string(),
+  /** Documents can be shared with the account only once its address is confirmed. */
+  emailVerified: z.boolean(),
 });
 
 /** Body of login / register / refresh. The refresh token travels only in its httpOnly cookie. */

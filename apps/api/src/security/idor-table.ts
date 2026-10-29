@@ -137,6 +137,9 @@ export const IDOR_TABLE: Record<string, Row> = {
   'POST /api/auth/refresh': openRow(401),
   'GET /api/auth/refresh': openRow(302),
   'POST /api/auth/logout': openRow(204),
+  'POST /api/auth/verify-email': openRow(400, () => ({ body: {} })),
+  // the personas are confirmed accounts, for whom there is nothing to send
+  'POST /api/auth/verify-email/resend': authRow(409, () => ({})),
   'GET /api/auth/me': authRow(200, () => ({})),
 
   // --- workspaces ---

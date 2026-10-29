@@ -424,6 +424,84 @@
         ]
       }
     },
+    "/api/auth/verify-email": {
+      "post": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm the email address of an account with the token from the confirmation email",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/verify-email/resend": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Email a new confirmation link to the signed-in user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/me": {
       "get": {
         "operationId": "AuthController_me",
@@ -4468,12 +4546,17 @@
           },
           "name": {
             "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Documents can be shared with the account only once its address is confirmed"
           }
         },
         "required": [
           "id",
           "email",
-          "name"
+          "name",
+          "emailVerified"
         ]
       },
       "AuthSessionResponse": {
@@ -4511,6 +4594,18 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "VerifyEmailDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the confirmation link"
+          }
+        },
+        "required": [
+          "token"
         ]
       },
       "CreateWorkspaceDto": {

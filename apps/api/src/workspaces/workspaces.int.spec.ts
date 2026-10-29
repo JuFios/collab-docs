@@ -7,6 +7,7 @@ import { PERM_EVENT_CHANNELS, type WorkspaceRole } from '@collab-docs/shared';
 import { MailQueueService } from '../mail/mail-queue.service';
 import { MailWorkerModule } from '../mail/mail.module';
 import { createTestApp } from '../test/test-app';
+import { confirmEmail } from '../test/confirm-email';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
@@ -38,6 +39,7 @@ describe('workspaces, members, invites', () => {
       .set('X-Forwarded-For', nextIp())
       .send({ email, password: PASSWORD, name: label })
       .expect(201);
+    await confirmEmail(prisma, response.body.user.id);
     return { id: response.body.user.id, email, token: response.body.accessToken };
   }
 
@@ -111,6 +113,8 @@ describe('workspaces, members, invites', () => {
 
     // capture the invite links regardless of whether a Mailpit is running; delivery still happens through the queue
     const mailQueue = app.get(MailQueueService, { strict: false });
+    // the accounts are confirmed by `confirmEmail`; the confirmation emails of their sign-up would only add noise
+    jest.spyOn(mailQueue, 'sendVerifyEmail').mockResolvedValue(undefined);
     const original = mailQueue.sendInvite.bind(mailQueue);
     jest.spyOn(mailQueue, 'sendInvite').mockImplementation((job) => {
       inviteLinks.set(job.to, job.link);
@@ -127,6 +131,8 @@ describe('workspaces, members, invites', () => {
     it('creates a workspace, invites by email, accepts the invite and lists the member', async () => {
       const owner = await register('flow-owner');
       const invitee = await register('flow-invitee');
+      // the invitation reached this address, so accepting it confirms the address
+      await prisma.user.update({ where: { id: invitee.id }, data: { emailVerifiedAt: null } });
 
       const created = await as(owner)
         .post('/workspaces')
@@ -167,6 +173,9 @@ describe('workspaces, members, invites', () => {
       expect((await as(invitee).post(`/invites/${token}/accept`).expect(200)).body).toEqual({
         workspaceId,
         role: 'EDITOR',
+      });
+      expect((await as(invitee).get('/auth/me').expect(200)).body).toMatchObject({
+        emailVerified: true,
       });
 
       const members = await as(owner).get(`/workspaces/${workspaceId}/members`).expect(200);
@@ -410,7 +419,10 @@ describe('workspaces, members, invites', () => {
           .send({ title: 'Payroll' })
           .expect(201);
         const id = (doc.body as { id: string }).id;
-        await as(team.owner).patch(`/documents/${id}`).send({ visibility: 'RESTRICTED' }).expect(200);
+        await as(team.owner)
+          .patch(`/documents/${id}`)
+          .send({ visibility: 'RESTRICTED' })
+          .expect(200);
         return id;
       };
       const forEditor = await restricted();

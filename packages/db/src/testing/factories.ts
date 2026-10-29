@@ -6,7 +6,7 @@ const unique = (): string => randomBytes(4).toString('hex');
 
 export function makeUser(
   prisma: PrismaClient,
-  overrides: Partial<Pick<User, 'email' | 'name' | 'passwordHash'>> = {},
+  overrides: Partial<Pick<User, 'email' | 'name' | 'passwordHash' | 'emailVerifiedAt'>> = {},
 ): Promise<User> {
   const id = unique();
   return prisma.user.create({
@@ -14,6 +14,7 @@ export function makeUser(
       email: `user-${id}@example.test`,
       name: `User ${id}`,
       passwordHash: 'test-password-hash',
+      emailVerifiedAt: new Date(),
       ...overrides,
     },
   });

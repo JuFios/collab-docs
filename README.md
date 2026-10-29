@@ -396,11 +396,9 @@ than gaps.
 
 **Product**
 
-- Email verification at sign-up, password reset and "sign out everywhere"; the access token cannot be revoked before it
-  expires (15 minutes). Without verification an address belongs to whoever registered it first, and sharing by email
-  grants access to that account at once (invitations to a workspace are safe: they need the token from the email).
-  The share dialog shows the account's name, which is the only check; verification, or shares that wait for a
-  link from the email, would close it.
+- Password reset, a change of email address and "sign out everywhere"; the access token cannot be revoked before it
+  expires (15 minutes). An unconfirmed account can use the app, only sharing with it waits for the confirmation
+  ([auth](docs/auth.md)).
 - Mentions in the **body** of a document (only comments carry @mentions); editing and deleting one's own comment from the
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.

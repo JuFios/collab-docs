@@ -26,6 +26,7 @@ const PRESETS: Record<string, string> = {
   'PATCH /api/comments/{commentId}': 'comment',
   'POST /api/workspaces/{workspaceId}/invites': 'invite',
   'POST /api/documents/{id}/shares': 'share',
+  'POST /api/auth/verify-email/resend': 'verifyEmail',
   'POST /api/mock-provider/checkout-sessions/{id}/complete': 'mockProvider',
   'POST /api/mock-provider/checkout-sessions/{id}/fail': 'mockProvider',
   'POST /api/mock-provider/events/{id}/redeliver': 'mockProvider',
@@ -215,6 +216,8 @@ describe('rate limits', () => {
       ['comments', 'post', `/api/documents/${UNKNOWN_ID}/threads`, 60],
       ['invitations', 'post', `/api/workspaces/${UNKNOWN_ID}/invites`, 3600],
       ['shares', 'post', `/api/documents/${UNKNOWN_ID}/shares`, 60],
+      // the accounts of this suite are not confirmed, so every request sends an email
+      ['confirmation emails', 'post', '/api/auth/verify-email/resend', 3600],
     ];
 
     it.each(cases)(

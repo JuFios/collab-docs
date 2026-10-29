@@ -9,6 +9,7 @@ import { DocumentStateWriter, type PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, REALTIME_CHANNEL, type WorkspaceRole } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { confirmEmail } from '../test/confirm-email';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
@@ -39,6 +40,7 @@ describe('documents', () => {
       .set('X-Forwarded-For', nextIp())
       .send({ email, password: PASSWORD, name: label })
       .expect(201);
+    await confirmEmail(prisma, response.body.user.id);
     return { id: response.body.user.id, email, token: response.body.accessToken };
   }
 
@@ -978,6 +980,36 @@ describe('documents', () => {
       await as(team.owner).delete(`/documents/${doc.id}/shares/${guest.id}`).expect(404);
       await as(guest).get(`/documents/${doc.id}`).expect(404);
       expect((await as(guest).get('/me/shared-documents').expect(200)).body).toEqual([]);
+    });
+
+    it('refuses an account whose address is not confirmed, and accepts it once confirmed', async () => {
+      const team = await setupTeam();
+      const doc = await createDoc(team.owner, team.workspaceId, { title: 'payroll' });
+      await as(team.owner)
+        .patch(`/documents/${doc.id}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
+      // anyone could have registered this address
+      const squatter = await register('squatter');
+      await prisma.user.update({ where: { id: squatter.id }, data: { emailVerifiedAt: null } });
+
+      const refused = await as(team.owner)
+        .post(`/documents/${doc.id}/shares`)
+        .send({ email: squatter.email, role: 'EDITOR' })
+        .expect(409);
+      expect(refused.body.message).toMatch(/has not confirmed their email address/);
+      expect(await prisma.documentShare.count({ where: { documentId: doc.id } })).toBe(0);
+      await as(squatter).get(`/documents/${doc.id}`).expect(404);
+
+      await prisma.user.update({
+        where: { id: squatter.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+      await as(team.owner)
+        .post(`/documents/${doc.id}/shares`)
+        .send({ email: squatter.email, role: 'EDITOR' })
+        .expect(201);
+      await as(squatter).get(`/documents/${doc.id}`).expect(200);
     });
 
     it('a share overrides the workspace role, upwards and downwards', async () => {

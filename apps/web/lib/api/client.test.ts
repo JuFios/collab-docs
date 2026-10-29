@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { createApiClient } from './client';
 
 const session = {
-  user: { id: '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d', email: 'a@b.co', name: 'A' },
+  user: {
+    id: '3f2b1c0e-8f0a-4b8e-9a53-7a1d2f3c4b5d',
+    email: 'a@b.co',
+    name: 'A',
+    emailVerified: true,
+  },
   accessToken: 't',
   expiresIn: 900,
 };

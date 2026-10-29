@@ -98,13 +98,17 @@ enum PublicLinkMode {
 }
 
 model User {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  email        String   @unique // stored lower-case; normalised by the application
-  passwordHash String   @map("password_hash")
-  name         String
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid(7)) @db.Uuid
+  email           String    @unique // stored lower-case; normalised by the application
+  passwordHash    String    @map("password_hash")
+  name            String
+  // null until the address is confirmed (the link in the confirmation email, or an accepted invitation sent to
+  // it); documents are shared only with confirmed addresses
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  emailVerification  EmailVerification?
   refreshTokens      RefreshToken[]
   ownedWorkspaces    Workspace[]
   memberships        WorkspaceMember[]
@@ -173,6 +177,19 @@ model WorkspaceMember {
   @@id([workspaceId, userId])
   @@index([userId])
   @@map("workspace_members")
+}
+
+// pending confirmation of an account's email address: one per account (sending again replaces the token), only
+// the SHA-256 of the token is stored
+model EmailVerification {
+  userId    String   @id @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verifications")
 }
 
 model WorkspaceInvite {

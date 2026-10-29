@@ -2,6 +2,7 @@ import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { PrismaClient } from '@collab-docs/db';
 import type { Access, WorkspaceRole } from '@collab-docs/shared';
+import { confirmEmail } from '../test/confirm-email';
 
 const PASSWORD = 'correct-horse-battery';
 export const UNKNOWN_ID = '0198d6c0-0000-7000-8000-000000000000';
@@ -126,6 +127,7 @@ export class Fixture {
     const response = await this.call('post', '/api/auth/register')
       .send({ email, password: PASSWORD, name: label })
       .expect(201);
+    await confirmEmail(this.prisma, response.body.user.id);
     return { id: response.body.user.id, email, token: response.body.accessToken };
   }
 
