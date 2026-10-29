@@ -23,9 +23,15 @@ import { LAST_WORKSPACE_COOKIE, lastWorkspaceCookieOptions } from './last-worksp
 // back as data (`ActionState`) for the form to show.
 const idSchema = z.string().uuid();
 
-/** Everything that shows workspaces: the navbar switcher lives in the root layout of the signed-in app. */
+/**
+ * The roots under the `(app)` layout, which renders the navbar switcher. Never `/`: the root layout is above the
+ * published pages too, and revalidating it would drop every one of them from the shared ISR cache.
+ */
+const APP_ROOTS = ['/workspaces', '/shared', '/notifications'] as const;
+
+/** Everything that shows workspaces: the navbar switcher lives in the layout of the signed-in app. */
 function refreshWorkspaces(): void {
-  revalidatePath('/', 'layout');
+  for (const root of APP_ROOTS) revalidatePath(root, 'layout');
 }
 
 /**
