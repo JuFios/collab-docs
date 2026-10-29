@@ -421,7 +421,9 @@ than gaps.
   not swept. The tree and the trash are not paginated. Creates, moves, deletes and restores in one workspace
   serialise on the workspace row lock, which is simple and correct but becomes the bottleneck of a very busy workspace.
 - One collab instance _by design_; horizontal scaling needs consistent routing by document id or a Redis fan-out between
-  instances ([CRDT](docs/crdt.md#scaling-the-collab-service)). No load test of the gateway and no Lighthouse measurements.
+  instances ([CRDT](docs/crdt.md#scaling-the-collab-service)). The web app and the api scale out as they are: the
+  ISR cache of the web replicas is shared in Redis, so a revalidation that reaches one replica holds for all
+  ([Publishing](docs/publishing.md)). No load test of the gateway and no Lighthouse measurements.
 - Email is delivered at least once, so a retry after a crash can send an invitation twice.
 - A duplicated character can appear when two people type their first character into an empty document at the same
   instant (behaviour of `@tiptap/y-tiptap`); it is a known limit, not a data loss.
