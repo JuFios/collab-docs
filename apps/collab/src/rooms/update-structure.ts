@@ -14,6 +14,7 @@ const MARKS: ReadonlySet<string> = new Set(MARK_NAMES);
  * Yjs ids (`client:clock`) and its values plain data.
  */
 const POSITION_MIGRATIONS = `__tiptap_position_migrations:root:${CONTENT_FIELD}`;
+const POSITION_MIGRATION_KEY = /^\d+:\d+$/;
 
 /**
  * Why an update does not fit the content model, or `null` when it does. Checked on the decoded update before it
@@ -30,8 +31,23 @@ export function structureViolation(decoded: {
   for (const struct of decoded.structs) {
     if (!(struct instanceof Y.Item)) continue;
     if (typeof struct.parent === 'string') {
-      if (struct.parent === POSITION_MIGRATIONS) continue;
+      if (struct.parent === POSITION_MIGRATIONS) {
+        // plain data under an id-shaped key, nothing else: no types, subdocuments, binaries or free-form keys
+        const plain =
+          struct.content instanceof Y.ContentAny || struct.content instanceof Y.ContentJSON;
+        if (!plain || struct.parentSub === null || !POSITION_MIGRATION_KEY.test(struct.parentSub)) {
+          return `position map entry ${struct.content.constructor.name}`;
+        }
+        continue;
+      }
       if (struct.parent !== CONTENT_FIELD) return `root "${struct.parent}"`;
+      // the fragment holds elements only: text, formats and plain values live inside them
+      if (
+        struct.parentSub !== null ||
+        !(struct.content instanceof Y.ContentType || struct.content instanceof Y.ContentDeleted)
+      ) {
+        return `content ${struct.content.constructor.name} directly in the document`;
+      }
     }
     const { content } = struct;
     if (content instanceof Y.ContentType) {

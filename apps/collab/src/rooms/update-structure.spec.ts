@@ -83,6 +83,32 @@ describe('structureViolation', () => {
 
   it.each([
     [
+      'a type in the position map',
+      (doc: Y.Doc) =>
+        doc.getMap('__tiptap_position_migrations:root:content').set('1:2', new Y.Text()),
+    ],
+    [
+      'a nested map in the position map',
+      (doc: Y.Doc) =>
+        doc.getMap('__tiptap_position_migrations:root:content').set('1:2', new Y.Map()),
+    ],
+    [
+      'a subdocument in the position map',
+      (doc: Y.Doc) =>
+        doc.getMap('__tiptap_position_migrations:root:content').set('1:2', new Y.Doc()),
+    ],
+    [
+      'binary data in the position map',
+      (doc: Y.Doc) =>
+        doc
+          .getMap('__tiptap_position_migrations:root:content')
+          .set('1:2', new Uint8Array(1024) as unknown as object),
+    ],
+    [
+      'a free-form key in the position map',
+      (doc: Y.Doc) => doc.getMap('__tiptap_position_migrations:root:content').set('junk', 1),
+    ],
+    [
       'an element outside the model',
       (doc: Y.Doc) => doc.getXmlFragment('content').insert(0, [new Y.XmlElement('script')]),
     ],
