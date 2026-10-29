@@ -120,7 +120,8 @@ export default class CacheHandler {
       const tags = tagsOf(entry, ctx);
       if (tags.length > 0) {
         const revalidatedAt = await this.store.hmget(this.tagsKey, ...tags);
-        if (revalidatedAt.some((at) => at !== null && Number(at) >= entry.lastModified)) return null;
+        if (revalidatedAt.some((at) => at !== null && Number(at) >= entry.lastModified))
+          return null;
       }
       return entry;
     } catch (error) {

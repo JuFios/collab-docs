@@ -114,6 +114,7 @@ describe('searchPageSchema', () => {
         items: [
           {
             id: '0190b1c2-0000-7000-8000-0000000000aa',
+            workspaceId: '0190b1c2-0000-7000-8000-0000000000bb',
             title: 'Plan',
             snippet: [{ text: 'x', match: true }],
             updatedAt: '2026-10-26T12:00:00.000Z',

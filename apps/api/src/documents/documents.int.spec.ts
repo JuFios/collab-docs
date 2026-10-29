@@ -565,7 +565,10 @@ describe('documents', () => {
       const hidden = await createDoc(team.owner, team.workspaceId, { parentId: parent.id });
       const readOnly = await createDoc(team.owner, team.workspaceId, { parentId: open.id });
       for (const id of [hidden.id, readOnly.id]) {
-        await as(team.owner).patch(`/documents/${id}`).send({ visibility: 'RESTRICTED' }).expect(200);
+        await as(team.owner)
+          .patch(`/documents/${id}`)
+          .send({ visibility: 'RESTRICTED' })
+          .expect(200);
       }
       await share(team.owner, readOnly.id, team.editor, 'VIEWER');
       await as(team.editor).get(`/documents/${hidden.id}`).expect(404);
@@ -586,12 +589,17 @@ describe('documents', () => {
       await share(team.owner, readOnly.id, team.editor, 'EDITOR');
       await as(team.editor).delete(`/documents/${parent.id}`).expect(204);
       expect(
-        await prisma.document.count({ where: { deletedRootId: parent.id, deletedAt: { not: null } } }),
+        await prisma.document.count({
+          where: { deletedRootId: parent.id, deletedAt: { not: null } },
+        }),
       ).toBe(4);
 
       const other = await createDoc(team.editor, team.workspaceId);
       const secret = await createDoc(team.owner, team.workspaceId, { parentId: other.id });
-      await as(team.owner).patch(`/documents/${secret.id}`).send({ visibility: 'RESTRICTED' }).expect(200);
+      await as(team.owner)
+        .patch(`/documents/${secret.id}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
       await as(team.admin).delete(`/documents/${other.id}`).expect(204);
     });
   });

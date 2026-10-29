@@ -298,7 +298,9 @@ describe('DocRoom', () => {
       client.settle();
       expect(handed).toHaveBeenCalledTimes(1);
       const before = new Y.Doc();
-      Y.applyUpdate(before, handed.mock.calls[0]![1]);
+      // the in-memory store ignores its arguments, so the spy is typed without them
+      const [, stateBefore] = handed.mock.calls[0] as unknown as [string, Uint8Array];
+      Y.applyUpdate(before, stateBefore);
       // the version keeps what the change replaced
       expect(before.getXmlFragment('content').toString()).not.toContain('first');
       expect(room.doc.getXmlFragment('content').toString()).toContain('first');
