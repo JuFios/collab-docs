@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LinkPending } from '@/components/link-pending';
 import { cn } from '@/lib/utils';
 
 /** Client component: marks the current section from the pathname. */
@@ -51,6 +52,7 @@ export function WorkspaceNav({
           )}
         >
           {link.label}
+          <LinkPending />
         </Link>
       ))}
     </nav>

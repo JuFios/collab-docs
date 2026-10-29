@@ -42,9 +42,8 @@ export function LeaveWorkspaceButton({
       }
       setOpen(false);
       toast.success(`You left ${workspaceName}.`);
-      // the workspace page would 404 now; go to the list (and refresh the navbar switcher with it)
+      // the workspace page would 404 now; the action refreshed the navbar switcher
       router.push('/workspaces?all=1');
-      router.refresh();
     });
   }
 

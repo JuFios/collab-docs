@@ -2,6 +2,17 @@
 export const LAST_WORKSPACE_COOKIE = 'cd_ws';
 export const LAST_WORKSPACE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
+/** Attributes of the cookie; `secure` when the request came over HTTPS (`x-forwarded-proto`). */
+export function lastWorkspaceCookieOptions(secure: boolean) {
+  return {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure,
+    maxAge: LAST_WORKSPACE_MAX_AGE_SECONDS,
+  };
+}
+
 const WORKSPACE_PATH =
   /^\/workspaces\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
 

@@ -9,7 +9,7 @@ import {
 } from '@/lib/security/headers';
 import {
   LAST_WORKSPACE_COOKIE,
-  LAST_WORKSPACE_MAX_AGE_SECONDS,
+  lastWorkspaceCookieOptions,
   workspaceIdFromPath,
 } from '@/lib/workspaces/last-workspace';
 
@@ -68,13 +68,11 @@ export async function middleware(request: NextRequest) {
       // remember the workspace the user is looking at, so `/workspaces` can send them back to it
       const workspaceId = workspaceIdFromPath(pathname);
       if (workspaceId && request.cookies.get(LAST_WORKSPACE_COOKIE)?.value !== workspaceId) {
-        response.cookies.set(LAST_WORKSPACE_COOKIE, workspaceId, {
-          path: '/',
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: request.headers.get('x-forwarded-proto') === 'https',
-          maxAge: LAST_WORKSPACE_MAX_AGE_SECONDS,
-        });
+        response.cookies.set(
+          LAST_WORKSPACE_COOKIE,
+          workspaceId,
+          lastWorkspaceCookieOptions(request.headers.get('x-forwarded-proto') === 'https'),
+        );
       }
     }
   }

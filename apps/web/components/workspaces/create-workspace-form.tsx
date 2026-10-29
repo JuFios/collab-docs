@@ -1,18 +1,17 @@
 'use client';
 
-import { createWorkspaceInputSchema } from '@collab-docs/shared';
+import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FormError, FormField } from '@/components/ui/form';
 import { createWorkspaceAction } from '@/lib/workspaces/actions';
 import { useActionFeedback } from './use-action-feedback';
-import { useValidatedAction } from './use-validated-action';
 
-/** Client component: pending state and field errors, with the zod check done before the round trip. */
+/**
+ * Client component for the pending state and the field errors. The form posts to the Server Action itself, so it
+ * also works without JavaScript; the action validates with the shared zod schema.
+ */
 export function CreateWorkspaceForm() {
-  const [state, formAction, pending] = useValidatedAction(
-    createWorkspaceAction,
-    createWorkspaceInputSchema,
-  );
+  const [state, formAction, pending] = useActionState(createWorkspaceAction, {});
   useActionFeedback(state);
   const errors = state.fieldErrors ?? {};
 

@@ -30,10 +30,10 @@ Server Component is the default: anything that reads data and needs no browser s
 | `components/documents/trash-list.tsx`                                                                       | Restore runs from an event handler, then the server-rendered list is refreshed                                                               |
 | `components/dashboard/block-boundary.tsx`                                                                   | Error boundaries must be class components; one per dashboard block                                                                           |
 | `app/(app)/workspaces/[workspaceId]/error.tsx`                                                              | Error boundary of the workspace segment (keeps the navbar and workspace header)                                                              |
-| `components/billing/checkout-button.tsx`, `cancel-subscription-button.tsx`, `use-action-runner.ts`          | Buttons call Server Actions from event handlers (a plain `<form>` has nothing to submit), then navigate through `useActionFeedback`          |
+| `components/billing/checkout-button.tsx`, `cancel-subscription-button.tsx`                                  | Forms with hidden inputs posting to Server Actions (pending state, field errors); the action redirects                                       |
 | `components/billing/awaiting-confirmation.tsx`                                                              | The only waiting piece of the flow: asks the server for a fresh render every 1.5 s, at most 30 times, until the webhook has changed the plan |
 | `components/billing/plan-limit-dialog.tsx`                                                                  | Listens to the plan-limit window event, so it needs the browser; reads the member's role from the workspace context                          |
-| `components/billing/mock-checkout-form.tsx`                                                                 | The three buttons of the payment page; each runs a Server Action from its handler                                                            |
+| `components/billing/mock-checkout-form.tsx`                                                                 | One form with three submit buttons (`name="outcome"`); the action settles the payment and redirects                                          |
 | `components/ui/dialog`, `dropdown-menu`, `label`, `sonner`                                                  | Radix/Sonner primitives that need effects and event handlers                                                                                 |
 | `app/error.tsx`                                                                                             | Error boundaries must be Client Components                                                                                                   |
 
@@ -45,7 +45,7 @@ Screens and where they render (everything not listed as a client island is a Ser
 | `/workspaces/[workspaceId]` (dashboard)            | RSC, four async RSC blocks                  | Each block has its own `Suspense` + error boundary, so the shell and skeletons flush first and the blocks stream in independently                                                                                                                             |
 | `/workspaces/[workspaceId]/settings`               | RSC page + client forms/tables              | Data is read on the server (admin-only, `ForbiddenState` otherwise); every mutation is a Server Action                                                                                                                                                        |
 | `/workspaces/[workspaceId]/billing`                | RSC page + client buttons                   | Plan, usage, plans and invoices are read on the server (admin-only); upgrade and cancel are Server Actions; one small island polls while a webhook is pending                                                                                                 |
-| `/mock-checkout/[sessionId]`                       | RSC page + client buttons                   | A public route like a hosted checkout; the session is read with `cache: 'no-store'`, the buttons are Server Actions                                                                                                                                           |
+| `/mock-checkout/[sessionId]`                       | RSC page + client form                      | A public route like a hosted checkout; the session is read with `cache: 'no-store'`, the buttons submit one form to a Server Action                                                                                                                           |
 | `/invite/[token]`                                  | RSC                                         | Previews the invite on the server and branches on the session: sign in / register links, a mismatch warning, or the accept form                                                                                                                               |
 | `/workspaces/[workspaceId]/documents/[documentId]` | RSC page + client shell and editor          | The page reads the document and its `myAccess` on the server (404 / `ForbiddenState`, and a "deleted" state that is looked up in the trash); the shell is a client island that owns the real-time connection, the title, presence, save status and the editor |
 | `/workspaces/[workspaceId]/trash`                  | RSC page + client list                      | Plain read of what the caller may restore; Restore is a REST call followed by `router.refresh()`                                                                                                                                                              |
@@ -283,7 +283,7 @@ dialog does not offer to free space (it only says so).
 
 | Operation                                                                                                                      | Channel               | Why                                                                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Create/rename workspace, invite, change role, remove member, revoke/accept invite, checkout, cancel subscription, login/logout | **Server Actions**    | Forms that work as plain `<form action>`, cookies handled on the server, `revalidatePath` refreshes the Server Components that show the data |
+| Create/rename workspace, invite, change role, remove member, revoke/accept invite, checkout, cancel subscription, login/logout | **Server Actions**    | Forms that work as plain `<form action>` (also without JavaScript), cookies handled on the server, `redirect`/`revalidatePath` in the action |
 | Document tree (move/create/rename/delete), comments, sharing, publishing                                                       | REST + TanStack Query | Interactive, optimistic UI and cache invalidation in the browser                                                                             |
 | Notifications, tree changes                                                                                                    | SSE                   | One-way push                                                                                                                                 |
 | Document content, presence                                                                                                     | WebSocket (Yjs)       | Conflict-free merging and awareness                                                                                                          |
@@ -296,18 +296,33 @@ listens to), or a generic message. Forms run the same schema in the browser firs
 function (`use-validated-action.ts`), so field errors appear without a round trip. Authorization is always the
 api's; hiding admin controls in the UI is convenience only.
 
-**Why actions do not call `revalidatePath` or `redirect`.** The api client is never cached, so there is no server
-data cache to purge; what a mutation needs is a fresh render of the current page. Calling `revalidatePath` or
-`redirect` inside the action makes the action response carry that render, and on the production build (Next 15.5,
-React 19.2) forms that did so intermittently stayed pending or never showed the result, with or without the nginx
-proxy in front. Two things were measured: a `loading.tsx` above the workspace layouts made it much worse (6 of 16
-submits of the invite form stalled, against 0 of 78 once the skeletons were scoped to their own segments, which
-is why the list skeleton lives in the `app/(app)/workspaces/(list)` route group), but revalidating actions still flaked
-in the parallel e2e run (create and rename, 2 of 4 runs). So an action only returns data (`ActionState`, including
-`redirectTo` after creating a workspace or accepting an invite) and the component finishes the job in
-`useActionFeedback`: toast, `router.push` when asked, and `router.refresh()`, a separate GET that also re-renders the
-layouts (the navbar switcher picks up a new workspace). Components that call actions from event handlers (role
-select, remove, revoke) refresh the same way. The root cause inside Next/React is not identified.
+**Forms work without JavaScript.** Every form posts to its Server Action directly (`useActionState(action)`, no
+client-side wrapper), and the action finishes the job on the server: `redirect` after creating a workspace,
+accepting an invitation, starting or cancelling a checkout and settling a mock payment, `revalidatePath` after the
+other mutations, so the response carries the page as it now is. With JavaScript, React applies that response in
+place and `useActionFeedback` only shows the toast and forwards a plan limit to the upgrade dialog; without it, the
+browser posts the form and follows the redirect like any HTML form (`e2e/tests/workspaces.spec.ts` creates a
+workspace and sends an invitation with JavaScript disabled). Buttons that cannot be forms (the role select, the
+confirmation dialogs) call the same actions from their handlers and get the same revalidated render.
+
+Two things make this hold:
+
+- **Pages with forms are not streamed.** A `loading.tsx` (or any `<Suspense>`) above a page makes Next send the
+  skeleton first and the content later, in a hidden element that an inline script reveals; without JavaScript only
+  the skeleton is ever shown. The workspace list, settings, billing, the invitation and the mock payment page
+  therefore have no `loading.tsx` and render in one piece; the route-state audit (`app/route-states.test.ts`) fails
+  if one gets a boundary back. While JavaScript navigates to one of them, the link that was clicked shows the wait
+  (`useLinkStatus`, `components/link-pending.tsx`) instead of a skeleton. The dashboard keeps its streamed blocks
+  (it has no form), with its skeleton scoped to the `(overview)` route group so that it does not wrap the pages
+  next to it.
+- **The action sets what the middleware would.** A redirect from an action is rendered in the response to the
+  POST, so no request for the new page reaches the middleware: the "last opened workspace" cookie (`cd_ws`) is set
+  by the action itself (`openWorkspace` in `lib/workspaces/actions.ts`).
+
+An earlier version returned `redirectTo` and navigated from the client instead, because forms that redirected or
+revalidated intermittently stayed pending. That was measured with a `loading.tsx` above the workspace layouts and
+with the forms wrapped in a client-side validation function; with both gone, the workspace and billing suites run
+three times in a row without a retry (63 of 63) and the full end-to-end suite passes on the first attempt.
 
 Route groups keep the rendering mode of each area separate:
 

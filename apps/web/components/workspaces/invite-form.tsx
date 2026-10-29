@@ -1,6 +1,7 @@
 'use client';
 
-import { INVITABLE_ROLES, type WorkspaceRole, inviteInputSchema } from '@collab-docs/shared';
+import { useActionState } from 'react';
+import { INVITABLE_ROLES, type WorkspaceRole } from '@collab-docs/shared';
 import { Button } from '@/components/ui/button';
 import { FormError, FormField } from '@/components/ui/form';
 import { Label } from '@/components/ui/label';
@@ -8,7 +9,6 @@ import { Select } from '@/components/ui/select';
 import { ROLE_LABELS } from '@/lib/workspaces/labels';
 import { inviteMemberAction } from '@/lib/workspaces/actions';
 import { useActionFeedback } from './use-action-feedback';
-import { useValidatedAction } from './use-validated-action';
 
 /** Client component: pending state, field errors and the plan-limit explanation from the Server Action. */
 export function InviteForm({
@@ -18,7 +18,7 @@ export function InviteForm({
   workspaceId: string;
   roles?: readonly WorkspaceRole[];
 }) {
-  const [state, formAction, pending] = useValidatedAction(inviteMemberAction, inviteInputSchema);
+  const [state, formAction, pending] = useActionState(inviteMemberAction, {});
   // React resets an uncontrolled form after a successful action; `values` is only echoed on failure
   useActionFeedback(state);
   const errors = state.fieldErrors ?? {};

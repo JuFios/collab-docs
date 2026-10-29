@@ -1,7 +1,6 @@
 'use client';
 
 import type { Invite } from '@collab-docs/shared';
-import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/states';
@@ -35,7 +34,6 @@ export function PendingInvites({
 }
 
 function InviteRow({ workspaceId, invite }: { workspaceId: string; invite: Invite }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function revoke() {
@@ -43,7 +41,6 @@ function InviteRow({ workspaceId, invite }: { workspaceId: string; invite: Invit
       const result = await revokeInviteAction({ workspaceId, inviteId: invite.id });
       if (result.ok) {
         toast.success(result.notice ?? 'Invitation revoked.');
-        router.refresh();
       } else toast.error(result.formError ?? 'Could not revoke the invitation.');
     });
   }

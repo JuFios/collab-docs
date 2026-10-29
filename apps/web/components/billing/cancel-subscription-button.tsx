@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,12 +12,14 @@ import {
 } from '@/components/ui/dialog';
 import { FormError } from '@/components/ui/form';
 import { cancelSubscriptionAction } from '@/lib/billing/actions';
-import { useActionRunner } from './use-action-runner';
 
-/** Confirmation, then a cancellation request; the plan drops to Free once the provider's webhook is applied. */
+/**
+ * Confirmation, then a cancellation request (a form posting to the action, which redirects to billing); the plan
+ * drops to Free once the provider's webhook is applied.
+ */
 export function CancelSubscriptionButton({ workspaceId }: { workspaceId: string }) {
   const [open, setOpen] = useState(false);
-  const { state, pending, execute } = useActionRunner(cancelSubscriptionAction);
+  const [state, formAction, pending] = useActionState(cancelSubscriptionAction, {});
 
   return (
     <>
@@ -35,18 +37,17 @@ export function CancelSubscriptionButton({ workspaceId }: { workspaceId: string 
             </DialogDescription>
           </DialogHeader>
           <FormError message={state.formError} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Keep the plan
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={pending}
-              onClick={() => execute({ workspaceId })}
-            >
-              {pending ? 'Canceling…' : 'Cancel subscription'}
-            </Button>
-          </DialogFooter>
+          <form action={formAction}>
+            <input type="hidden" name="workspaceId" value={workspaceId} />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Keep the plan
+              </Button>
+              <Button type="submit" variant="destructive" disabled={pending}>
+                {pending ? 'Canceling…' : 'Cancel subscription'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

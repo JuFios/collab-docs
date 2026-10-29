@@ -325,6 +325,36 @@ test.describe('workspaces', () => {
     expect(await (await context.request.get('/api/me/shared-documents')).json()).toEqual([]);
   });
 
+  test('the forms work without JavaScript: create a workspace, then invite', async ({
+    browser,
+    baseURL,
+    user,
+  }) => {
+    const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
+    const login = await context.request.post('/api/auth/login', {
+      data: { email: user.email, password: user.password },
+    });
+    expect(login.status()).toBe(200);
+    const page = await context.newPage();
+
+    await page.goto('/workspaces');
+    await page.getByLabel('Workspace name').fill('No script');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+    await expect(page).toHaveURL(/\/workspaces\/[0-9a-f-]{36}$/);
+    const workspaceId = new URL(page.url()).pathname.split('/')[2]!;
+
+    await page.goto(`/workspaces/${workspaceId}/settings`);
+    await page.getByRole('textbox', { name: 'Email' }).fill('not-an-email');
+    await page.getByRole('button', { name: 'Send invitation' }).click();
+    await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Email' }).fill('no-script@example.test');
+    await page.getByRole('button', { name: 'Send invitation' }).click();
+    await expect(
+      page.getByRole('list', { name: 'Pending invitations' }).getByText('no-script@example.test'),
+    ).toBeVisible();
+    await context.close();
+  });
+
   test('a member can leave a workspace, the last owner cannot', async ({
     browser,
     baseURL,
