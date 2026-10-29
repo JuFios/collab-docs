@@ -295,6 +295,57 @@ describe('DocRoom', () => {
       client.settle();
       expect(observer.rejected).toContain('document_too_large');
       expect(room.doc.getXmlFragment('content').toString()).not.toContain('b');
+      expect(client.lastEvent('rejected')).toEqual({
+        type: 'rejected',
+        reason: 'document_too_large',
+      });
+    });
+
+    it('tells only the sender about a refused update, once, and ignores what it builds on it', () => {
+      const { room, observer } = setup({ maxUpdateBytes: 64 });
+      const sender = new TestClient(room);
+      const other = new TestClient(room);
+      sender.join();
+      other.join();
+      sender.settle();
+      other.settle();
+
+      sender.text().insert(0, 'x'.repeat(500));
+      sender.settle();
+      sender.text().insert(0, 'later');
+      sender.settle();
+      other.settle();
+
+      expect(sender.events.filter((e) => e.type === 'rejected')).toEqual([
+        { type: 'rejected', reason: 'too_large' },
+      ]);
+      expect(other.lastEvent('rejected')).toBeUndefined();
+      expect(observer.rejected).toEqual(['too_large']);
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('later');
+
+      // the room keeps serving everyone else
+      other.text().insert(0, 'ok');
+      other.settle();
+      expect(room.doc.getXmlFragment('content').toString()).toContain('ok');
+    });
+
+    it('measures the document before refusing it, so edits that were deleted do not count', () => {
+      const { room, observer } = setup({ maxDocumentBytes: 2000 });
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+      for (let round = 0; round < 60; round++) {
+        client.text().insert(0, 'y'.repeat(40));
+        client.settle();
+        client.text().delete(0, 40);
+        client.settle();
+      }
+      client.text().insert(0, 'kept');
+      client.settle();
+
+      expect(observer.rejected).toEqual([]);
+      expect(client.lastEvent('rejected')).toBeUndefined();
+      expect(room.doc.getXmlFragment('content').toString()).toContain('kept');
     });
   });
 

@@ -24,7 +24,8 @@ close codes and the `persisted` / `access` / `deleted` room events are specified
   identity, so a client cannot impersonate anybody.
 - **Limits** (env, defaults from the spec): 200 messages per 10 s per connection, 1 MB per update, 10 MB per
   document, 100 connections per document, 4 KB per presence state. Violations are rejected, counted and logged
-  as `collab.update_rejected` without disturbing the other clients.
+  as `collab.update_rejected` without disturbing the other clients; a refused update is reported to its sender
+  (room event `rejected`), which reloads the document from the server state.
 - **Metrics** (`/metrics`): `collab_connections`, `collab_rooms`, `collab_updates_applied_total`,
   `collab_updates_duplicate_total`, `collab_updates_rejected_total{reason}`, `collab_rate_limited_total`,
   `collab_ws_close_total{code}`, `collab_access_changes_total{outcome}`, plus the platform metrics.

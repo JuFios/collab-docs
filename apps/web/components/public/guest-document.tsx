@@ -3,6 +3,7 @@
 import { collabTicketSchema } from '@collab-docs/shared';
 import Link from 'next/link';
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 import { DocumentEditor } from '@/components/editor/document-editor';
 import { PresenceAvatars } from '@/components/editor/presence-avatars';
 import { SaveIndicator } from '@/components/editor/save-indicator';
@@ -10,6 +11,7 @@ import { Providers } from '@/components/providers';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api/client';
+import { rejectionMessage } from '@/lib/collab/errors';
 import { deriveSaveStatus } from '@/lib/collab/save-status';
 import { useCollabConnection } from '@/lib/collab/use-collab-connection';
 import { useOnlineStatus } from '@/lib/collab/use-online-status';
@@ -55,7 +57,10 @@ function GuestSession({
       }),
     [token],
   );
-  const connection = useCollabConnection(documentId, { fetchTicket });
+  const connection = useCollabConnection(documentId, {
+    fetchTicket,
+    onRejected: ({ reason }) => toast.warning(rejectionMessage(reason)),
+  });
   const presence = usePresence(connection.provider);
   const status = deriveSaveStatus({
     connection: connection.status,

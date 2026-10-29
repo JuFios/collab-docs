@@ -8,6 +8,8 @@ import {
   type Access,
   COLLAB_CLOSE,
   COLLAB_MESSAGE,
+  COLLAB_REJECT_REASONS,
+  type CollabRejectReason,
   type CollabRoomEvent,
   accessAtLeast,
 } from '@collab-docs/shared';
@@ -39,8 +41,7 @@ export interface RoomLimits {
   maxAwarenessBytes: number;
 }
 
-export type RejectReason =
-  'read_only' | 'too_large' | 'document_too_large' | 'invalid' | 'awareness_invalid';
+export type RejectReason = 'read_only' | 'awareness_invalid' | CollabRejectReason;
 
 export interface RoomObserver {
   updateApplied(): void;
@@ -67,11 +68,21 @@ const RATE_WINDOW_MS = 10_000;
 const MAX_AWARENESS_IDS_PER_CONNECTION = 4;
 /** Update of a Y.Doc without structs and deletions. */
 const EMPTY_UPDATE_BYTES = 2;
+/**
+ * The size estimate is re-measured only once it has drifted by this share of the limit, so a document that really is
+ * close to its limit is not encoded again on every keystroke.
+ */
+const MEASURE_SLACK_FRACTION = 64;
+
+const isUpdateRejection = (reason: RejectReason): reason is CollabRejectReason =>
+  (COLLAB_REJECT_REASONS as readonly string[]).includes(reason);
 
 interface ConnectionState {
   readonly conn: RoomConnection;
   access: Access;
   readOnly: boolean;
+  /** An update of this connection was refused; its later ones depend on it and are ignored until it reconnects. */
+  rejected: boolean;
   /** Awareness client ids this connection owns; it may only change those. */
   readonly awarenessIds: Set<number>;
   windowStart: number;
@@ -109,7 +120,13 @@ export class DocRoom {
   private lastSubmittedSeq = 0;
   /** The last of those the store has written. */
   private persistedSeq = 0;
-  private approximateBytes: number;
+  /** Encoded size of the document when it was last measured (or loaded). */
+  private measuredBytes: number;
+  /**
+   * Bytes of the updates applied since then. Their sum only grows, deletions included, so together with
+   * `measuredBytes` it is an upper bound that is measured again before it may refuse an update.
+   */
+  private unmeasuredBytes = 0;
   private appliedChange = false;
   private readonly unsubscribe: () => void;
   private destroyed = false;
@@ -124,7 +141,7 @@ export class DocRoom {
     private readonly clock: () => number = Date.now,
   ) {
     if (initialState) Y.applyUpdate(this.doc, initialState, 'load');
-    this.approximateBytes = initialState?.byteLength ?? 0;
+    this.measuredBytes = initialState?.byteLength ?? 0;
     // everything loaded from the store is durable by definition
     this.persistedStateVector = Y.encodeStateVector(this.doc);
     this.awareness.setLocalState(null);
@@ -163,6 +180,7 @@ export class DocRoom {
       conn,
       access,
       readOnly: !accessAtLeast(access, 'EDIT'),
+      rejected: false,
       awarenessIds: new Set(),
       windowStart: this.clock(),
       messages: 0,
@@ -328,10 +346,10 @@ export class DocRoom {
     // a client answering our sync step 1 with nothing to add sends an empty update; that is not an event
     if (update.byteLength <= EMPTY_UPDATE_BYTES) return;
     if (state.readOnly) return this.reject(state, 'read_only');
+    // the client starts over after a rejection; until then everything it sends builds on the refused update
+    if (state.rejected) return;
     if (update.byteLength > this.limits.maxUpdateBytes) return this.reject(state, 'too_large');
-    if (this.approximateBytes + update.byteLength > this.limits.maxDocumentBytes) {
-      return this.reject(state, 'document_too_large');
-    }
+    if (!this.fitsDocument(update.byteLength)) return this.reject(state, 'document_too_large');
     this.appliedChange = false;
     try {
       // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
@@ -347,6 +365,17 @@ export class DocRoom {
       // a client repeats what it holds after reconnecting; answering says whether that is stored or still pending
       this.sendEvent(state, this.persistedEvent());
     }
+  }
+
+  /** Would the document stay within its size limit with `bytes` more? */
+  private fitsDocument(bytes: number): boolean {
+    const limit = this.limits.maxDocumentBytes;
+    if (this.measuredBytes + this.unmeasuredBytes + bytes <= limit) return true;
+    if (this.unmeasuredBytes >= limit / MEASURE_SLACK_FRACTION) {
+      this.measuredBytes = Y.encodeStateAsUpdate(this.doc).byteLength;
+      this.unmeasuredBytes = 0;
+    }
+    return this.measuredBytes + this.unmeasuredBytes + bytes <= limit;
   }
 
   private handleAwareness(state: ConnectionState, payload: Uint8Array): void {
@@ -411,13 +440,18 @@ export class DocRoom {
       },
       'collab.update_rejected',
     );
+    // the refused change stays in the client's own document; without being told it would never converge again
+    if (isUpdateRejection(reason) && !state.rejected) {
+      state.rejected = true;
+      this.sendEvent(state, { type: 'rejected', reason });
+    }
   }
 
   // --- fan-out ----------------------------------------------------------------------------------------
 
   private readonly onDocUpdate = (update: Uint8Array, origin: unknown): void => {
     this.appliedChange = true;
-    this.approximateBytes += update.byteLength;
+    this.unmeasuredBytes += update.byteLength;
     const message = frame(COLLAB_MESSAGE.sync, (encoder) =>
       syncProtocol.writeUpdate(encoder, update),
     );

@@ -261,6 +261,26 @@ describe('useCollabConnection', () => {
     expect(current().params.ticket).toBe('t2');
   });
 
+  it('starts over from the server state once when the server refuses a local change', async () => {
+    const onRejected = vi.fn();
+    const { result } = await connected({ onRejected });
+    const first = current();
+    const firstDoc = result.current.ydoc;
+    act(() => (result.current.ydoc as Y.Doc).getText('t').insert(0, 'too much'));
+    act(() => {
+      first.roomEvent({ type: 'rejected', reason: 'too_large' });
+      first.roomEvent({ type: 'rejected', reason: 'too_large' });
+    });
+
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    expect(onRejected).toHaveBeenCalledWith({ reason: 'too_large' });
+    await waitFor(() => expect(FakeProvider.instances).toHaveLength(2));
+    expect(first.destroy).toHaveBeenCalled();
+    await waitFor(() => expect(result.current.provider).toBe(current()));
+    expect(result.current.ydoc).not.toBe(firstDoc);
+    expect(result.current.error).toBeNull();
+  });
+
   it('does not recreate the document for a viewer that was always read-only', async () => {
     const onDowngrade = vi.fn();
     await connected({ onDowngrade });

@@ -2,6 +2,7 @@
 
 import {
   type Access,
+  type CollabRejectReason,
   type CollabTicket,
   COLLAB_MESSAGE,
   accessAtLeast,
@@ -35,8 +36,14 @@ interface DowngradeNotice {
   discardedChanges: boolean;
 }
 
+interface RejectionNotice {
+  reason: CollabRejectReason;
+}
+
 interface CollabConnectionOptions {
   onDowngrade?: (notice: DowngradeNotice) => void;
+  /** The server refused a local change; the session starts over from the server's state without it. */
+  onRejected?: (notice: RejectionNotice) => void;
   /** Where a ticket comes from; the default is the signed-in user's `collab-ticket`. Guests pass their link's. */
   fetchTicket?: (signal: AbortSignal) => Promise<CollabTicket>;
 }
@@ -91,8 +98,8 @@ function fetchCollabTicket(documentId: string, signal: AbortSignal) {
 /**
  * The only place that opens a document's WebSocket. It owns the `Y.Doc` and the `WebsocketProvider`, fetches the
  * short-lived ticket before every (re)connect that needs one, turns close codes and room events into state and
- * recreates the document when the user's access drops to read-only. Every WebSocket failure goes through
- * `decideOnClose` / `decideOnTicketError` in `./errors`.
+ * recreates the document when the user's access drops to read-only or the server refuses a local change. Every
+ * WebSocket failure goes through `decideOnClose` / `decideOnTicketError` in `./errors`.
  */
 export function useCollabConnection(
   documentId: string,
@@ -103,6 +110,8 @@ export function useCollabConnection(
   const [session, setSession] = useState(0);
   const onDowngrade = useRef(options.onDowngrade);
   onDowngrade.current = options.onDowngrade;
+  const onRejected = useRef(options.onRejected);
+  onRejected.current = options.onRejected;
   const fetchTicket = useRef(options.fetchTicket);
   fetchTicket.current = options.fetchTicket;
 
@@ -119,6 +128,8 @@ export function useCollabConnection(
     let unsynced = false;
     // a local change the server has not confirmed as stored; a state vector alone cannot show a deletion
     let dirty = false;
+    // this session's document is being replaced; further events of its socket change nothing
+    let restarting = false;
 
     const patch = (change: Partial<Snapshot>) => {
       if (alive) setSnapshot((current) => ({ ...current, ...change }));
@@ -148,6 +159,11 @@ export function useCollabConnection(
       scheduleConnect(action === 'backoff' ? backoffDelay(failedRounds) : 0);
     };
 
+    const restart = () => {
+      restarting = true;
+      setSession((value) => value + 1);
+    };
+
     const handleRoomEvent = (raw: string) => {
       let json: unknown;
       try {
@@ -158,6 +174,7 @@ export function useCollabConnection(
       const parsed = collabRoomEventSchema.safeParse(json);
       if (!parsed.success) return;
       const event = parsed.data;
+      if (restarting) return;
       if (event.type === 'persisted') {
         persisted = base64ToBytes(event.sv);
         // `saved` (absent from older servers) is the only acknowledgement that covers a deletion
@@ -170,8 +187,12 @@ export function useCollabConnection(
         if (previous !== null && accessAtLeast(previous, 'EDIT') && event.readOnly) {
           // the server ignores this client's edits from now on; start over from the server's state
           onDowngrade.current?.({ discardedChanges: unsynced });
-          setSession((value) => value + 1);
+          restart();
         }
+      } else if (event.type === 'rejected') {
+        // the refused change and everything typed after it can never reach the room: drop them with this document
+        onRejected.current?.({ reason: event.reason });
+        restart();
       } else {
         giveUp(collabError('deleted'));
       }

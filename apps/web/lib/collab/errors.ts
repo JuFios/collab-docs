@@ -1,4 +1,8 @@
-import { COLLAB_CLOSE, COLLAB_FINAL_CLOSE_CODES } from '@collab-docs/shared';
+import {
+  COLLAB_CLOSE,
+  COLLAB_FINAL_CLOSE_CODES,
+  type CollabRejectReason,
+} from '@collab-docs/shared';
 import { isApiError } from '@/lib/api/errors';
 
 /** Why a collaboration session ended for good; the editor shows a screen for each. */
@@ -72,6 +76,15 @@ export function decideOnTicketError(error: unknown): RecoveryDecision {
   }
   return stopped('unavailable');
 }
+
+const REJECTED: Record<CollabRejectReason, string> = {
+  too_large: 'That change was too large to save and was undone.',
+  document_too_large: 'This document has reached its size limit. The last change was undone.',
+  invalid: 'A change could not be saved and was undone.',
+};
+
+/** What the editor tells the user when the server refused a local change and the document was reloaded. */
+export const rejectionMessage = (reason: CollabRejectReason): string => REJECTED[reason];
 
 /** Consecutive failed rounds (ticket or connection) before the session gives up and offers a manual retry. */
 export const MAX_RECOVERY_ROUNDS = 5;
