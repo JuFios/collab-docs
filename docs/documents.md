@@ -28,7 +28,9 @@ in `documents.position` (`COLLATE "C"`), so a reorder rewrites one row and never
   documents shared with them (`GET /me/shared-documents`), not the tree or the workspace. A share overrides the
   workspace role in both directions.
 - **Recent documents** (`GET /workspaces/:id/documents/recent?limit=`, default 8, max 20) feed the dashboard:
-  newest change first, visibility filtered in SQL so the limit applies to documents the caller may open.
+  newest change first, where an edit of the content counts as much as a rename or a move (the later of
+  `updated_at` and `content_updated_at`, as in search), visibility filtered in SQL so the limit applies to
+  documents the caller may open.
 - **Who may do what:** create `EDITOR`+ with `EDIT` on the parent; edit title/icon, move and delete `EDIT`;
   change visibility or manage shares `MANAGE` or `EDIT` as the author; restore Owner/Admin or the author.
 

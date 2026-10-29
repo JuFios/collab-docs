@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SEARCH_MAX_TOKENS,
   SEARCH_TOKEN_MAX_LENGTH,
+  INDEXED_LESS_THAN,
   parseSnippet,
   plainSearchText,
   searchPageSchema,
@@ -47,6 +48,12 @@ describe('plainSearchText', () => {
   it('collapses whitespace and replaces control characters (NUL included)', () => {
     expect(plainSearchText('a\u0000b\n\n  c\u0001d\u0002\te ')).toBe('a b c d e');
   });
+
+  it('stands in for every "<", so Postgres does not read text as a tag, and keeps a typed stand-in out', () => {
+    expect(plainSearchText('use <div> and\u0003 a<b')).toBe(
+      `use ${INDEXED_LESS_THAN}div> and a${INDEXED_LESS_THAN}b`,
+    );
+  });
 });
 
 describe('parseSnippet', () => {
@@ -72,6 +79,15 @@ describe('parseSnippet', () => {
     expect(parseSnippet('<img src=x onerror=alert(1)> \u0001<b>x</b>\u0002')).toEqual([
       { text: '<img src=x onerror=alert(1)> ', match: false },
       { text: '<b>x</b>', match: true },
+    ]);
+  });
+
+  it('turns the stand-in back into "<"', () => {
+    const indexed = plainSearchText('use <div> here');
+    expect(parseSnippet(indexed.replace('div', '\u0001div\u0002'))).toEqual([
+      { text: 'use <', match: false },
+      { text: 'div', match: true },
+      { text: '> here', match: false },
     ]);
   });
 

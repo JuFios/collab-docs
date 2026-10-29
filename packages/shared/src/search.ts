@@ -10,6 +10,13 @@ export const SEARCH_MAX_LIMIT = 50;
 /** Control characters that the api puts around a match in a snippet. Text never contains them (see `plainSearchText`). */
 export const SNIPPET_MATCH_START = '\u0001';
 export const SNIPPET_MATCH_END = '\u0002';
+/**
+ * Stands in for `<` in indexed text. The Postgres parser reads `<div>` or `<script ...>` as an HTML tag and drops
+ * it from both the vector and `ts_headline`, so such text (code, a pasted snippet) could be neither found nor shown.
+ * To the parser a control character only separates words, and indexed text has no other (see `plainSearchText`);
+ * `parseSnippet` turns it back into `<`.
+ */
+export const INDEXED_LESS_THAN = '\u0003';
 
 const TOKEN = /[\p{L}\p{N}]+/gu;
 
@@ -33,14 +40,16 @@ export function tokenizeSearchQuery(query: string): string[] {
 }
 
 /**
- * Text as it is indexed: whitespace runs collapse to one space and control characters (a NUL cannot be stored in
- * Postgres; the snippet delimiters must not occur in the text) become spaces.
+ * Text as it is indexed: whitespace runs collapse to one space, control characters (a NUL cannot be stored in
+ * Postgres; the snippet delimiters must not occur in the text) become spaces and `<` becomes
+ * {@link INDEXED_LESS_THAN}.
  */
 export function plainSearchText(text: string): string {
   return text
     .replace(/\p{Cc}/gu, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replaceAll('<', INDEXED_LESS_THAN);
 }
 
 export interface SnippetPart {
@@ -69,7 +78,7 @@ export function parseSnippet(raw: string): SnippetPart[] {
       flush();
       match = char === SNIPPET_MATCH_START;
     } else {
-      text += char;
+      text += char === INDEXED_LESS_THAN ? '<' : char;
     }
   }
   flush();

@@ -21,8 +21,8 @@ transaction commits: the collab service after a flush, the api after create, ren
 so a burst of edits is one run. The worker reads the **current** stored state of the document, not the event:
 
 1. it reads `documents.revision`, then the CRDT state (`DocumentStateReader`), sanitises the content and extracts
-   its text (`extractPlainText`; whitespace collapsed, control characters replaced, at most 200 000 characters,
-   because a `tsvector` is limited to 1 MB and a longer text would fail the job);
+   its text (`extractPlainText`; whitespace collapsed, control characters replaced, `<` stored as `\u0003`, at
+   most 200 000 characters, because a `tsvector` is limited to 1 MB and a longer text would fail the job);
 2. it upserts `document_search` with `WHERE indexed_revision < EXCLUDED.indexed_revision`, so a duplicate or a
    late job of an older run changes nothing. The revision is read before the state on purpose: if a flush lands
    in between, the text is newer than its stamp, which costs one more run; the other order could stamp a revision
@@ -54,7 +54,10 @@ nothing else reaches the `tsquery`, and the words are bound parameters of a `Pri
 is built from user input). Every word is a prefix term and all are required (`a:* & b:*`), ranked with
 `ts_rank_cd` (title above body), ties broken by id, paged with a keyset cursor (rank, id). Highlights come from
 `ts_headline`, which marks matches with the control characters `\u0001` and `\u0002` that cannot occur in the
-indexed text; the api splits on them and the client renders the parts.
+indexed text; the api splits on them and the client renders the parts. The Postgres parser reads `<div>` or
+`<script ...>` as an HTML tag and drops it from both the vector and the headline, so the indexed text keeps `<` as
+the control character `\u0003` (a word separator to the parser), and the api turns it back into `<` in the
+snippet: text in angle brackets, such as code, is found and shown as written.
 
 | Language / input                  | Behaviour                                                                                                                                                                                                                                                                                               |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,7 +75,8 @@ original text again, so `ts_headline` uses a text search configuration `cd_headl
 (or `--all`) rebuilds the rows from the stored documents and drops those of deleted ones; with Docker:
 `docker compose exec api node dist/scripts/reindex.js --workspace=<id>`. Run it with `--all` once after
 upgrading (documents that existed before the index have no row, and the lag metric shows them as pending), after a
-change of the text extraction, or to repair an index after a Redis loss (a job that could not be queued is logged and counted in
+change of the text extraction (such as the `<` stand-in above; until then a document keeps its old row up to its
+next change), or to repair an index after a Redis loss (a job that could not be queued is logged and counted in
 `queue_enqueue_failures_total`; the document is then indexed with its next change).
 
 **Query plan.** For a prefix query Postgres has no better estimate than a fixed share of the table, so on a

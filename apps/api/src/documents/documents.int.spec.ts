@@ -4,7 +4,8 @@ import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
-import { type PrismaClient } from '@collab-docs/db';
+import * as Y from 'yjs';
+import { DocumentStateWriter, type PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, REALTIME_CHANNEL, type WorkspaceRole } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
@@ -750,6 +751,22 @@ describe('documents', () => {
       expect(
         (await recentOf(team.viewer, team.workspaceId, '?limit=2')).map((d) => d.title),
       ).toEqual(['first, edited', 'third']);
+    });
+
+    it('counts an edit of the content as a change, as collab writes it', async () => {
+      const team = await setupTeam();
+      const edited = await createDoc(team.owner, team.workspaceId, { title: 'edited' });
+      await createDoc(team.owner, team.workspaceId, { title: 'untouched' });
+      const before = (await recentOf(team.viewer, team.workspaceId))[1];
+      expect(before?.title).toBe('edited');
+
+      const doc = new Y.Doc();
+      doc.getXmlFragment('default').insert(0, [new Y.XmlElement('paragraph')]);
+      await new DocumentStateWriter(prisma).append(edited.id, Y.encodeStateAsUpdate(doc));
+
+      const after = await recentOf(team.viewer, team.workspaceId);
+      expect(after.map((d) => d.title)).toEqual(['edited', 'untouched']);
+      expect(Date.parse(after[0]!.updatedAt)).toBeGreaterThan(Date.parse(before!.updatedAt));
     });
 
     it('omits restricted documents the caller has no share on, and applies the limit after filtering', async () => {

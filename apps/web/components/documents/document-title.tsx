@@ -91,7 +91,7 @@ export function DocumentTitle({
           event.currentTarget.blur();
         }
       }}
-      className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-2xl font-semibold outline-none hover:border-input focus-visible:border-input focus-visible:ring-2 focus-visible:ring-ring"
+      className="min-w-0 flex-1 basis-48 rounded-md border border-transparent bg-transparent px-1 text-2xl font-semibold outline-none hover:border-input focus-visible:border-input focus-visible:ring-2 focus-visible:ring-ring"
     />
   );
 }

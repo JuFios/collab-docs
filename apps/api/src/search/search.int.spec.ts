@@ -254,6 +254,23 @@ describe('search', () => {
       expect(await idsFor(owner, workspaceId, 'ішов')).toEqual([]);
     });
 
+    it('finds and shows text in angle brackets, which Postgres would read as a tag', async () => {
+      const { owner, workspaceId } = await setup();
+      const documentId = await createDocument(owner, workspaceId, 'Markup <section> notes');
+      await edit(documentId, 'Wrap it in <div class="x"> and <script>alert(1)</script> stays text');
+      await until(async () => (await idsFor(owner, workspaceId, 'div')).length === 1);
+
+      expect(await idsFor(owner, workspaceId, 'script')).toEqual([documentId]);
+      expect(await idsFor(owner, workspaceId, 'section')).toEqual([documentId]);
+      const [hit] = (await find(owner, workspaceId, 'div')).items;
+      expect(hit!.title).toBe('Markup <section> notes');
+      expect(textOf(hit!.snippet)).toBe(
+        'Wrap it in <div class="x"> and <script>alert(1)</script> stays text',
+      );
+      expect(matchesOf(hit!.snippet)).toEqual(['div']);
+      expect(textOf(hit!.snippet)).not.toMatch(/\p{Cc}/u);
+    });
+
     it('does not fail on text that cannot be stored or indexed as it is', async () => {
       const { owner, workspaceId } = await setup();
       const documentId = await createDocument(owner, workspaceId, 'Hostile title\u0001');

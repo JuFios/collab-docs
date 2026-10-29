@@ -3,6 +3,7 @@ import { Prisma } from '@collab-docs/db';
 import {
   type Access,
   type DocumentChangeReason,
+  type DocumentVisibility,
   type ShareRole,
   type WorkspaceRole,
   accessAtLeast,
@@ -33,7 +34,7 @@ import type {
   UpdateDocumentDto,
 } from './documents.dto';
 import { LIVE_DOCUMENT, LIVE_DOCUMENT_SQL } from '../prisma/live-document';
-import { wouldViewDocumentSql } from '../permissions/document-access-sql';
+import { viewableDocumentSql, wouldViewDocumentSql } from '../permissions/document-access-sql';
 import { positionBetween } from './position';
 import { TreeCacheService } from './tree-cache.service';
 import { buildTree } from './tree';
@@ -192,8 +193,10 @@ export class DocumentsService {
   }
 
   /**
-   * Latest changes first. Visibility is filtered in SQL (so the limit applies to documents the caller may open)
-   * and the access level is then resolved with the same function as the tree.
+   * Latest changes first, where a change is an edit of the content (`content_updated_at`, written by collab) as
+   * much as of the title or the place in the tree (`updated_at`), as in search. Visibility is filtered in SQL (so
+   * the limit applies to documents the caller may open) and the access level is then resolved with the same
+   * function as the tree.
    */
   async recent(
     userId: string,
@@ -201,40 +204,33 @@ export class DocumentsService {
     role: WorkspaceRole,
     limit: number,
   ): Promise<RecentDocumentResponse[]> {
-    const managesAll = role === 'OWNER' || role === 'ADMIN';
-    const rows = await this.prisma.document.findMany({
-      where: {
-        workspaceId,
-        ...LIVE_DOCUMENT,
-        ...(managesAll
-          ? {}
-          : {
-              OR: [
-                { visibility: 'WORKSPACE' },
-                { shares: { some: { userId } } },
-                ...(role === 'EDITOR' ? [{ createdBy: userId }] : []),
-              ],
-            }),
-      },
-      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      take: limit,
-      select: {
-        id: true,
-        title: true,
-        icon: true,
-        visibility: true,
-        createdBy: true,
-        updatedAt: true,
-        shares: { where: { userId }, select: { role: true } },
-      },
-    });
+    const user = Prisma.sql`${userId}::uuid`;
+    const rows = await this.prisma.$queryRaw<
+      {
+        id: string;
+        title: string;
+        icon: string | null;
+        visibility: DocumentVisibility;
+        created_by: string;
+        share_role: ShareRole | null;
+        changed_at: Date;
+      }[]
+    >`
+      SELECT d.id, d.title, d.icon, d.visibility, d.created_by,
+             (SELECT s.role FROM document_shares s WHERE s.document_id = d.id AND s.user_id = ${user}) AS share_role,
+             GREATEST(d.updated_at, d.content_updated_at) AS changed_at
+      FROM documents d
+      WHERE d.workspace_id = ${workspaceId}::uuid AND ${viewableDocumentSql(user)}
+      ORDER BY changed_at DESC, d.id DESC
+      LIMIT ${limit}
+    `;
     return rows.flatMap((row) => {
       const access = resolveDocumentAccess({
         deleted: false,
         workspaceRole: role,
-        shareRole: row.shares[0]?.role ?? null,
+        shareRole: row.share_role,
         visibility: row.visibility,
-        isAuthor: row.createdBy === userId,
+        isAuthor: row.created_by === userId,
       });
       return access === 'NONE'
         ? []
@@ -244,7 +240,7 @@ export class DocumentsService {
               title: row.title,
               icon: row.icon,
               myAccess: access,
-              updatedAt: row.updatedAt.toISOString(),
+              updatedAt: row.changed_at.toISOString(),
             },
           ];
     });
