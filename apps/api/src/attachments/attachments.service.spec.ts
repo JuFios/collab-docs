@@ -55,6 +55,7 @@ async function setup() {
     head: jest.fn().mockResolvedValue({ size: 100, contentType: 'image/png' }),
     readHead: jest.fn().mockResolvedValue(PNG_HEAD),
     delete: jest.fn().mockResolvedValue(undefined),
+    copy: jest.fn().mockResolvedValue(true),
   };
   const logger = { info: jest.fn() };
   const moduleRef = await Test.createTestingModule({
@@ -104,7 +105,7 @@ describe('AttachmentsService', () => {
         }),
       );
       expect(s3.presignPost).toHaveBeenCalledWith({
-        key: 'k',
+        key: 'uploads/k',
         contentType: 'image/png',
         size: 100,
         expiresInSeconds: ATTACHMENT_UPLOAD_TTL_SECONDS,
@@ -171,7 +172,11 @@ describe('AttachmentsService', () => {
 
       const result = await service.complete(row());
 
-      expect(s3.readHead).toHaveBeenCalledWith(expect.any(String), SNIFF_BYTES);
+      // the copy is what gets checked and served, not the upload the form can still overwrite
+      expect(s3.copy).toHaveBeenCalledWith(`uploads/${row().key}`, row().key);
+      expect(s3.delete).toHaveBeenCalledWith(`uploads/${row().key}`);
+      expect(s3.head).toHaveBeenCalledWith(row().key);
+      expect(s3.readHead).toHaveBeenCalledWith(row().key, SNIFF_BYTES);
       expect(prisma.attachment.updateMany).toHaveBeenCalledWith({
         where: { id: 'att-1', status: 'PENDING' },
         data: { status: 'READY' },
@@ -185,6 +190,7 @@ describe('AttachmentsService', () => {
 
     it('answers 422 not_uploaded while the object is missing, and keeps the row', async () => {
       const { service, s3, prisma } = await setup();
+      s3.copy.mockResolvedValue(false);
       s3.head.mockResolvedValue(null);
       await expect(service.complete(row())).rejects.toMatchObject({
         code: 'VALIDATION_FAILED',
@@ -209,6 +215,7 @@ describe('AttachmentsService', () => {
       });
 
       expect(s3.delete).toHaveBeenCalledWith(row().key);
+      expect(s3.delete).toHaveBeenCalledWith(`uploads/${row().key}`);
       expect(prisma.attachment.deleteMany).toHaveBeenCalledWith({
         where: { id: 'att-1', status: 'PENDING' },
       });

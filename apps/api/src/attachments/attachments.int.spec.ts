@@ -6,6 +6,7 @@ import { type PrismaClient } from '@collab-docs/db';
 import { PLAN_CATALOG } from '@collab-docs/shared';
 import { createTestApp } from '../test/test-app';
 import { S3Storage } from '../storage/s3.service';
+import { uploadKeyOf } from './attachment-keys';
 import { AttachmentSweeper } from './attachment-sweeper';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -206,6 +207,25 @@ describe('attachments', () => {
       expect(again.body.status).toBe('READY');
     });
 
+    it('keeps serving the checked file when the upload form is used again after completion', async () => {
+      const { owner, documentId } = await setup();
+      const presigned = (await presign(owner, documentId).expect(201)).body as Presigned;
+      expect((await upload(presigned, PNG)).status).toBe(204);
+      await as(owner).post(`/attachments/${presigned.attachmentId}/complete`).expect(200);
+
+      // the form is valid until it expires: same type and size, other bytes
+      const replacement = Buffer.from(PNG);
+      replacement.writeUInt8(
+        replacement.readUInt8(replacement.length - 1) ^ 0xff,
+        replacement.length - 1,
+      );
+      expect((await upload(presigned, replacement)).status).toBe(204);
+
+      const read = await as(owner).get(`/attachments/${presigned.attachmentId}/url`).expect(200);
+      const file = await fetch(read.body.url);
+      expect(Buffer.from(await file.arrayBuffer()).equals(PNG)).toBe(true);
+    });
+
     it('does not hand out a read URL before the upload is completed', async () => {
       const { owner, documentId } = await setup();
       const presigned = (await presign(owner, documentId).expect(201)).body as Presigned;
@@ -286,7 +306,7 @@ describe('attachments', () => {
         await prisma.attachment.findUniqueOrThrow({ where: { id: presigned.attachmentId } })
       ).key;
       expect((await upload(presigned, text)).status).toBe(204);
-      expect(await s3.head(key)).not.toBeNull();
+      expect(await s3.head(uploadKeyOf(key))).not.toBeNull();
 
       const response = await as(owner)
         .post(`/attachments/${presigned.attachmentId}/complete`)
@@ -296,6 +316,7 @@ describe('attachments', () => {
         details: { reason: 'content_mismatch' },
       });
       expect(await s3.head(key)).toBeNull();
+      expect(await s3.head(uploadKeyOf(key))).toBeNull();
       expect(await prisma.attachment.count({ where: { id: presigned.attachmentId } })).toBe(0);
     });
 
@@ -469,6 +490,7 @@ describe('attachments', () => {
       expect(await sweeper.sweep()).toBeGreaterThanOrEqual(1);
       expect(await prisma.attachment.count({ where: { id: stale.attachmentId } })).toBe(0);
       expect(await s3.head(staleRow.key)).toBeNull();
+      expect(await s3.head(uploadKeyOf(staleRow.key))).toBeNull();
       expect(
         await prisma.attachment.count({ where: { id: { in: [ready, fresh.attachmentId] } } }),
       ).toBe(2);

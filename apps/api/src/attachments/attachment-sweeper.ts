@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type AppConfig, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { S3Storage } from '../storage/s3.service';
+import { uploadKeyOf } from './attachment-keys';
 import { PrismaService } from '../prisma/prisma.service';
 
 const BATCH = 200;
@@ -32,6 +33,7 @@ export class AttachmentSweeper {
         ) RETURNING key`;
       for (const { key } of claimed) {
         try {
+          await this.s3.delete(uploadKeyOf(key));
           await this.s3.delete(key);
         } catch (error) {
           logEvent(this.logger, 'attachment.sweep_object_failed', { key, error: String(error) });
