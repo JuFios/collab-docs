@@ -1,6 +1,8 @@
 import type { Browser, Page } from '@playwright/test';
+import { connectRaw } from '../collab-client';
 import { inviteLinkFor } from '../mailpit';
 import { expect, newUser, registerViaApi, test } from '../fixtures';
+import { ORIGIN, createDocument, invitedMember } from '../workspace';
 
 /** A page for a user that exists already, signed in through the api (no UI login). */
 async function signedIn(
@@ -281,6 +283,46 @@ test.describe('workspaces', () => {
     await expect(outsider.getByText('Page not found')).toBeVisible();
     await outsider.goto('/workspaces/not-a-uuid');
     await expect(outsider.getByText('Page not found')).toBeVisible();
+  });
+
+  test('a removed member loses the documents shared with them, over the api and the socket', async ({
+    browser,
+    baseURL,
+    signedInPage: owner,
+  }) => {
+    const workspaceId = await createWorkspace(owner, 'Removal');
+    const documentId = await createDocument(owner, workspaceId, 'Payroll');
+    const restrict = await owner.request.patch(`/api/documents/${documentId}`, {
+      data: { visibility: 'RESTRICTED' },
+      headers: { origin: ORIGIN },
+    });
+    expect(restrict.status()).toBe(200);
+    const { context } = await invitedMember(browser, baseURL, owner, workspaceId, 'Viewer');
+    const me = (await (await context.request.get('/api/auth/me')).json()) as {
+      id: string;
+      email: string;
+    };
+    const share = await owner.request.post(`/api/documents/${documentId}/shares`, {
+      data: { email: me.email, role: 'EDITOR' },
+      headers: { origin: ORIGIN },
+    });
+    expect(share.status(), await share.text()).toBe(201);
+    const socket = await connectRaw(context.request, documentId);
+    await socket.synced;
+
+    const removed = await owner.request.delete(`/api/workspaces/${workspaceId}/members/${me.id}`, {
+      headers: { origin: ORIGIN },
+    });
+    expect(removed.status()).toBe(204);
+
+    // collab closes the open socket with 4403, and nothing lets them back in
+    expect(await socket.closed).toBe(4403);
+    expect((await context.request.get(`/api/documents/${documentId}`)).status()).toBe(404);
+    const ticket = await context.request.post(`/api/documents/${documentId}/collab-ticket`, {
+      headers: { origin: ORIGIN },
+    });
+    expect(ticket.status()).toBe(404);
+    expect(await (await context.request.get('/api/me/shared-documents')).json()).toEqual([]);
   });
 
   test('a member can leave a workspace, the last owner cannot', async ({
