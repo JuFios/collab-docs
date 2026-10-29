@@ -54,13 +54,12 @@ describe('mutation errors', () => {
   it('shows the words of a 403 that gives its reason', () => {
     const { onMutationError, toastError } = setup();
     onMutationError(
-      new ApiError(403, 'FORBIDDEN', 'This page has a subpage you cannot edit', 'c-3', {
+      new ApiError(403, 'FORBIDDEN', 'This page has subpages you cannot edit', 'c-3', {
         reason: 'SUBTREE_NOT_EDITABLE',
-        blocked: 1,
       }),
     );
     expect(toastError).toHaveBeenCalledWith(
-      'This page has a subpage you cannot edit',
+      'This page has subpages you cannot edit',
       'Reference: c-3',
     );
   });

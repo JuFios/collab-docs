@@ -442,7 +442,7 @@ export class DocumentsService {
              (SELECT ds.role FROM document_shares ds WHERE ds.document_id = d.id AND ds.user_id = ${userId}::uuid)
                AS share_role
       FROM documents d JOIN subtree USING (id)`;
-    const blocked = pages.filter(
+    const blocked = pages.some(
       (page) =>
         !accessAtLeast(
           resolveDocumentAccess({
@@ -454,13 +454,14 @@ export class DocumentsService {
           }),
           'EDIT',
         ),
-    ).length;
-    if (blocked > 0) {
+    );
+    if (blocked) {
+      // no count: a restricted subpage the caller cannot see (404 on GET) must not show up in the answer
       throw new AppException(
         'FORBIDDEN',
-        `This page has ${blocked === 1 ? 'a subpage' : `${blocked} subpages`} you cannot edit, and deleting ` +
-          'a page deletes its subpages too. Ask an owner or admin, or someone who can edit them.',
-        { details: { reason: 'SUBTREE_NOT_EDITABLE', blocked } },
+        'This page has subpages you cannot edit, and deleting a page deletes its subpages too. ' +
+          'Ask an owner or admin, or someone who can edit them.',
+        { details: { reason: 'SUBTREE_NOT_EDITABLE' } },
       );
     }
   }
