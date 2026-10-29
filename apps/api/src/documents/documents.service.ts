@@ -3,7 +3,6 @@ import { Prisma } from '@collab-docs/db';
 import {
   type Access,
   type DocumentChangeReason,
-  type DocumentVisibility,
   type ShareRole,
   type WorkspaceRole,
   accessAtLeast,
@@ -34,6 +33,7 @@ import type {
   UpdateDocumentDto,
 } from './documents.dto';
 import { LIVE_DOCUMENT, LIVE_DOCUMENT_SQL } from '../prisma/live-document';
+import { wouldViewDocumentSql } from '../permissions/document-access-sql';
 import { positionBetween } from './position';
 import { TreeCacheService } from './tree-cache.service';
 import { buildTree } from './tree';
@@ -57,6 +57,9 @@ const DOCUMENT_SELECT = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.DocumentSelect;
+
+/** Deleted roots listed at most; the trash is not paginated (README, "Not done"). */
+const TRASH_LIMIT = 200;
 
 type DocumentRow = Prisma.DocumentGetPayload<{ select: typeof DOCUMENT_SELECT }>;
 
@@ -497,6 +500,10 @@ export class DocumentsService {
     return this.get(userId, restored as DocumentAccessResult);
   }
 
+  /**
+   * Deleted roots the caller would see were they live, newest first. The access rules are part of the statement, so
+   * the limit applies to what the caller may see rather than to the whole workspace.
+   */
   async trash(
     userId: string,
     workspaceId: string,
@@ -507,42 +514,26 @@ export class DocumentsService {
         id: string;
         title: string;
         icon: string | null;
-        visibility: DocumentVisibility;
         created_by: string;
         deleted_at: Date;
         document_count: bigint;
       }>
     >`
-      SELECT r.id, r.title, r.icon, r.visibility, r.created_by, r.deleted_at,
-             (SELECT count(*) FROM documents d WHERE d.deleted_root_id = r.id) AS document_count
-        FROM documents r
-       WHERE r.workspace_id = ${workspaceId}::uuid AND r.deleted_at IS NOT NULL AND r.deleted_root_id = r.id
-       ORDER BY r.deleted_at DESC, r.id
-       LIMIT 200`;
-    const shares = await this.prisma.documentShare.findMany({
-      where: { userId, documentId: { in: roots.map((root) => root.id) } },
-      select: { documentId: true, role: true },
-    });
-    const shareByDocument = new Map(shares.map((s) => [s.documentId, s.role]));
-    return roots
-      .filter(
-        (root) =>
-          resolveDocumentAccess({
-            deleted: false,
-            workspaceRole: role,
-            shareRole: shareByDocument.get(root.id) ?? null,
-            visibility: root.visibility,
-            isAuthor: root.created_by === userId,
-          }) !== 'NONE',
-      )
-      .map((root) => ({
-        id: root.id,
-        title: root.title,
-        icon: root.icon,
-        deletedAt: root.deleted_at.toISOString(),
-        documentCount: Number(root.document_count),
-        canRestore: canRestoreDocument(role, root.created_by === userId),
-      }));
+      SELECT d.id, d.title, d.icon, d.created_by, d.deleted_at,
+             (SELECT count(*) FROM documents x WHERE x.deleted_root_id = d.id) AS document_count
+        FROM documents d
+       WHERE d.workspace_id = ${workspaceId}::uuid AND d.deleted_at IS NOT NULL AND d.deleted_root_id = d.id
+         AND ${wouldViewDocumentSql(Prisma.sql`${userId}::uuid`)}
+       ORDER BY d.deleted_at DESC, d.id
+       LIMIT ${TRASH_LIMIT}`;
+    return roots.map((root) => ({
+      id: root.id,
+      title: root.title,
+      icon: root.icon,
+      deletedAt: root.deleted_at.toISOString(),
+      documentCount: Number(root.document_count),
+      canRestore: canRestoreDocument(role, root.created_by === userId),
+    }));
   }
 
   // --- helpers --------------------------------------------------------------------------------------------

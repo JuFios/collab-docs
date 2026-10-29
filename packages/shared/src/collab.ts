@@ -43,12 +43,18 @@ export const COLLAB_FINAL_CLOSE_CODES: readonly number[] = [
   COLLAB_CLOSE.deleted,
 ];
 
+/** Why the server refused a document update; each one is reported to the client that sent it. */
+export const COLLAB_REJECT_REASONS = ['too_large', 'document_too_large', 'invalid'] as const;
+export type CollabRejectReason = (typeof COLLAB_REJECT_REASONS)[number];
+
 /**
  * Server → client events carried in message type 100 as JSON.
  * `persisted.sv` is a base64 Yjs state vector: everything it covers is stored in the database.
  * `persisted.saved` says the room stored every update it received, which a state vector alone cannot do: a
  * deletion produces an update without moving it. The event sent on connect carries only `sv` — the client's
  * offline changes have not reached the room yet — and a missing `saved` means "not confirmed" to the client.
+ * `rejected` says an update of this client was refused: it never reaches the room, and every later update of the
+ * same client depends on it, so the client has to start over from the server's state.
  */
 export const collabRoomEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('persisted'), sv: z.string(), saved: z.boolean().optional() }),
@@ -59,6 +65,7 @@ export const collabRoomEventSchema = z.discriminatedUnion('type', [
     readOnly: z.boolean(),
   }),
   z.object({ type: z.literal('deleted') }),
+  z.object({ type: z.literal('rejected'), reason: z.enum(COLLAB_REJECT_REASONS) }),
 ]);
 export type CollabRoomEvent = z.infer<typeof collabRoomEventSchema>;
 

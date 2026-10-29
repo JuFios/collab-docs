@@ -43,6 +43,12 @@ describe('security headers', () => {
     );
   });
 
+  it('trades unsafe-inline for the nonce and strict-dynamic on per-request pages', () => {
+    const scripts = directive(contentSecurityPolicy({ ...env, nonce: 'abc123==' }), 'script-src');
+    expect(scripts).toBe("'self' 'nonce-abc123==' 'strict-dynamic'");
+    expect(directive(contentSecurityPolicy(env), 'script-src')).toBe("'self' 'unsafe-inline'");
+  });
+
   it('is sent together with the other protective headers', () => {
     const names = securityHeaders(env).map((header) => header.key);
     expect(names).toEqual(

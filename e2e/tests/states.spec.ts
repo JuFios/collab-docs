@@ -93,12 +93,13 @@ test.describe('a panel whose data cannot be read', () => {
 
     await page.getByRole('button', { name: /^Notifications/ }).click();
     const menu = page.getByRole('menu');
-    await expect(menu.getByRole('alert')).toContainText('Could not load notifications.', {
+    // a menu may hold only items, labels and separators: the error is a label, the retry an item
+    await expect(menu.getByText('Could not load notifications.')).toBeVisible({
       timeout: ERROR_TIMEOUT,
     });
 
     outage.recover();
-    await menu.getByRole('button', { name: 'Try again' }).click();
+    await menu.getByRole('menuitem', { name: 'Try again' }).click();
     await expect(menu.getByText('all caught up')).toBeVisible();
   });
 });

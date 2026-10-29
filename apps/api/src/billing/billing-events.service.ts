@@ -21,8 +21,17 @@ interface PlanChange {
   checkoutSessionId?: string;
 }
 
+/** A payment that was collected but arrived after a newer event: it is recorded, the plan stays as it is. */
+interface UnappliedPayment {
+  workspaceId: string;
+  checkoutSessionId: string;
+  plan: PlanTier;
+  amountCents: number;
+}
+
 type EventOutcome =
   | { result: 'applied'; change?: PlanChange }
+  | { result: 'payment_not_applied'; payment: UnappliedPayment }
   | { result: 'ignored'; reason: string }
   | { result: 'already_processed' }
   | { result: 'missing' };
@@ -68,6 +77,14 @@ export class BillingEventsService {
       case 'applied':
         if (outcome.change) logEvent(this.logger, 'plan.changed', { eventId, ...outcome.change });
         break;
+      case 'payment_not_applied':
+        // a real provider would refund it; here the invoice and this event are what an operator acts on
+        logEvent(this.logger, 'billing.payment_not_applied', {
+          eventId,
+          reason: 'stale',
+          ...outcome.payment,
+        });
+        break;
       case 'ignored':
         logEvent(this.logger, 'webhook.ignored', { eventId, type, reason: outcome.reason });
         break;
@@ -107,22 +124,14 @@ export class BillingEventsService {
 
     await this.planLimits.lockWorkspace(tx, session.workspaceId);
     const eventAt = new Date(event.created);
-    if (await this.subscriptions.isStale(tx, session.workspaceId, eventAt)) {
-      return { result: 'ignored', reason: 'stale' };
-    }
+    const stale = await this.subscriptions.isStale(tx, session.workspaceId, eventAt);
 
+    // the money was collected either way: the session is settled and invoiced exactly once
     const settled = await tx.checkoutSession.updateMany({
       where: { id: session.id, status: 'PENDING' },
       data: { status: 'COMPLETED', settledAt: new Date() },
     });
     if (settled.count !== 1) return { result: 'ignored', reason: 'session_already_settled' };
-
-    const from = await this.subscriptions.apply(tx, session.workspaceId, {
-      plan: session.plan,
-      status: 'ACTIVE',
-      currentPeriodEnd: new Date(eventAt.getTime() + SUBSCRIPTION_PERIOD_DAYS * DAY_MS),
-      eventAt,
-    });
     await tx.invoice.create({
       data: {
         workspaceId: session.workspaceId,
@@ -131,6 +140,26 @@ export class BillingEventsService {
         plan: session.plan,
         amountCents: session.amountCents,
       },
+    });
+
+    // a newer event (a cancellation, another payment) already decided the plan; this one must not undo it
+    if (stale) {
+      return {
+        result: 'payment_not_applied',
+        payment: {
+          workspaceId: session.workspaceId,
+          checkoutSessionId: session.id,
+          plan: session.plan,
+          amountCents: session.amountCents,
+        },
+      };
+    }
+
+    const from = await this.subscriptions.apply(tx, session.workspaceId, {
+      plan: session.plan,
+      status: 'ACTIVE',
+      currentPeriodEnd: new Date(eventAt.getTime() + SUBSCRIPTION_PERIOD_DAYS * DAY_MS),
+      eventAt,
     });
     return {
       result: 'applied',

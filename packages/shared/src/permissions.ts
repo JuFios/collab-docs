@@ -115,12 +115,6 @@ export function canMoveDocument(ctx: MoveContext): boolean {
   return ctx.newParentAccess === null || accessAtLeast(ctx.newParentAccess, 'EDIT');
 }
 
-/** Only roles that can edit may comment (Viewers and EDIT-link guests cannot). */
-export function canComment(access: Access, workspaceRole: WorkspaceRole | null): boolean {
-  if (!accessAtLeast(access, 'COMMENT')) return false;
-  return workspaceRole === null || roleAtLeast(workspaceRole, 'EDITOR');
-}
-
 // --- Member management rules -------------------------------------------------------------------------------
 
 export type MemberRuleViolation =

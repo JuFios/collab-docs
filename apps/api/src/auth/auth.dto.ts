@@ -1,10 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsString, Length, MaxLength, MinLength } from 'class-validator';
-
-const PASSWORD_MIN_LENGTH = 10;
-// argon2 accepts long inputs, but unbounded ones are a cheap way to burn CPU
-const PASSWORD_MAX_LENGTH = 128;
+// argon2 accepts long inputs, but unbounded ones are a cheap way to burn CPU: the maximum is the same on every layer
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@collab-docs/shared';
 
 const normaliseEmail = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;

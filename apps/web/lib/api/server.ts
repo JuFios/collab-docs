@@ -14,11 +14,12 @@ async function serverHeaders(): Promise<Headers> {
   const [cookieStore, incoming] = await Promise.all([cookies(), headers()]);
   const out = new Headers({
     'x-correlation-id': incoming.get('x-correlation-id') ?? crypto.randomUUID(),
-    // the api only trusts this from TRUSTED_PROXY_CIDRS; without it every user shares the web container's rate limit
+    // Next has checked the origin of the Server Action; this tells the api's CSRF guard the call is the web app's own
     origin: webOrigin(),
   });
   const cookie = cookieStore.toString();
   if (cookie) out.set('cookie', cookie);
+  // the api only trusts this from TRUSTED_PROXY_CIDRS; without it every user shares the web container's rate limit
   const forwarded = incoming.get('x-forwarded-for');
   if (forwarded) out.set('x-forwarded-for', forwarded);
   return out;

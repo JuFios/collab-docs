@@ -202,7 +202,7 @@ describe('BillingEventsService', () => {
     expect(subscription.writes).toBe(1);
   });
 
-  it('ignores an event older than the one applied last, whatever the order of arrival', async () => {
+  it('records an older payment without letting it undo the plan a newer event set', async () => {
     const { service, addSession, receive, subscription, sessions, invoices } = await setup();
     addSession(SESSION, 'PRO', 1200);
     addSession(SESSION_2, 'TEAM', 4900);
@@ -215,11 +215,22 @@ describe('BillingEventsService', () => {
     );
 
     expect((await service.process(newer)).result).toBe('applied');
-    expect(await service.process(older)).toEqual({ result: 'ignored', reason: 'stale' });
+    expect(await service.process(older)).toEqual({
+      result: 'payment_not_applied',
+      payment: {
+        workspaceId: WORKSPACE,
+        checkoutSessionId: SESSION,
+        plan: 'PRO',
+        amountCents: 1200,
+      },
+    });
+    // replaying it changes nothing more
+    expect(await service.process(older)).toEqual({ result: 'already_processed' });
 
     expect(subscription.plan).toBe('TEAM');
-    expect(sessions.get(SESSION)!.status).toBe('PENDING');
-    expect([...invoices.keys()]).toEqual([SESSION_2]);
+    expect(subscription.writes).toBe(1);
+    expect(sessions.get(SESSION)!.status).toBe('COMPLETED');
+    expect([...invoices.keys()].sort()).toEqual([SESSION, SESSION_2].sort());
   });
 
   it('ignores a cancellation that was overtaken by a later upgrade', async () => {

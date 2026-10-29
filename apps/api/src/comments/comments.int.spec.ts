@@ -324,6 +324,16 @@ describe('comments and notifications', () => {
       await as(team.guest).post(`/threads/${thread.id}/comments`).send({ body: 'x' }).expect(404);
     });
 
+    it('lets a workspace viewer comment once an editor share lets them edit the document', async () => {
+      const team = await setup();
+      const documentId = await createDocument(team.owner, team.workspaceId);
+      const { thread } = await startThread(team.editor, documentId, 'First');
+      await as(team.viewer).post(`/threads/${thread.id}/comments`).send({ body: 'no' }).expect(403);
+
+      await shareWith(team.owner, documentId, team.viewer, 'EDITOR');
+      await reply(team.viewer, thread.id, 'Now I can');
+    });
+
     it('hides the threads of a document in the trash', async () => {
       const team = await setup();
       const documentId = await createDocument(team.owner, team.workspaceId);

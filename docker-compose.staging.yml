@@ -48,8 +48,8 @@ services:
       S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in .env.staging}
   mailpit:
     restart: unless-stopped
-    ports: !override
-      - '1025:1025'
+    # the services reach it on the compose network; a published SMTP port would only let others inject mail
+    ports: !override []
   migrate:
     environment: *staging-env
   api:

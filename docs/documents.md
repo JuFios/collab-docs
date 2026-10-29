@@ -16,7 +16,8 @@ in `documents.position` (`COLLATE "C"`), so a reorder rewrites one row and never
   serialises the plan-limit check and makes a cycle from two racing moves impossible, including moves into the
   root where there is no parent row to lock.
 - **Soft delete** marks the whole live subtree in one recursive statement and stamps every node with
-  `deleted_root_id`, including descendants the caller cannot see. The trash lists the root of each deletion.
+  `deleted_root_id`, including descendants the caller cannot see. The trash lists the root of each deletion that the
+  caller would see were it live (filtered in the query, so the 200-entry cap applies to those).
   **Restore** brings back exactly the nodes of that deletion (a child deleted earlier stays in the trash), needs
   room under the plan's document limit (`403 PLAN_LIMIT_EXCEEDED`), and returns the document to the root when its
   parent is still deleted. Only a deletion root can be restored; restoring a node that was deleted with its

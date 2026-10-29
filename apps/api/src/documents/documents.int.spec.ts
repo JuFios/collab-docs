@@ -509,6 +509,31 @@ describe('documents', () => {
       await as(team.editor).post(`/documents/${secret.id}/restore`).expect(404);
     });
 
+    it('keeps the own trash entries of a member visible behind many they may not see', async () => {
+      const team = await setupTeam();
+      const mine = await createDoc(team.editor, team.workspaceId);
+      await as(team.editor).delete(`/documents/${mine.id}`).expect(204);
+      // more deleted restricted roots than the list returns, all newer than the editor's own
+      const hidden = Array.from({ length: 210 }, () => crypto.randomUUID());
+      const deletedAt = new Date(Date.now() + 60_000);
+      await prisma.document.createMany({
+        data: hidden.map((id, i) => ({
+          id,
+          workspaceId: team.workspaceId,
+          title: `secret ${i}`,
+          position: `b${String(i).padStart(3, '0')}`,
+          visibility: 'RESTRICTED' as const,
+          createdBy: team.owner.id,
+          deletedAt,
+          deletedRootId: id,
+        })),
+      });
+
+      const trash = (await as(team.editor).get(`/workspaces/${team.workspaceId}/trash`).expect(200))
+        .body as Array<{ id: string }>;
+      expect(trash.map((t) => t.id)).toEqual([mine.id]);
+    });
+
     it('refuses to restore beyond the plan limit', async () => {
       const team = await setupTeam('FREE');
       const parent = await createDoc(team.owner, team.workspaceId);

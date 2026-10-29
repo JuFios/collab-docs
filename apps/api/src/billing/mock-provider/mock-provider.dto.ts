@@ -6,7 +6,7 @@ export class MockCheckoutSessionResponse {
   @ApiProperty({ format: 'uuid' }) workspaceId!: string;
   @ApiProperty({ enum: PLAN_TIERS }) plan!: PlanTier;
   @ApiProperty({ description: 'US cents' }) amountCents!: number;
-  @ApiProperty({ enum: ['PENDING', 'COMPLETED', 'FAILED'] }) status!: string;
+  @ApiProperty({ enum: ['PENDING', 'COMPLETED', 'FAILED', 'CANCELED'] }) status!: string;
 }
 
 export class EventIssuedResponse {

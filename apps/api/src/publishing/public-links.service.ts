@@ -129,6 +129,8 @@ export class PublicLinksService {
     });
     await this.expiry.reschedule(before, after);
     if (statusOf(before) !== 'active') await this.linkChanged(after, 'expiry_changed');
+    // open guest sockets keep a timer for the old expiry; a shorter one must not wait for the periodic check
+    if (after.mode === 'EDIT') await this.cutOffGuests(current);
     return present(after);
   }
 

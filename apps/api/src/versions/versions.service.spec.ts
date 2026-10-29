@@ -145,6 +145,7 @@ describe('VersionsService', () => {
         kind: 'MANUAL',
         label: 'before the rewrite',
         createdBy: USER,
+        maxManual: MAX_VERSIONS,
       });
       expect(result).toMatchObject({ id: VERSION, label: 'before the rewrite', flushed: true });
     });
@@ -170,6 +171,14 @@ describe('VersionsService', () => {
       });
       expect(collab.flush).not.toHaveBeenCalled();
       expect(versions.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses the snapshot when a parallel one took the last slot while collab flushed', async () => {
+      const { service, versions } = await setup();
+      versions.create.mockResolvedValue(null);
+      await expect(service.createManual(DOCUMENT, USER)).rejects.toMatchObject({
+        code: 'CONFLICT',
+      });
     });
   });
 

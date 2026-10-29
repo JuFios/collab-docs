@@ -8,7 +8,8 @@ side builds on it.
 
 1. `POST /api/documents/:id/collab-ticket` (cookie session, at least `VIEW`) returns
    `{ ticket, wsUrl }`. The ticket is a JWT (HS256, `aud=collab`, 60 s) with the document id and the user id. It
-   only says who is asking: the collab service reads the permissions from the database when the socket opens, so
+   is not single-use: within its 60 s it can open more sockets for the same document and identity, which grants
+   nothing the holder could not get with a new ticket. It only says who is asking: the collab service reads the permissions from the database when the socket opens, so
    a viewer receives a read-only connection from the same kind of ticket as an editor. `wsUrl` comes from the
    runtime variable `COLLAB_PUBLIC_URL` (`ws://host:4001/ws`). A guest with an edit link gets the same kind of
    ticket from `POST /api/public/links/:token/ticket`, carrying `{docId, linkId}` instead of a user id; the api
@@ -45,6 +46,7 @@ close the socket with 1009.
 { "type": "persisted", "sv": "<base64 Yjs state vector>", "saved": true }
 { "type": "access", "level": "VIEW", "readOnly": true }
 { "type": "deleted" }
+{ "type": "rejected", "reason": "too_large" }
 ```
 
 - **`persisted`** is sent after every flush of the document to storage, when a client repeats an update the room
@@ -59,6 +61,11 @@ close the socket with 1009.
   `EDIT`. After a downgrade the client recreates its `Y.Doc` from the server state (local changes the server
   ignored are discarded, with a warning to the user).
 - **`deleted`** precedes close code 4410.
+- **`rejected`** tells the sender that one of its updates was refused (`too_large`, `document_too_large` or
+  `invalid`); the other clients are not told. The refused change stays in the sender's own `Y.Doc`, and every later
+  update of that client builds on it, so the room ignores the connection's updates from then on and sends the event
+  once. The client recreates its `Y.Doc` from the server state, as after a downgrade, and tells the user that the
+  change was undone.
 
 ## Presence
 
@@ -76,9 +83,13 @@ Sync step 2 and update messages from a client are applied to the room's `Y.Doc` 
 
 - the connection has `EDIT` or better (otherwise ignored; counted and logged as `collab.update_rejected`),
 - the update is at most `COLLAB_MAX_UPDATE_BYTES`, and applying it keeps the document under
-  `COLLAB_MAX_DOCUMENT_BYTES`,
+  `COLLAB_MAX_DOCUMENT_BYTES`. The room estimates the size as the encoded state at load plus every update applied
+  since; that sum also counts deleted content, so before it refuses an update the room encodes the document and
+  measures it again (only once the estimate has drifted by 1/64 of the limit, so a document that really is near
+  its limit is not re-encoded on every keystroke),
 - it decodes as a whole before anything is applied, so a malformed update never reaches the document, the other
   clients or the store, and
+- the connection has had no update refused before (see `rejected` above), and
 - it changes the document. A duplicate or no-op update is neither stored nor broadcast
   (`collab_updates_duplicate_total`).
 
@@ -109,8 +120,9 @@ collab service subscribes and re-reads the permissions of the affected sockets f
 turns a socket read-only (and sends `access`), a grant makes it editable again, lost access closes it with 4403,
 a deleted document is flushed, announced with `deleted` and closed with 4410. Every socket is also re-evaluated
 every `COLLAB_ACCESS_RECHECK_MS` (60 s), which covers a lost Redis message. Revoking or replacing an EDIT link
-publishes `perm.changed` (reason `link_changed`) for the document, and the job that runs when a link expires
-does the same, so guests are cut off at once; the 60 s check remains the fallback.
+publishes `perm.changed` (reason `link_changed`) for the document, and so do changing the expiry of an EDIT link
+(its guests re-arm their expiry timer) and the job that runs when a link expires, so guests are cut off at once;
+the 60 s check remains the fallback.
 
 ## Rooms
 

@@ -8,25 +8,30 @@ import { Prisma } from '@collab-docs/db';
  * (search, notifications, mention candidates) instead of resolving every row in the application.
  */
 export function viewableDocumentSql(userId: Prisma.Sql): Prisma.Sql {
+  return Prisma.sql`(d.deleted_at IS NULL AND ${wouldViewDocumentSql(userId)})`;
+}
+
+/**
+ * The same rules without the trash check: "would this user see the document were it not deleted", which is what
+ * decides whether a deleted document exists for them (the trash). Same naming contract as `viewableDocumentSql`.
+ */
+export function wouldViewDocumentSql(userId: Prisma.Sql): Prisma.Sql {
   return Prisma.sql`(
-    d.deleted_at IS NULL
-    AND (
-      EXISTS (
+    EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.workspace_id = d.workspace_id AND wm.user_id = ${userId}
+        AND (wm.role IN ('OWNER', 'ADMIN') OR d.visibility = 'WORKSPACE')
+    )
+    OR (
+      d.created_by = ${userId}
+      AND EXISTS (
         SELECT 1 FROM workspace_members wm
         WHERE wm.workspace_id = d.workspace_id AND wm.user_id = ${userId}
-          AND (wm.role IN ('OWNER', 'ADMIN') OR d.visibility = 'WORKSPACE')
+          AND wm.role IN ('OWNER', 'ADMIN', 'EDITOR')
       )
-      OR (
-        d.created_by = ${userId}
-        AND EXISTS (
-          SELECT 1 FROM workspace_members wm
-          WHERE wm.workspace_id = d.workspace_id AND wm.user_id = ${userId}
-            AND wm.role IN ('OWNER', 'ADMIN', 'EDITOR')
-        )
-      )
-      OR EXISTS (
-        SELECT 1 FROM document_shares ds WHERE ds.document_id = d.id AND ds.user_id = ${userId}
-      )
+    )
+    OR EXISTS (
+      SELECT 1 FROM document_shares ds WHERE ds.document_id = d.id AND ds.user_id = ${userId}
     )
   )`;
 }

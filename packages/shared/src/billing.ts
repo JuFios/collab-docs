@@ -107,7 +107,7 @@ export const billingOverviewSchema = z.object({
 });
 export type BillingOverviewData = z.infer<typeof billingOverviewSchema>;
 
-export const CHECKOUT_SESSION_STATUSES = ['PENDING', 'COMPLETED', 'FAILED'] as const;
+export const CHECKOUT_SESSION_STATUSES = ['PENDING', 'COMPLETED', 'FAILED', 'CANCELED'] as const;
 
 /** The checkout session as the provider's payment page shows it. */
 export const mockCheckoutSessionSchema = z.object({

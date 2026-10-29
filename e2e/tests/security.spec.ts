@@ -114,6 +114,33 @@ signedInTest.describe('cross-site requests', () => {
   );
 });
 
+signedInTest.describe('nonce policy on workspace pages', () => {
+  signedInTest(
+    'a workspace page gets its own nonce, every script carries it, and nothing is blocked',
+    async ({ signedInPage }) => {
+      const workspaceId = await createWorkspace(signedInPage, 'Nonce policy');
+      const nonceOf = (policy: string | undefined) => policy?.match(/'nonce-([^']+)'/)?.[1];
+
+      const first = await signedInPage.goto(`/workspaces/${workspaceId}`);
+      const policy = first?.headers()['content-security-policy'];
+      signedInExpect(directive(policy ?? '', 'script-src')).toContain("'strict-dynamic'");
+      signedInExpect(directive(policy ?? '', 'script-src')).not.toContain("'unsafe-inline'");
+      const nonce = nonceOf(policy);
+      signedInExpect(nonce).toBeTruthy();
+      // browsers hide the attribute once the script ran; the property still holds it
+      const scripts = await signedInPage.evaluate(() =>
+        [...document.querySelectorAll('script')].map((script) => script.nonce),
+      );
+      signedInExpect(scripts.length).toBeGreaterThan(0);
+      signedInExpect(scripts.every((value) => value === nonce)).toBe(true);
+      // a blocked script would show up as a policy violation, which fails every signed-in test (fixtures.ts)
+
+      const second = await signedInPage.reload();
+      signedInExpect(nonceOf(second?.headers()['content-security-policy'])).not.toBe(nonce);
+    },
+  );
+});
+
 signedInTest.describe('static policy and cached pages', () => {
   signedInTest(
     'a published page keeps its Content-Security-Policy and is still served from the ISR cache',
@@ -153,14 +180,24 @@ signedInTest.describe('client address behind Server Actions', () => {
     async ({ page, request }) => {
       // The api limits logins per client address. If the Server Action did not pass the visitor's address on, its
       // attempts would be counted against the web container instead and this bucket would not move.
+      signedInTest.setTimeout(120_000);
       const attempt = async () => {
         const response = await request.post('/api/auth/login', {
           data: { email: `nobody-${Date.now()}@example.test`, password: 'irrelevant-password' },
         });
         signedInExpect(response.status()).toBe(401);
-        return Number(response.headers()['x-ratelimit-remaining']);
+        const headers = response.headers();
+        return {
+          remaining: Number(headers['x-ratelimit-remaining']),
+          // seconds until the one-minute bucket starts over
+          reset: Number(headers['x-ratelimit-reset']),
+        };
       };
-      const before = await attempt();
+      // start early in a window: a bucket that starts over between the two readings would look like it never moved
+      let before = await attempt();
+      await signedInExpect
+        .poll(async () => (before = await attempt()).reset, { timeout: 70_000, intervals: [1000] })
+        .toBeGreaterThanOrEqual(40);
       const stranger = newUser('stranger');
       for (let i = 0; i < 3; i += 1) {
         await loginThroughUi(page, stranger);
@@ -170,8 +207,9 @@ signedInTest.describe('client address behind Server Actions', () => {
           .waitFor();
       }
       const after = await attempt();
+      signedInExpect(after.reset).toBeLessThanOrEqual(before.reset);
       // three form submissions and one more direct call; other tests add to it, none takes away from it
-      signedInExpect(after).toBeLessThanOrEqual(before - 4);
+      signedInExpect(after.remaining).toBeLessThanOrEqual(before.remaining - 4);
     },
   );
 });

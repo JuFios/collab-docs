@@ -76,17 +76,28 @@ export class BillingService {
     };
   }
 
+  /**
+   * Starts a checkout and cancels the ones still open for the workspace, so that two tabs or a repeated click cannot
+   * end in two payments: the provider refuses to settle a canceled session, and the webhook cannot complete it either.
+   */
   async checkout(workspaceId: string, plan: CheckoutPlan): Promise<CheckoutStarted> {
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { workspaceId },
-      select: { plan: true, status: true },
-    });
-    if (subscription?.plan === plan && subscription.status === 'ACTIVE') {
-      throw new AppException('CONFLICT', `The workspace is already on the ${plan} plan`);
-    }
-    const session = await this.prisma.checkoutSession.create({
-      data: { workspaceId, plan, amountCents: PLAN_CATALOG[plan].priceCents },
-      select: { id: true },
+    const session = await this.prisma.$transaction(async (tx) => {
+      await this.planLimits.lockWorkspace(tx, workspaceId);
+      const subscription = await tx.subscription.findUnique({
+        where: { workspaceId },
+        select: { plan: true, status: true },
+      });
+      if (subscription?.plan === plan && subscription.status === 'ACTIVE') {
+        throw new AppException('CONFLICT', `The workspace is already on the ${plan} plan`);
+      }
+      await tx.checkoutSession.updateMany({
+        where: { workspaceId, status: 'PENDING' },
+        data: { status: 'CANCELED', settledAt: new Date() },
+      });
+      return tx.checkoutSession.create({
+        data: { workspaceId, plan, amountCents: PLAN_CATALOG[plan].priceCents },
+        select: { id: true },
+      });
     });
     return { sessionId: session.id, checkoutUrl: this.provider.checkoutUrl(session.id) };
   }
