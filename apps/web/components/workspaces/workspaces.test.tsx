@@ -57,32 +57,27 @@ const team = [
 ];
 
 describe('CreateWorkspaceForm', () => {
-  it('validates the name before calling the action', async () => {
+  it('posts straight to the Server Action and shows the field errors it returns', async () => {
+    actions.createWorkspaceAction.mockResolvedValueOnce({
+      fieldErrors: { name: ['Enter a workspace name.'] },
+      values: { name: '' },
+    } as never);
     const user = userEvent.setup();
     render(<CreateWorkspaceForm />);
     await user.click(screen.getByRole('button', { name: 'Create workspace' }));
     expect(await screen.findByText('Enter a workspace name.')).toBeInTheDocument();
-    expect(actions.createWorkspaceAction).not.toHaveBeenCalled();
-  });
-
-  it('submits a valid name and opens the new workspace', async () => {
-    actions.createWorkspaceAction.mockResolvedValueOnce({
-      ok: true,
-      notice: 'Workspace created.',
-      redirectTo: '/workspaces/new-id',
-    } as never);
-    const user = userEvent.setup();
-    render(<CreateWorkspaceForm />);
-    await user.type(screen.getByLabelText('Workspace name'), 'Acme');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
-    await waitFor(() => expect(actions.createWorkspaceAction).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/workspaces/new-id'));
-    expect(navigation.refresh).toHaveBeenCalled();
+    expect(actions.createWorkspaceAction).toHaveBeenCalledTimes(1);
+    // the action redirects on success: nothing for the browser to navigate
+    expect(navigation.push).not.toHaveBeenCalled();
   });
 });
 
 describe('RenameWorkspaceForm', () => {
-  it('starts with the current name and rejects an over-long one', async () => {
+  it('starts with the current name and shows what the action refused', async () => {
+    actions.renameWorkspaceAction.mockResolvedValueOnce({
+      fieldErrors: { name: ['Use at most 80 characters.'] },
+      values: { name: 'x'.repeat(81) },
+    } as never);
     const user = userEvent.setup();
     render(<RenameWorkspaceForm workspaceId={WS} name="Acme" />);
     const input = screen.getByLabelText('Workspace name');
@@ -91,12 +86,17 @@ describe('RenameWorkspaceForm', () => {
     await user.type(input, 'x'.repeat(81));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Use at most 80 characters.')).toBeInTheDocument();
-    expect(actions.renameWorkspaceAction).not.toHaveBeenCalled();
+    const data = (actions.renameWorkspaceAction.mock.calls[0] as unknown as [unknown, FormData])[1];
+    expect(data.get('workspaceId')).toBe(WS);
   });
 });
 
 describe('InviteForm', () => {
-  it('requires a valid email and offers no OWNER role', async () => {
+  it('shows an invalid email as the action reports it, and offers no OWNER role', async () => {
+    actions.inviteMemberAction.mockResolvedValueOnce({
+      fieldErrors: { email: ['Enter a valid email address.'] },
+      values: { email: 'not-an-email', role: 'EDITOR' },
+    });
     const user = userEvent.setup();
     render(<InviteForm workspaceId={WS} />);
     const options = within(screen.getByLabelText('Role')).getAllByRole('option');
@@ -104,7 +104,7 @@ describe('InviteForm', () => {
     await user.type(screen.getByLabelText('Email'), 'not-an-email');
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
-    expect(actions.inviteMemberAction).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Email')).toHaveValue('not-an-email');
   });
 
   it('sends the chosen email and role', async () => {
@@ -159,8 +159,8 @@ describe('InviteForm', () => {
     await user.type(screen.getByLabelText('Email'), 'grace@example.com');
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Invitation sent.'));
-    // the settings page is re-fetched so the pending list shows the new invitation
-    expect(navigation.refresh).toHaveBeenCalled();
+    // the action revalidated the page, so the browser does not fetch it again
+    expect(navigation.refresh).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByLabelText('Email')).toHaveValue(''));
   });
 });
@@ -213,7 +213,6 @@ describe('MembersTable by role', () => {
       }),
     );
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Role updated.'));
-    expect(navigation.refresh).toHaveBeenCalled();
   });
 
   it('asks for confirmation before removing, and shows the failure reason', async () => {
@@ -256,7 +255,7 @@ describe('PendingInvites', () => {
         inviteId: invite.id,
       }),
     );
-    await waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Invitation revoked.'));
   });
 });
 
@@ -278,7 +277,6 @@ describe('LeaveWorkspaceButton', () => {
       expect(actions.removeMemberAction).toHaveBeenCalledWith({ workspaceId: WS, userId }),
     );
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/workspaces?all=1'));
-    expect(navigation.refresh).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith('You left Acme.');
   });
 

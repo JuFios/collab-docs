@@ -11,9 +11,10 @@ import {
 import type { PersistenceHooks } from '../rooms/postgres-document-store';
 
 /**
- * What follows a committed flush: the `document.changed` event for the derived-data queues (spec §7a) and the
- * periodic automatic version. Both are fire-and-forget: a Redis outage or a failed snapshot is logged and counted,
- * and editing carries on.
+ * What surrounds a write: the `document.changed` event for the derived-data queues (spec §7a) after a committed
+ * flush, and the automatic version, taken of the state **before** the first change after a pause (so restoring it
+ * undoes that editing session). Both are fire-and-forget: a Redis outage or a failed snapshot is logged and
+ * counted, and editing carries on.
  */
 @Injectable()
 export class PersistenceHooksService implements PersistenceHooks {
@@ -32,7 +33,10 @@ export class PersistenceHooksService implements PersistenceHooks {
 
   contentPersisted(documentId: string, revision: number): void {
     this.track(emitDocumentChanged(this.queues, { documentId, revision, reason: 'content' }));
-    this.track(this.snapshotIfDue(documentId));
+  }
+
+  changeStarting(documentId: string, stateBefore: Uint8Array): void {
+    this.track(this.snapshotIfDue(documentId, stateBefore));
   }
 
   async drain(): Promise<void> {
@@ -48,13 +52,13 @@ export class PersistenceHooksService implements PersistenceHooks {
     this.lastAuto.delete(documentId);
   }
 
-  private async snapshotIfDue(documentId: string): Promise<void> {
+  private async snapshotIfDue(documentId: string, state: Uint8Array): Promise<void> {
     try {
       const last = await this.lastSnapshotAt(documentId);
       if (Date.now() - last < this.config.get('AUTO_VERSION_INTERVAL_MS', { infer: true })) return;
       // claim the slot first so a burst of flushes takes one snapshot
       this.lastAuto.set(documentId, Promise.resolve(Date.now()));
-      await this.versions.create({ documentId, kind: 'AUTO' });
+      await this.versions.create({ documentId, kind: 'AUTO', state });
     } catch (error) {
       this.lastAuto.delete(documentId);
       this.logger.warn({ err: error, documentId }, 'automatic version failed');

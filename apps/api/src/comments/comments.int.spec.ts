@@ -13,6 +13,7 @@ import type {
 } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { confirmEmail } from '../test/confirm-email';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailQueueService } from '../mail/mail-queue.service';
 import { MailerService, type MailMessage } from '../mail/mailer.service';
@@ -66,6 +67,7 @@ describe('comments and notifications', () => {
       .set('X-Forwarded-For', `10.4.${counter % 250}.${(counter * 7) % 250}`)
       .send({ email, password: PASSWORD, name })
       .expect(201);
+    await confirmEmail(prisma, response.body.user.id);
     return { id: response.body.user.id, email, name, token: response.body.accessToken };
   }
 
@@ -198,6 +200,10 @@ describe('comments and notifications', () => {
     prisma = app.get(PrismaService, { strict: false });
     writer = new DocumentStateWriter(prisma);
     notifications = app.get(NotificationsService, { strict: false });
+    // the accounts are confirmed by `confirmEmail`; the confirmation emails of their sign-up would only add noise
+    jest
+      .spyOn(app.get(MailQueueService, { strict: false }), 'sendVerifyEmail')
+      .mockResolvedValue(undefined);
     mailer = app.get(MailerService, { strict: false });
     const send = mailer.send.bind(mailer);
     jest.spyOn(mailer, 'send').mockImplementation(async (message) => {

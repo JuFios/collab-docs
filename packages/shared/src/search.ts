@@ -89,6 +89,7 @@ export const snippetPartSchema = z.object({ text: z.string(), match: z.boolean()
 
 export const searchResultSchema = z.object({
   id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
   title: z.string(),
   snippet: z.array(snippetPartSchema),
   updatedAt: z.string(),

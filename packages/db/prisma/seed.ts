@@ -34,7 +34,7 @@ async function main(): Promise<void> {
       const user = await prisma.user.upsert({
         where: { email: u.email },
         update: {},
-        create: { email: u.email, name: u.name, passwordHash },
+        create: { email: u.email, name: u.name, passwordHash, emailVerifiedAt: new Date() },
       });
       users.set(u.email, user.id);
     }

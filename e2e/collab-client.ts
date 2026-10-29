@@ -12,6 +12,8 @@ interface RawCollabClient {
   doc: Y.Doc;
   /** Resolves once the server's state has been merged into `doc`. */
   synced: Promise<void>;
+  /** Resolves with the close code once the socket is closed (by either side). */
+  closed: Promise<number>;
   /** Text of the document body, for comparing with what the browser shows. */
   text(): string;
   /** Sends a paragraph the way a hostile client would, straight over the socket. */
@@ -59,6 +61,7 @@ export async function connectRaw(
   });
   // a rejection after the first sync (the server closing the socket) is not an error of the test
   synced.catch(() => undefined);
+  const closed = new Promise<number>((resolve) => ws.on('close', (code) => resolve(code)));
 
   doc.on('update', (update: Uint8Array, origin: unknown) => {
     if (origin === 'server' || ws.readyState !== WebSocket.OPEN) return;
@@ -71,6 +74,7 @@ export async function connectRaw(
   return {
     doc,
     synced,
+    closed,
     text: () => doc.getXmlFragment('content').toString(),
     injectParagraph(text) {
       doc.transact(() => {

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, newUser, registerViaApi, test } from '../fixtures';
+import { confirmEmail } from '../mailpit';
 import { ORIGIN, createDocument, createWorkspace, invitedMember, signedIn } from '../workspace';
 
 /** Runs `action` and waits for the matching api call to succeed, so a following reload sees persisted data. */
@@ -279,6 +280,35 @@ test.describe('document tree', () => {
     await expect(page.getByRole('treeitem', { name: 'Child' })).toBeVisible();
   });
 
+  test('an editor cannot trash a page that holds a subpage they cannot edit, and is told why', async ({
+    browser,
+    baseURL,
+    signedInPage: owner,
+  }) => {
+    const workspaceId = await createWorkspace(owner, 'Guarded');
+    const parent = await createDocument(owner, workspaceId, 'Shared parent');
+    const secret = await createDocument(owner, workspaceId, 'Owner only', parent);
+    const restrict = await owner.request.patch(`/api/documents/${secret}`, {
+      data: { visibility: 'RESTRICTED' },
+      headers: { origin: ORIGIN },
+    });
+    expect(restrict.status()).toBe(200);
+
+    const { page: editor } = await invitedMember(browser, baseURL, owner, workspaceId, 'Editor');
+    await editor.goto(`/workspaces/${workspaceId}/documents/${parent}`);
+    await editor.getByRole('treeitem', { name: 'Shared parent' }).hover();
+    await editor.getByRole('button', { name: 'Actions for Shared parent' }).click();
+    await editor.getByRole('menuitem', { name: 'Move to trash' }).click();
+    await editor.getByRole('dialog').getByRole('button', { name: 'Move to trash' }).click();
+
+    await expect(editor.getByText(/has a subpage you cannot edit/)).toBeVisible();
+    await editor.reload();
+    await expect(editor.getByRole('treeitem', { name: 'Shared parent' })).toBeVisible();
+    // the restricted subpage is untouched
+    await owner.goto(`/workspaces/${workspaceId}/documents/${secret}`);
+    await expect(owner.getByRole('textbox', { name: 'Document title' })).toHaveValue('Owner only');
+  });
+
   test('the pages beside the tree follow a deletion and a rename made in it', async ({
     signedInPage: page,
   }) => {
@@ -341,10 +371,15 @@ test.describe('document tree', () => {
   }) => {
     const workspaceId = await createWorkspace(owner, 'Guests');
     const docId = await createDocument(owner, workspaceId, 'For guests');
-    const guest = await registerViaApi(
-      (await browser.newContext({ baseURL })).request,
-      newUser('guest'),
-    );
+    const guestRequest = (await browser.newContext({ baseURL })).request;
+    const guest = await registerViaApi(guestRequest, newUser('guest'));
+    // a document can be shared only with a confirmed address
+    const early = await owner.request.post(`/api/documents/${docId}/shares`, {
+      data: { email: guest.email, role: 'VIEWER' },
+      headers: { origin: ORIGIN },
+    });
+    expect(early.status()).toBe(409);
+    await confirmEmail(guestRequest, guest.email);
     const share = await owner.request.post(`/api/documents/${docId}/shares`, {
       data: { email: guest.email, role: 'VIEWER' },
       headers: { origin: ORIGIN },

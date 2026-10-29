@@ -130,18 +130,18 @@ passes **typed props** (the zod types of `@collab-docs/shared`, no `any`) to a s
 that cannot be rendered on the server stays in the island; everything SEO- or data-critical stays out of it. Every client
 component, with its reason, is listed in [Frontend](docs/frontend.md#server-vs-client-boundary).
 
-| Screen                            | Primitive                                              | Why                                                                                                                    |
-| --------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `/published/[slug]`               | **ISR** with tag `pub:<slug>` + on-demand revalidation | Many readers, rare changes, must be SEO-friendly: render once, serve from cache, drop it within seconds of a change    |
-| `/edit-link/[token]`              | Server shell + client editor, never cached             | A personal capability URL: dynamic, `noindex`, `Referrer-Policy: no-referrer`                                          |
-| Every route                       | **Edge middleware**                                    | Redirects anonymous visitors off private routes and refreshes an expired session; UX only, every page re-checks access |
-| `/workspaces/[id]` (dashboard)    | **Streaming SSR** (async RSC blocks in `Suspense`)     | Four independent data blocks; a slow or failing one never holds back the shell or the others                           |
-| Settings, invites, billing, login | **Server Actions**                                     | Form posts that work as plain `<form action>`, cookies handled on the server; input validated by the same zod schemas  |
-| Document tree, sharing, comments  | Client Components + REST + TanStack Query              | Optimistic updates, drag and drop and cache invalidation live in the browser                                           |
-| Document body, presence           | Client Component + **WebSocket (Yjs)**                 | Content mutations never go through Server Actions: they need conflict-free merging, not request/response               |
-| Notifications, tree changes       | Client + SSE                                           | One-way push                                                                                                           |
-| Loading / empty / error           | `loading.tsx`, `error.tsx`, empty states               | Present on every key screen; a test fails when a route lacks a loading state or an error boundary                      |
-| Offline while editing             | Client indicator                                       | The editor shows "Offline", keeps typing in the local `Y.Doc` and merges on reconnect                                  |
+| Screen                            | Primitive                                              | Why                                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/published/[slug]`               | **ISR** with tag `pub:<slug>` + on-demand revalidation | Many readers, rare changes, must be SEO-friendly: render once, serve from cache, drop it within seconds of a change                                         |
+| `/edit-link/[token]`              | Server shell + client editor, never cached             | A personal capability URL: dynamic, `noindex`, `Referrer-Policy: no-referrer`                                                                               |
+| Every route                       | **Edge middleware**                                    | Redirects anonymous visitors off private routes and refreshes an expired session; UX only, every page re-checks access                                      |
+| `/workspaces/[id]` (dashboard)    | **Streaming SSR** (async RSC blocks in `Suspense`)     | Four independent data blocks; a slow or failing one never holds back the shell or the others                                                                |
+| Settings, invites, billing, login | **Server Actions**                                     | Form posts that work as plain `<form action>`, also without JavaScript: the action redirects or revalidates on the server, and these pages are not streamed |
+| Document tree, sharing, comments  | Client Components + REST + TanStack Query              | Optimistic updates, drag and drop and cache invalidation live in the browser                                                                                |
+| Document body, presence           | Client Component + **WebSocket (Yjs)**                 | Content mutations never go through Server Actions: they need conflict-free merging, not request/response                                                    |
+| Notifications, tree changes       | Client + SSE                                           | One-way push                                                                                                                                                |
+| Loading / empty / error           | `loading.tsx`, `error.tsx`, empty states               | Present on every key screen; a test fails when a route lacks a loading state or an error boundary                                                           |
+| Offline while editing             | Client indicator                                       | The editor shows "Offline", keeps typing in the local `Y.Doc` and merges on reconnect                                                                       |
 
 Public pages are also kept light on purpose: client providers live in the layouts that need them, not in the root
 layout, so `/published/[slug]` downloads React and Next but not the editor, Yjs or the query client (a CI job,
@@ -180,7 +180,8 @@ flowchart LR
 - **"Saved" means durable.** After each flush the server acknowledges what is stored (`persisted {sv, saved}`); the
   editor says "Saving…" until then, and **publishing waits for it**, which closes the "publish with unsaved local changes"
   edge case. The loss window after a hard kill is at most the 5 s buffer, and the author's open tab still holds it.
-- **Versions.** Automatic snapshots every 10 min when changed, manual ones on demand, and one before every restore. A
+- **Versions.** Automatic snapshots of the state before the first change after a pause (at most every 10 min), manual
+  ones on demand, and one before every restore. A
   restore is a server-made Yjs transaction applied to the live room, so connected clients converge and the restore can
   itself be undone.
 - **Delete while editing.** The gateway writes its buffer, tells the clients (`deleted`) and closes the sockets with
@@ -218,7 +219,9 @@ index is, and `reindex` rebuilds it. Details, query semantics and language behav
 The worker (`public-revalidate`, debounced 3 s for content, immediate for publish / unpublish / expiry) calls the web app's
 `POST /internal/revalidate` with a shared secret and the tag `pub:<slug>`. The call is retried with backoff, and after an
 unpublish or expiry the job verifies the page really answers 404, because Next may store a render started before the
-invalidation. Editing never waits for any of this: the editor only enqueues. Details: [Publishing](docs/publishing.md).
+invalidation. Editing never waits for any of this: the editor only enqueues. The ISR cache itself is in Redis
+(`apps/web/cache-handler.mjs`), so a revalidation received by one web replica holds for all of them. Details:
+[Publishing](docs/publishing.md).
 
 ## Security
 
@@ -292,7 +295,6 @@ listed here with the reason, so that a reader does not have to rediscover them.
 | Thread and comment access | Routes under `documents/:id` use `@DocumentAccess`; routes that carry a thread or comment id (`threads/:threadId/…`, `comments/:commentId`) load the row in the service and call `PermissionsService.assertDocumentAccess(…, tx)` on its document, inside the write transaction.                                                                                                                                                                                                 | A guard sees only the route, and the document is not in it; a guard that resolved thread → document would run the same lookups a second time, and the write still has to re-check inside its transaction so a revoked share cannot slip through between the two.                                                        |
 | Webhook signature         | `Mock-Signature: t=…,v1=…` is built and checked in `webhook-signature.ts` with `node:crypto` (HMAC-SHA256, `timingSafeEqual`, a five-minute window); the raw body comes from `rawBody: true`, the Nest way.                                                                                                                                                                                                                                                                      | The provider is a mock, so there is no vendor SDK to call (`stripe.webhooks.constructEvent` does the same thing for Stripe). The format is Stripe's, so replacing the module with the real provider changes the verifier, not the design.                                                                               |
 | Mock payment provider     | A module of its own with its own table (`mock_provider_events`) and its own queue (`billing-delivery`); the billing module sees it through the `BILLING_PROVIDER` token only.                                                                                                                                                                                                                                                                                                    | A real provider keeps its events and delivers them itself; "redeliver" and retries only make sense if the mock does the same, and keeping its state out of `webhook_events` keeps the receiving side identical to what it would be with Stripe.                                                                         |
-| Checkout redirect (web)   | The checkout action returns the payment page and the button navigates, instead of calling `redirect` inside the action: the same reason as for every other action (see "Why actions do not call `revalidatePath` or `redirect`").                                                                                                                                                                                                                                                |
 | Tree cache                | A small service over Redis; the key carries a version that `INCR` bumps.                                                                                                                                                                                                                                                                                                                                                                                                         | `@nestjs/cache-manager` has no atomic increment, so invalidation by version would need the raw client anyway.                                                                                                                                                                                                           |
 | Events between services   | `ioredis` publish/subscribe with JSON payloads (`perm.changed`, `doc.deleted`, `doc.restored`, the realtime bridge).                                                                                                                                                                                                                                                                                                                                                             | These are fire-and-forget broadcasts. The Redis transporter of `@nestjs/microservices` would wrap every message as `{ pattern, data }` and make every subscriber a microservice for the same delivery guarantees. The request/response calls between api and collab do use the microservices TCP transport (see above). |
 | OpenAPI                   | `@ApiProperty` decorators are written by hand, and `docs/openapi.json` is exported and committed.                                                                                                                                                                                                                                                                                                                                                                                | The Nest CLI plugin is optional, saves decorators only, and would change the generated document silently when a type changes.                                                                                                                                                                                           |
@@ -396,18 +398,16 @@ than gaps.
 
 **Product**
 
-- Email verification at sign-up, password reset and "sign out everywhere"; the access token cannot be revoked before it
-  expires (15 minutes). Without verification an address belongs to whoever registered it first, and sharing by email
-  grants access to that account at once (invitations to a workspace are safe: they need the token from the email).
-  The share dialog shows the account's name, which is the only check; verification, or shares that wait for a
-  link from the email, would close it.
+- Password reset, a change of email address and "sign out everywhere"; the access token cannot be revoked before it
+  expires (15 minutes). An unconfirmed account can use the app, only sharing with it waits for the confirmation
+  ([auth](docs/auth.md)).
 - Mentions in the **body** of a document (only comments carry @mentions); editing and deleting one's own comment from the
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.
 - Sharing is not inherited down the tree _by design_: a child copies its parent's visibility and shares when it is created and is independent
-  afterwards. Deleting a document trashes its whole subtree _by design_ (as in Notion), restricted subpages the caller
-  cannot edit or see included; restoring those needs an Owner or Admin, or the author. A guest who holds an edit link
-  cannot comment.
+  afterwards. Deleting a document trashes its whole subtree (as in Notion), so it needs `EDIT` on every subpage; a
+  page with a subpage the caller cannot edit is refused with an explanation. A guest who holds an edit link cannot
+  comment.
 - Billing is a mock: no renewals, proration, taxes, payment methods, dunning or refunds (a payment overtaken by a newer
   event or checkout is invoiced and logged as `billing.payment_not_applied`, not refunded). The 80 % usage warning is shown on the meters, but nothing warns before the action that would cross it.
 - Search has no typo tolerance and no stemming (Postgres ships no Ukrainian dictionary); a trigram index on titles exists
@@ -421,7 +421,9 @@ than gaps.
   not swept. The tree and the trash are not paginated. Creates, moves, deletes and restores in one workspace
   serialise on the workspace row lock, which is simple and correct but becomes the bottleneck of a very busy workspace.
 - One collab instance _by design_; horizontal scaling needs consistent routing by document id or a Redis fan-out between
-  instances ([CRDT](docs/crdt.md#scaling-the-collab-service)). No load test of the gateway and no Lighthouse measurements.
+  instances ([CRDT](docs/crdt.md#scaling-the-collab-service)). The web app and the api scale out as they are: the
+  ISR cache of the web replicas is shared in Redis, so a revalidation that reaches one replica holds for all
+  ([Publishing](docs/publishing.md)). No load test of the gateway and no Lighthouse measurements.
 - Email is delivered at least once, so a retry after a crash can send an invitation twice.
 - A duplicated character can appear when two people type their first character into an empty document at the same
   instant (behaviour of `@tiptap/y-tiptap`); it is a known limit, not a data loss.

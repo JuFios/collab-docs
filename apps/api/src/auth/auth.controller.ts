@@ -15,16 +15,29 @@ import type { Request, Response } from 'express';
 import { type AuthSession, REFRESH_COOKIE, sanitizeNextPath } from '@collab-docs/shared';
 import { AppException, type AppConfig, RateLimit } from '@collab-docs/nest';
 import { CurrentUser, Public } from './auth.decorators';
-import { AuthSessionResponse, AuthUserResponse, LoginDto, RegisterDto } from './auth.dto';
+import {
+  AuthSessionResponse,
+  AuthUserResponse,
+  LoginDto,
+  RegisterDto,
+  VerifyEmailDto,
+} from './auth.dto';
 import { type IssuedSession, AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
 import type { RequestUser } from './auth.types';
 import { clearAuthCookies, readCookie, setAccessCookie, setRefreshCookie } from './cookies';
+import { clientFingerprint } from './refresh-token.service';
+
+/** The client presenting a refresh token; `req.ip` is resolved through the trusted proxies only. */
+const clientOf = (req: Request): string =>
+  clientFingerprint({ userAgent: req.get('user-agent'), ip: req.ip });
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly verification: EmailVerificationService,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
@@ -64,8 +77,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Rotate the refresh token (cookie cd_rt) and issue a new access token',
     description:
-      'Presenting a token rotated less than 30 s ago returns a new access token without a new rotation; ' +
-      'later reuse revokes the whole token family.',
+      'Presenting a token rotated less than 10 s ago, from the same client (User-Agent and address), returns a ' +
+      'new access token without a new rotation; any other reuse revokes the whole token family.',
   })
   @ApiOkResponse({ type: AuthSessionResponse })
   async refresh(
@@ -75,7 +88,7 @@ export class AuthController {
     const presented = readCookie(req, REFRESH_COOKIE);
     if (!presented) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');
     try {
-      return this.respond(res, await this.auth.refresh(presented));
+      return this.respond(res, await this.auth.refresh(presented, clientOf(req)));
     } catch (error) {
       if (error instanceof AppException && error.code === 'UNAUTHENTICATED') {
         clearAuthCookies(res, this.cookieEnv);
@@ -111,7 +124,7 @@ export class AuthController {
     const presented = readCookie(req, REFRESH_COOKIE);
     try {
       if (!presented) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');
-      this.respond(res, await this.auth.refresh(presented));
+      this.respond(res, await this.auth.refresh(presented, clientOf(req)));
       res.redirect(302, next);
     } catch (error) {
       if (!(error instanceof AppException) || error.code !== 'UNAUTHENTICATED') throw error;
@@ -129,6 +142,28 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.auth.logout(readCookie(req, REFRESH_COOKIE));
     clearAuthCookies(res, this.cookieEnv);
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Confirm the email address of an account with the token from the confirmation email',
+  })
+  @ApiNoContentResponse()
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+    await this.verification.verify(dto.token);
+  }
+
+  @Post('verify-email/resend')
+  @HttpCode(204)
+  @RateLimit.user('verifyEmail')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access-cookie')
+  @ApiOperation({ summary: 'Email a new confirmation link to the signed-in user' })
+  @ApiNoContentResponse()
+  async resendVerification(@CurrentUser() user: RequestUser): Promise<void> {
+    await this.verification.resend(user.id);
   }
 
   @Get('me')

@@ -19,8 +19,6 @@ export interface ActionState {
   ok?: boolean;
   /** Short confirmation for the user (toast) after a successful submit. */
   notice?: string;
-  /** Where to go after a successful submit; the client navigates (see `useActionFeedback`). */
-  redirectTo?: string;
 }
 
 const PLAN_NAMES: Record<PlanTier, string> = { FREE: 'Free', PRO: 'Pro', TEAM: 'Team' };

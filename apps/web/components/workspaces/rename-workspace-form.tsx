@@ -1,18 +1,17 @@
 'use client';
 
-import { renameWorkspaceInputSchema } from '@collab-docs/shared';
+import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FormError, FormField } from '@/components/ui/form';
 import { renameWorkspaceAction } from '@/lib/workspaces/actions';
 import { useActionFeedback } from './use-action-feedback';
-import { useValidatedAction } from './use-validated-action';
 
-/** Client component: pending state and field errors, with the zod check done before the round trip. */
+/**
+ * Client component for the pending state and the field errors. The form posts to the Server Action itself, so it
+ * also works without JavaScript; the action validates with the shared zod schema.
+ */
 export function RenameWorkspaceForm({ workspaceId, name }: { workspaceId: string; name: string }) {
-  const [state, formAction, pending] = useValidatedAction(
-    renameWorkspaceAction,
-    renameWorkspaceInputSchema,
-  );
+  const [state, formAction, pending] = useActionState(renameWorkspaceAction, {});
   useActionFeedback(state);
   const errors = state.fieldErrors ?? {};
 

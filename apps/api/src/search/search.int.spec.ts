@@ -12,6 +12,7 @@ import {
 import type { SearchPage, SnippetPart } from '@collab-docs/shared';
 import { MetricsService, QueueService, emitDocumentChanged } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { confirmEmail } from '../test/confirm-email';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAX_INDEXED_BODY_CHARS, SearchIndexService } from './search-index.service';
 import { SearchWorkerModule } from './search.module';
@@ -57,6 +58,7 @@ describe('search', () => {
       .set('X-Forwarded-For', `10.5.${counter % 250}.${(counter * 7) % 250}`)
       .send({ email, password: PASSWORD, name: label })
       .expect(201);
+    await confirmEmail(prisma, response.body.user.id);
     return { id: response.body.user.id, email, token: response.body.accessToken };
   }
 
@@ -458,6 +460,46 @@ describe('search', () => {
         data: { workspaceId, userId: second.id, role: 'EDITOR' },
       });
       expect(await idsFor(second, workspaceId, 'pelican')).toEqual([]);
+    });
+
+    it('lets a guest search the documents shared with them, in any workspace, and nothing else', async () => {
+      const { owner, guest, outsider, viewer, workspaceId, open, secret } = await seeded();
+      const elsewhere = await as(outsider).post('/workspaces').send({ name: 'Other' }).expect(201);
+      const far = await createDocument(outsider, elsewhere.body.id as string, 'Pelican far');
+      await edit(far, 'pelican body');
+      await until(async () => (await indexedRevision(far)) === (await currentRevision(far)));
+      await as(owner)
+        .post(`/documents/${secret}/shares`)
+        .send({ email: guest.email, role: 'VIEWER' })
+        .expect(201);
+      await as(outsider)
+        .post(`/documents/${far}/shares`)
+        .send({ email: guest.email, role: 'EDITOR' })
+        .expect(201);
+
+      const shared = async (user: TestUser) =>
+        (await as(user).get('/me/shared-documents/search?q=pelican').expect(200)).body as {
+          items: Array<{ id: string; workspaceId: string; snippet: unknown[] }>;
+        };
+      const found = await shared(guest);
+      expect(found.items.map((i) => [i.id, i.workspaceId]).sort()).toEqual(
+        [
+          [secret, workspaceId],
+          [far, elsewhere.body.id],
+        ].sort(),
+      );
+      expect(found.items[0]!.snippet.length).toBeGreaterThan(0);
+      // the open document is visible to members, but not shared with the guest
+      expect(found.items.map((i) => i.id)).not.toContain(open);
+      // a member without shares has nothing here (workspace search is theirs)
+      expect((await shared(viewer)).items).toEqual([]);
+
+      // a removed share and a deleted document stop matching at once
+      const guestId = (await prisma.user.findUniqueOrThrow({ where: { email: guest.email } })).id;
+      await as(owner).delete(`/documents/${secret}/shares/${guestId}`).expect(204);
+      await as(outsider).delete(`/documents/${far}`).expect(204);
+      expect((await shared(guest)).items).toEqual([]);
+      await as(null).get('/me/shared-documents/search?q=pelican').expect(401);
     });
 
     it('answers 404 to people outside the workspace, guests with a share included', async () => {

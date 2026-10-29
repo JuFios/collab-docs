@@ -99,11 +99,11 @@ most 100 rows (tested); `collab_compaction_*` metrics show duration and rows fol
 
 **Versions** (`document_versions`, whole document as one update):
 
-| Kind          | Created                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------- |
-| `AUTO`        | by collab after a flush, at most every 10 min (`AUTO_VERSION_INTERVAL_MS`) and only if changed |
-| `MANUAL`      | `POST /documents/:id/versions {label?}` (EDIT); collab is asked to flush first (2 s limit)     |
-| `PRE_RESTORE` | automatically, before a restore replaces the content                                           |
+| Kind          | Created                                                                                                                                                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTO`        | by collab, of the content **just before** the first change after a pause: at most every 10 min (`AUTO_VERSION_INTERVAL_MS`), only when an update really changes the document. Restoring it undoes that editing session |
+| `MANUAL`      | `POST /documents/:id/versions {label?}` (EDIT); collab is asked to flush first (2 s limit)                                                                                                                             |
+| `PRE_RESTORE` | automatically, before a restore replaces the content                                                                                                                                                                   |
 
 `GET /documents/:id/versions` lists them, `GET .../:versionId` returns the content as **sanitised** ProseMirror JSON
 for a preview. Retention (hourly job in the worker): 50 automatic snapshots per document and 100 snapshots in all;

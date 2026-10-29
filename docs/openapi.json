@@ -289,7 +289,7 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "description": "Presenting a token rotated less than 30 s ago returns a new access token without a new rotation; later reuse revokes the whole token family.",
+        "description": "Presenting a token rotated less than 10 s ago, from the same client (User-Agent and address), returns a new access token without a new rotation; any other reuse revokes the whole token family.",
         "operationId": "AuthController_refresh",
         "parameters": [],
         "responses": {
@@ -419,6 +419,84 @@
           }
         ],
         "summary": "Revoke the refresh token family and clear the cookies",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/verify-email": {
+      "post": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm the email address of an account with the token from the confirmation email",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/verify-email/resend": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Email a new confirmation link to the signed-in user",
         "tags": [
           "auth"
         ]
@@ -2210,7 +2288,7 @@
     },
     "/api/documents/{id}/versions": {
       "get": {
-        "description": "Automatic snapshots (every 10 minutes while the document changes, 50 kept), manual ones and the snapshots taken before a restore.",
+        "description": "Automatic snapshots (the content before the first change after a pause, at most every 10 minutes, 50 kept), manual ones and the snapshots taken before a restore.",
         "operationId": "VersionsController_list",
         "parameters": [
           {
@@ -3111,7 +3189,7 @@
     },
     "/api/workspaces/{workspaceId}/search": {
       "get": {
-        "description": "Members only (guests with a share get 404). Returns the documents the caller can open, best match first: title weighs more than body, words are matched as prefixes and ignore case and accents. The index is updated a few seconds after an edit; permissions are checked at request time. Rate limited per user (60 per minute by default).",
+        "description": "Members only (guests with a share get 404 and search through /me/shared-documents/search). Returns the documents the caller can open, best match first: title weighs more than body, words are matched as prefixes and ignore case and accents. The index is updated a few seconds after an edit; permissions are checked at request time. Rate limited per user (60 per minute by default).",
         "operationId": "SearchController_find",
         "parameters": [
           {
@@ -3197,6 +3275,91 @@
           }
         ],
         "summary": "Full-text search in a workspace",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/me/shared-documents/search": {
+      "get": {
+        "description": "Every document shared with the caller directly, in any workspace: what a guest of a document can reach, since workspace search is for members. Same matching, ranking and paging as workspace search; a share that is removed stops matching at once. Rate limited per user, together with workspace search.",
+        "operationId": "SearchController_findShared",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Words to look for (at most 8), each matched as the start of a word. Anything but letters and digits separates words. An empty query returns an empty page.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "`nextCursor` of the previous page; valid for the same `q` only.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED or TOKEN_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          },
+          "default": {
+            "description": "Error; see `code` for the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Full-text search in the documents shared with the caller",
         "tags": [
           "search"
         ]
@@ -4468,12 +4631,17 @@
           },
           "name": {
             "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Documents can be shared with the account only once its address is confirmed"
           }
         },
         "required": [
           "id",
           "email",
-          "name"
+          "name",
+          "emailVerified"
         ]
       },
       "AuthSessionResponse": {
@@ -4511,6 +4679,18 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "VerifyEmailDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the confirmation link"
+          }
+        },
+        "required": [
+          "token"
         ]
       },
       "CreateWorkspaceDto": {
@@ -5749,6 +5929,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "title": {
             "type": "string"
           },
@@ -5765,6 +5949,7 @@
         },
         "required": [
           "id",
+          "workspaceId",
           "title",
           "snippet",
           "updatedAt"

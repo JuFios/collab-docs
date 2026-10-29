@@ -18,6 +18,7 @@ import {
   encodeAwarenessUpdate,
 } from './awareness-codec';
 import type { DocumentStore } from './document-store';
+import { structureViolation } from './update-structure';
 
 /** One WebSocket as the room sees it; the transport (and its tests) provide the implementation. */
 export interface RoomConnection {
@@ -38,6 +39,8 @@ export interface RoomLimits {
   maxDocumentBytes: number;
   maxConnections: number;
   maxAwarenessBytes: number;
+  /** Automatic versions: the state before a change is handed to the store at most this often. */
+  snapshotIntervalMs: number;
 }
 
 export type RejectReason = 'read_only' | 'awareness_invalid' | CollabRejectReason;
@@ -120,6 +123,8 @@ export class DocRoom {
    */
   private unmeasuredBytes = 0;
   private appliedChange = false;
+  /** When the state before a change was last handed over for an automatic version (`-Infinity`: never). */
+  private lastSnapshotOffer = Number.NEGATIVE_INFINITY;
   private readonly unsubscribe: () => void;
   private destroyed = false;
 
@@ -351,8 +356,21 @@ export class DocRoom {
     try {
       // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
       // decode first, or an update called "rejected" has already changed the document
-      Y.decodeUpdate(update);
+      const violation = structureViolation(Y.decodeUpdate(update));
+      if (violation) {
+        return this.refuse(state, 'invalid', new Error(`outside the content model: ${violation}`));
+      }
+      // the version keeps what the change replaces; encoded only when one may be due, not on every keystroke
+      const now = this.clock();
+      const before =
+        now - this.lastSnapshotOffer >= this.limits.snapshotIntervalMs
+          ? Y.encodeStateAsUpdate(this.doc)
+          : null;
       Y.applyUpdate(this.doc, update, state);
+      if (before && this.appliedChange) {
+        this.lastSnapshotOffer = now;
+        this.store.changeStarting(this.documentId, before);
+      }
     } catch (error) {
       // a throw after the update was integrated (from an observer) leaves it in the room: it was not refused
       return this.appliedChange

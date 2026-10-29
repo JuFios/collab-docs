@@ -1,6 +1,8 @@
 import type { Browser, Page } from '@playwright/test';
+import { connectRaw } from '../collab-client';
 import { inviteLinkFor } from '../mailpit';
 import { expect, newUser, registerViaApi, test } from '../fixtures';
+import { ORIGIN, createDocument, invitedMember } from '../workspace';
 
 /** A page for a user that exists already, signed in through the api (no UI login). */
 async function signedIn(
@@ -281,6 +283,76 @@ test.describe('workspaces', () => {
     await expect(outsider.getByText('Page not found')).toBeVisible();
     await outsider.goto('/workspaces/not-a-uuid');
     await expect(outsider.getByText('Page not found')).toBeVisible();
+  });
+
+  test('a removed member loses the documents shared with them, over the api and the socket', async ({
+    browser,
+    baseURL,
+    signedInPage: owner,
+  }) => {
+    const workspaceId = await createWorkspace(owner, 'Removal');
+    const documentId = await createDocument(owner, workspaceId, 'Payroll');
+    const restrict = await owner.request.patch(`/api/documents/${documentId}`, {
+      data: { visibility: 'RESTRICTED' },
+      headers: { origin: ORIGIN },
+    });
+    expect(restrict.status()).toBe(200);
+    const { context } = await invitedMember(browser, baseURL, owner, workspaceId, 'Viewer');
+    const me = (await (await context.request.get('/api/auth/me')).json()) as {
+      id: string;
+      email: string;
+    };
+    const share = await owner.request.post(`/api/documents/${documentId}/shares`, {
+      data: { email: me.email, role: 'EDITOR' },
+      headers: { origin: ORIGIN },
+    });
+    expect(share.status(), await share.text()).toBe(201);
+    const socket = await connectRaw(context.request, documentId);
+    await socket.synced;
+
+    const removed = await owner.request.delete(`/api/workspaces/${workspaceId}/members/${me.id}`, {
+      headers: { origin: ORIGIN },
+    });
+    expect(removed.status()).toBe(204);
+
+    // collab closes the open socket with 4403, and nothing lets them back in
+    expect(await socket.closed).toBe(4403);
+    expect((await context.request.get(`/api/documents/${documentId}`)).status()).toBe(404);
+    const ticket = await context.request.post(`/api/documents/${documentId}/collab-ticket`, {
+      headers: { origin: ORIGIN },
+    });
+    expect(ticket.status()).toBe(404);
+    expect(await (await context.request.get('/api/me/shared-documents')).json()).toEqual([]);
+  });
+
+  test('the forms work without JavaScript: create a workspace, then invite', async ({
+    browser,
+    baseURL,
+    user,
+  }) => {
+    const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
+    const login = await context.request.post('/api/auth/login', {
+      data: { email: user.email, password: user.password },
+    });
+    expect(login.status()).toBe(200);
+    const page = await context.newPage();
+
+    await page.goto('/workspaces');
+    await page.getByLabel('Workspace name').fill('No script');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+    await expect(page).toHaveURL(/\/workspaces\/[0-9a-f-]{36}$/);
+    const workspaceId = new URL(page.url()).pathname.split('/')[2]!;
+
+    await page.goto(`/workspaces/${workspaceId}/settings`);
+    await page.getByRole('textbox', { name: 'Email' }).fill('not-an-email');
+    await page.getByRole('button', { name: 'Send invitation' }).click();
+    await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Email' }).fill('no-script@example.test');
+    await page.getByRole('button', { name: 'Send invitation' }).click();
+    await expect(
+      page.getByRole('list', { name: 'Pending invitations' }).getByText('no-script@example.test'),
+    ).toBeVisible();
+    await context.close();
   });
 
   test('a member can leave a workspace, the last owner cannot', async ({

@@ -18,14 +18,17 @@ describe('decideRoute', () => {
     },
   );
 
-  it.each(['/published/some-slug', '/edit-link/token', '/invite/abc', '/mock-checkout/1'])(
-    'keeps %s public',
-    (pathname) => {
-      for (const session of ['valid', 'expired', 'none'] as const) {
-        expect(decideRoute({ pathname, search: '', session })).toEqual({ type: 'next' });
-      }
-    },
-  );
+  it.each([
+    '/published/some-slug',
+    '/edit-link/token',
+    '/invite/abc',
+    '/verify-email/abc',
+    '/mock-checkout/1',
+  ])('keeps %s public', (pathname) => {
+    for (const session of ['valid', 'expired', 'none'] as const) {
+      expect(decideRoute({ pathname, search: '', session })).toEqual({ type: 'next' });
+    }
+  });
 
   it('shows the landing page to everyone but a signed-in visitor, who goes to the workspaces', () => {
     for (const session of ['expired', 'none'] as const) {

@@ -4,8 +4,12 @@ import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { PrismaService } from '../prisma/prisma.service';
 
-/** A just-rotated token may be presented again for this long (parallel requests, several tabs). */
-export const REFRESH_GRACE_MS = 30_000;
+/**
+ * A just-rotated token may be presented again for this long, by the client that rotated it: parallel requests and
+ * several tabs of one browser all hold the old cookie for a moment. The same token from another client, or later,
+ * is a stolen copy and revokes the family.
+ */
+export const REFRESH_GRACE_MS = 10_000;
 
 type RefreshResult =
   /** The presented token was current: it has been rotated, `token` is the replacement. */
@@ -15,6 +19,15 @@ type RefreshResult =
 
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Who presented a token, for the grace window: the SHA-256 of the User-Agent and the client address (the one the
+ * api resolves after its trusted proxies). Both can be forged by a thief who knows them, which is why the window is
+ * also short; nothing about the client is stored in the clear.
+ */
+export function clientFingerprint(client: { userAgent?: string; ip?: string }): string {
+  return hashToken(`${client.userAgent ?? ''}\n${client.ip ?? ''}`);
 }
 
 /** Opaque 256-bit token; only its SHA-256 is stored. */
@@ -50,18 +63,18 @@ export class RefreshTokenService {
    * Exchanges a refresh token. Concurrency: the `rotated_at IS NULL` claim is a single conditional UPDATE,
    * so of two parallel requests with the same token exactly one rotates; the other lands in the grace branch.
    */
-  async rotate(presented: string, now = new Date()): Promise<RefreshResult> {
+  async rotate(presented: string, client: string, now = new Date()): Promise<RefreshResult> {
     const row = await this.prisma.refreshToken.findUnique({
       where: { tokenHash: hashToken(presented) },
     });
     if (!row || row.revokedAt || row.expiresAt <= now) throw rejected();
-    if (row.rotatedAt) return this.reuse(row.id, now);
+    if (row.rotatedAt) return this.reuse(row.id, client, now);
 
     const next = generateToken();
     const created = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.refreshToken.updateMany({
         where: { id: row.id, rotatedAt: null, revokedAt: null },
-        data: { rotatedAt: now },
+        data: { rotatedAt: now, rotatedBy: client },
       });
       if (claimed.count === 0) return null;
       const replacement = await tx.refreshToken.create({
@@ -75,7 +88,7 @@ export class RefreshTokenService {
       await tx.refreshToken.update({ where: { id: row.id }, data: { replacedBy: replacement.id } });
       return replacement;
     });
-    if (!created) return this.reuse(row.id, now); // lost the race to a parallel request
+    if (!created) return this.reuse(row.id, client, now); // lost the race to a parallel request
     return { kind: 'rotated', userId: row.userId, token: next.token };
   }
 
@@ -87,16 +100,17 @@ export class RefreshTokenService {
     if (row) await this.revokeFamily(row.familyId, now);
   }
 
-  private async reuse(id: string, now: Date): Promise<RefreshResult> {
+  private async reuse(id: string, client: string, now: Date): Promise<RefreshResult> {
     const row = await this.prisma.refreshToken.findUnique({ where: { id } });
     if (!row || row.revokedAt || !row.rotatedAt) throw rejected();
-    if (now.getTime() - row.rotatedAt.getTime() <= REFRESH_GRACE_MS) {
-      return { kind: 'grace', userId: row.userId };
-    }
+    const inWindow = now.getTime() - row.rotatedAt.getTime() <= REFRESH_GRACE_MS;
+    const sameClient = row.rotatedBy === client;
+    if (inWindow && sameClient) return { kind: 'grace', userId: row.userId };
     await this.revokeFamily(row.familyId, now);
     logEvent(this.logger, 'auth.refresh_reuse_detected', {
       userId: row.userId,
       familyId: row.familyId,
+      reason: inWindow ? 'other_client' : 'after_grace',
     });
     throw rejected();
   }

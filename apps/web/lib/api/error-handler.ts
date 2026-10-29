@@ -12,6 +12,11 @@ function describe(error: ApiError): string | undefined {
   return error.correlationId ? `Reference: ${error.correlationId}` : undefined;
 }
 
+function explained(error: ApiError): boolean {
+  const details = error.details as { reason?: unknown } | undefined;
+  return typeof details?.reason === 'string';
+}
+
 function messageFor(error: ApiError): string {
   if (error.code === 'RATE_LIMITED')
     return 'Too many requests. Please wait a moment and try again.';
@@ -45,7 +50,11 @@ export function createErrorHandlers(deps: ErrorHandlerDeps) {
         return;
       }
       if (error.status === 403) {
-        deps.toastError("You don't have permission to do that.", describe(error));
+        // a refusal that explains itself (`details.reason`) is shown as the api words it
+        deps.toastError(
+          explained(error) ? error.message : "You don't have permission to do that.",
+          describe(error),
+        );
         return;
       }
       deps.toastError(messageFor(error), describe(error));

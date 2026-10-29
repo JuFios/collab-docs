@@ -3,6 +3,7 @@
 import type { Workspace } from '@collab-docs/shared';
 import { Check, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,7 +43,10 @@ export function WorkspaceSwitcher({ workspaces }: { workspaces: readonly Workspa
         ))}
         {workspaces.length > 0 ? <DropdownMenuSeparator /> : null}
         <DropdownMenuItem asChild>
-          <Link href="/workspaces?all=1">All workspaces</Link>
+          <Link href="/workspaces?all=1">
+            All workspaces
+            <LinkPending />
+          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -42,10 +42,21 @@ export class LoginDto {
   password!: string;
 }
 
+export class VerifyEmailDto {
+  @ApiProperty({ description: 'The token from the confirmation link' })
+  @IsString()
+  @MaxLength(100)
+  token!: string;
+}
+
 export class AuthUserResponse {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() email!: string;
   @ApiProperty() name!: string;
+  @ApiProperty({
+    description: 'Documents can be shared with the account only once its address is confirmed',
+  })
+  emailVerified!: boolean;
 }
 
 export class AuthSessionResponse {

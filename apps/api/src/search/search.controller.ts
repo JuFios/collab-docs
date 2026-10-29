@@ -28,7 +28,7 @@ export class SearchController {
   @ApiOperation({
     summary: 'Full-text search in a workspace',
     description:
-      'Members only (guests with a share get 404). Returns the documents the caller can open, best match first: ' +
+      'Members only (guests with a share get 404 and search through /me/shared-documents/search). Returns the documents the caller can open, best match first: ' +
       'title weighs more than body, words are matched as prefixes and ignore case and accents. The index is ' +
       'updated a few seconds after an edit; permissions are checked at request time. Rate limited per user (60 per minute by default).',
   })
@@ -40,5 +40,20 @@ export class SearchController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.search.search(user.id, workspaceId, query);
+  }
+
+  @Get('me/shared-documents/search')
+  @RateLimit.user('search')
+  @ApiOperation({
+    summary: 'Full-text search in the documents shared with the caller',
+    description:
+      'Every document shared with the caller directly, in any workspace: what a guest of a document can reach, ' +
+      'since workspace search is for members. Same matching, ranking and paging as workspace search; a share ' +
+      'that is removed stops matching at once. Rate limited per user, together with workspace search.',
+  })
+  @ApiOkResponse({ type: SearchPageResponse })
+  @ApiTooManyRequestsResponse({ description: 'RATE_LIMITED' })
+  findShared(@Query() query: SearchQueryDto, @CurrentUser() user: RequestUser) {
+    return this.search.search(user.id, null, query);
   }
 }

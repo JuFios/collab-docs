@@ -16,17 +16,19 @@ in `documents.position` (`COLLATE "C"`), so a reorder rewrites one row and never
   serialises the plan-limit check and makes a cycle from two racing moves impossible, including moves into the
   root where there is no parent row to lock.
 - **Soft delete** marks the whole live subtree in one recursive statement and stamps every node with
-  `deleted_root_id`, including descendants the caller cannot see. This is deliberate, as in Notion: `EDIT` on a
-  page is enough to trash its subpages, also restricted ones the caller may only view or not see at all, and
-  restoring them then needs an Owner or Admin, or the author of the deleted root. The trash lists the root of each deletion that the
+  `deleted_root_id`. A page takes its subpages with it, so the caller needs `EDIT` on every page of the subtree
+  (resolved per page with the same rules as any access check, inside the transaction): an editor of a parent
+  cannot trash a restricted subpage that was not shared with them, or one they may only view. Otherwise the answer
+  is `403` with `details: { reason: 'SUBTREE_NOT_EDITABLE', blocked }` and a message the app shows as it is, and
+  nothing is deleted; an Owner or Admin can always delete. The trash lists the root of each deletion that the
   caller would see were it live (filtered in the query, so the 200-entry cap applies to those).
   **Restore** brings back exactly the nodes of that deletion (a child deleted earlier stays in the trash), needs
   room under the plan's document limit (`403 PLAN_LIMIT_EXCEEDED`), and returns the document to the root when its
   parent is still deleted. Only a deletion root can be restored; restoring a node that was deleted with its
   parent is `409`.
-- **Sharing** is by email for registered users only (`404` for unknown addresses). A guest sees only the
-  documents shared with them (`GET /me/shared-documents`), not the tree or the workspace. A share overrides the
-  workspace role in both directions.
+- **Sharing** is by email for registered users with a confirmed address only (`404` for unknown addresses, `409`
+  for an unconfirmed one). A guest sees only the documents shared with them (`GET /me/shared-documents`), not the
+  tree or the workspace. A share overrides the workspace role in both directions.
 - **Recent documents** (`GET /workspaces/:id/documents/recent?limit=`, default 8, max 20) feed the dashboard:
   newest change first, where an edit of the content counts as much as a rename or a move (the later of
   `updated_at` and `content_updated_at`, as in search), visibility filtered in SQL so the limit applies to

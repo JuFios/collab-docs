@@ -70,6 +70,12 @@ state.
   change was undone. The new session reuses the ticket while it is under 30 s old, so a full document refusing every
   keystroke does not cost a ticket request each. Only refused updates send the event: a malformed message that is not
   an update is logged as `invalid` and changes nothing else.
+- An update is also `invalid` when it does not fit the content model (`rooms/update-structure.ts`): it is decoded
+  before it reaches the room, and every element, attribute, mark and Yjs type it introduces must be one of the
+  shared allowlist (`NODE_SPECS`, `MARK_NAMES`), under the `content` fragment or Tiptap's position map beside it. A
+  hostile client therefore cannot store a `<script>` element or an `onclick` attribute at all, instead of relying on
+  the sanitiser that strips them on the way out. Values are not checked here (an `href` with `javascript:` is only
+  text in the document); the sanitiser still runs before anything is rendered or indexed.
 
 ## Presence
 

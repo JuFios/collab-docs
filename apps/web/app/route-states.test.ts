@@ -18,6 +18,20 @@ const WITHOUT_LOADING: Record<string, string> = {
 /** Exempt pages that do read data, because the cache answers instead of a request the user waits for. */
 const CACHED = new Set(['(public)/published/[slug]/page.tsx']);
 
+/**
+ * Pages whose forms post to Server Actions and must work without JavaScript. A `loading.tsx` (or any Suspense
+ * boundary) makes Next stream the page: the content arrives in a hidden element that a script reveals, so without
+ * JavaScript only the skeleton shows. These pages render in one piece instead; with JavaScript, the link that leads
+ * to them shows the wait (`useLinkStatus`).
+ */
+const FORM_PAGES: Record<string, string> = {
+  '(app)/workspaces/(list)/page.tsx': 'create a workspace',
+  '(app)/workspaces/[workspaceId]/settings/page.tsx': 'rename, invite',
+  '(app)/workspaces/[workspaceId]/billing/page.tsx': 'checkout, cancel',
+  '(public)/(interactive)/invite/[token]/page.tsx': 'accept an invitation',
+  '(public)/(interactive)/mock-checkout/[sessionId]/page.tsx': 'pay or decline',
+};
+
 function pagesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
@@ -48,12 +62,24 @@ describe('every screen has its loading and error state', () => {
     expect(nearest(page, 'error.tsx'), 'no error.tsx in the page folder or above').not.toBeNull();
   });
 
-  it.each(pages.filter((page) => !(page in WITHOUT_LOADING)))('%s has a loading state', (page) => {
-    expect(
-      nearest(page, 'loading.tsx'),
-      'no loading.tsx in the page folder or above',
-    ).not.toBeNull();
-  });
+  it.each(Object.keys(FORM_PAGES))(
+    '%s is not streamed, so its forms work without JavaScript',
+    (page) => {
+      expect(pages).toContain(page);
+      expect(nearest(page, 'loading.tsx'), 'a loading.tsx streams the page').toBeNull();
+      expect(readFileSync(path.join(APP_DIR, page), 'utf8')).not.toMatch(/<Suspense/);
+    },
+  );
+
+  it.each(pages.filter((page) => !(page in WITHOUT_LOADING) && !(page in FORM_PAGES)))(
+    '%s has a loading state',
+    (page) => {
+      expect(
+        nearest(page, 'loading.tsx'),
+        'no loading.tsx in the page folder or above',
+      ).not.toBeNull();
+    },
+  );
 
   it('lists as exempt only pages that exist and do not fetch', () => {
     for (const page of CACHED) expect(pages).toContain(page);

@@ -414,12 +414,69 @@ export class DocumentsService {
 
   // --- soft delete and restore ------------------------------------------------------------------------------
 
+  /**
+   * Moving a page to the trash takes its subpages with it, so the caller needs EDIT on every one of them: an editor
+   * of a parent must not trash a restricted subpage that was not shared with them. The rule is the one of
+   * `resolveDocumentAccess`, applied to each page of the live subtree.
+   */
+  private async assertCanEditSubtree(
+    tx: Tx,
+    userId: string,
+    workspaceRole: WorkspaceRole | null,
+    rootId: string,
+  ): Promise<void> {
+    if (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN') return;
+    const pages = await tx.$queryRaw<
+      Array<{
+        visibility: DocumentVisibility;
+        created_by: string;
+        share_role: ShareRole | null;
+      }>
+    >`
+      WITH RECURSIVE subtree AS (
+        SELECT id FROM documents WHERE id = ${rootId}::uuid AND ${LIVE_DOCUMENT_SQL}
+        UNION ALL
+        SELECT d.id FROM documents d JOIN subtree s ON d.parent_id = s.id WHERE ${LIVE_DOCUMENT_SQL}
+      )
+      SELECT d.visibility, d.created_by,
+             (SELECT ds.role FROM document_shares ds WHERE ds.document_id = d.id AND ds.user_id = ${userId}::uuid)
+               AS share_role
+      FROM documents d JOIN subtree USING (id)`;
+    const blocked = pages.filter(
+      (page) =>
+        !accessAtLeast(
+          resolveDocumentAccess({
+            deleted: false,
+            workspaceRole,
+            shareRole: page.share_role,
+            visibility: page.visibility,
+            isAuthor: page.created_by === userId,
+          }),
+          'EDIT',
+        ),
+    ).length;
+    if (blocked > 0) {
+      throw new AppException(
+        'FORBIDDEN',
+        `This page has ${blocked === 1 ? 'a subpage' : `${blocked} subpages`} you cannot edit, and deleting ` +
+          'a page deletes its subpages too. Ask an owner or admin, or someone who can edit them.',
+        { details: { reason: 'SUBTREE_NOT_EDITABLE', blocked } },
+      );
+    }
+  }
+
   async remove(userId: string, current: DocumentAccessResult): Promise<void> {
     const workspaceId = current.document.workspaceId;
     const changed = await this.prisma.$transaction(async (tx) => {
       await this.limits.lockWorkspace(tx, workspaceId);
-      await this.permissions.assertDocumentAccess(userId, current.document.id, 'EDIT', tx);
-      // the whole live subtree goes with the document, including descendants the caller cannot see
+      const { workspaceRole } = await this.permissions.assertDocumentAccess(
+        userId,
+        current.document.id,
+        'EDIT',
+        tx,
+      );
+      await this.assertCanEditSubtree(tx, userId, workspaceRole, current.document.id);
+      // the whole live subtree goes with the document
       const rows = await tx.$queryRaw<Array<{ id: string; revision: bigint }>>`
         WITH RECURSIVE subtree AS (
           SELECT id FROM documents WHERE id = ${current.document.id}::uuid AND ${LIVE_DOCUMENT_SQL}

@@ -3,10 +3,19 @@ import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { QUEUE_NAMES, addJob } from '@collab-docs/nest';
 import type { InviteEmailData } from './invite-email';
+import type { VerifyEmailData } from './verify-email';
 
-export const MAIL_JOBS = { invite: 'invite', mention: 'mention' } as const;
+export const MAIL_JOBS = {
+  invite: 'invite',
+  mention: 'mention',
+  verifyEmail: 'verify-email',
+} as const;
 
 export interface InviteMailJob extends InviteEmailData {
+  to: string;
+}
+
+export interface VerifyEmailMailJob extends VerifyEmailData {
   to: string;
 }
 
@@ -15,7 +24,7 @@ export interface MentionMailJob {
   notificationId: string;
 }
 
-export type MailJob = InviteMailJob | MentionMailJob;
+export type MailJob = InviteMailJob | MentionMailJob | VerifyEmailMailJob;
 
 /** Producer side of the `mail` queue (retries and backoff come from the queue defaults). */
 @Injectable()
@@ -24,6 +33,10 @@ export class MailQueueService {
 
   async sendInvite(job: InviteMailJob): Promise<void> {
     await addJob(this.queue, MAIL_JOBS.invite, job);
+  }
+
+  async sendVerifyEmail(job: VerifyEmailMailJob): Promise<void> {
+    await addJob(this.queue, MAIL_JOBS.verifyEmail, job);
   }
 
   /**

@@ -22,8 +22,10 @@
 | `POST /api/invites/:token/accept`              | signed in    | Join; the account email must equal the invited email |
 
 Rules enforced on the server: an admin can neither change or remove an owner nor grant `OWNER`; the last
-owner can be neither demoted nor leave (`409`); a role change or removal publishes `perm.changed` on Redis
-once the transaction has committed (the real-time server listens to it). Both rules run under the workspace
+owner can be neither demoted nor leave (`409`); removing a member, or leaving, also deletes their shares on the
+workspace's documents in the same transaction, so a former member does not stay on as a guest of what was shared
+with them; a role change or removal publishes `perm.changed` on Redis once the transaction has committed (the
+real-time server listens to it and closes the sockets that lost access). Both rules run under the workspace
 row lock, so two concurrent demotions cannot leave a workspace without an owner.
 
 **Invites.** The token is 256 random bits, valid for 7 days, and only its SHA-256 is stored. Inviting an

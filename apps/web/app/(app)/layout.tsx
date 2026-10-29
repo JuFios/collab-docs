@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { ConfirmEmailBanner } from '@/components/auth/confirm-email-banner';
 import { Navbar } from '@/components/navbar';
 import { Providers } from '@/components/providers';
 import { isApiError } from '@/lib/api/errors';
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           Skip to content
         </a>
         <Navbar user={user} workspaces={workspaces} unreadCount={unread?.count} />
+        {user.emailVerified ? null : <ConfirmEmailBanner email={user.email} />}
         <main id="content" className="mx-auto max-w-6xl px-4 py-6">
           {children}
         </main>

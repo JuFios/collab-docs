@@ -137,6 +137,9 @@ export const IDOR_TABLE: Record<string, Row> = {
   'POST /api/auth/refresh': openRow(401),
   'GET /api/auth/refresh': openRow(302),
   'POST /api/auth/logout': openRow(204),
+  'POST /api/auth/verify-email': openRow(400, () => ({ body: {} })),
+  // the personas are confirmed accounts, for whom there is nothing to send
+  'POST /api/auth/verify-email/resend': authRow(409, () => ({})),
   'GET /api/auth/me': authRow(200, () => ({})),
 
   // --- workspaces ---
@@ -315,6 +318,8 @@ export const IDOR_TABLE: Record<string, Row> = {
     ...ws(r),
     query: { q: 'doc' },
   })),
+  // nobody's documents but the caller's own shares: the same answer for every signed-in persona
+  'GET /api/me/shared-documents/search': authRow(200, () => ({ query: { q: 'doc' } })),
 
   // --- comments ---
   'GET /api/documents/{id}/threads': docRow('VIEW', 200, doc),

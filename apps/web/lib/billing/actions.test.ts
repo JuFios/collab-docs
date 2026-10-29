@@ -1,8 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
 
-const { apiServer } = vi.hoisted(() => ({ apiServer: vi.fn() }));
+const { apiServer, redirect } = vi.hoisted(() => ({
+  apiServer: vi.fn(),
+  // like Next's, it ends the action by throwing
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`);
+  }),
+}));
 vi.mock('@/lib/api/server', () => ({ apiServer }));
+vi.mock('next/navigation', () => ({ redirect }));
+
+/** What a form posts. */
+function form(fields: Record<string, string>): FormData {
+  const data = new FormData();
+  for (const [name, value] of Object.entries(fields)) data.set(name, value);
+  return data;
+}
 
 import { cancelSubscriptionAction, startCheckoutAction } from './actions';
 import { settleCheckoutAction } from './mock-checkout-actions';
@@ -12,23 +26,26 @@ const SESSION = '6f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
 const EVENT = `evt_${'a'.repeat(32)}`;
 
 beforeEach(() => {
-  vi.resetAllMocks();
+  vi.clearAllMocks();
+  apiServer.mockReset();
   vi.unstubAllEnvs();
 });
 
 describe('startCheckoutAction', () => {
   it('goes to the payment page the api returned', async () => {
     apiServer.mockResolvedValue({ sessionId: SESSION, checkoutUrl: `/mock-checkout/${SESSION}` });
-    const state = await startCheckoutAction({ workspaceId: WS, plan: 'PRO' });
+    await expect(startCheckoutAction({}, form({ workspaceId: WS, plan: 'PRO' }))).rejects.toThrow(
+      'NEXT_REDIRECT',
+    );
     expect(apiServer).toHaveBeenCalledWith(
       `/workspaces/${WS}/billing/checkout`,
       expect.objectContaining({ method: 'POST', body: { plan: 'PRO' } }),
     );
-    expect(state).toEqual({ ok: true, redirectTo: `/mock-checkout/${SESSION}` });
+    expect(redirect).toHaveBeenCalledWith(`/mock-checkout/${SESSION}`);
   });
 
   it('refuses a plan that cannot be bought without calling the api', async () => {
-    expect(await startCheckoutAction({ workspaceId: WS, plan: 'FREE' })).toEqual({
+    expect(await startCheckoutAction({}, form({ workspaceId: WS, plan: 'FREE' }))).toEqual({
       formError: 'Invalid request.',
     });
     expect(apiServer).not.toHaveBeenCalled();
@@ -38,7 +55,7 @@ describe('startCheckoutAction', () => {
     apiServer.mockRejectedValue(
       new ApiError(409, 'CONFLICT', 'The workspace is already on the PRO plan'),
     );
-    const state = await startCheckoutAction({ workspaceId: WS, plan: 'PRO' });
+    const state = await startCheckoutAction({}, form({ workspaceId: WS, plan: 'PRO' }));
     expect(state.formError).toBe('The workspace is already on the PRO plan');
     expect(state.ok).toBeUndefined();
   });
@@ -47,12 +64,11 @@ describe('startCheckoutAction', () => {
 describe('cancelSubscriptionAction', () => {
   it('asks the api and waits for the Free plan', async () => {
     apiServer.mockResolvedValue(undefined);
-    const state = await cancelSubscriptionAction({ workspaceId: WS });
+    await expect(cancelSubscriptionAction({}, form({ workspaceId: WS }))).rejects.toThrow(
+      'NEXT_REDIRECT',
+    );
     expect(apiServer).toHaveBeenCalledWith(`/workspaces/${WS}/billing/cancel`, { method: 'POST' });
-    expect(state).toMatchObject({
-      ok: true,
-      redirectTo: `/workspaces/${WS}/billing?awaiting=FREE`,
-    });
+    expect(redirect).toHaveBeenCalledWith(`/workspaces/${WS}/billing?awaiting=FREE`);
   });
 });
 
@@ -78,24 +94,27 @@ describe('settleCheckoutAction', () => {
 
   it('pays and returns to billing to wait for the plan the session was for', async () => {
     answers(pending);
-    const state = await settleCheckoutAction({ sessionId: SESSION, outcome: 'pay' });
+    await expect(
+      settleCheckoutAction({}, form({ sessionId: SESSION, outcome: 'pay' })),
+    ).rejects.toThrow('NEXT_REDIRECT');
     expect(posted()).toEqual([`/mock-provider/checkout-sessions/${SESSION}/complete`]);
-    expect(state).toMatchObject({
-      ok: true,
-      redirectTo: `/workspaces/${WS}/billing?awaiting=TEAM`,
-    });
+    expect(redirect).toHaveBeenCalledWith(`/workspaces/${WS}/billing?awaiting=TEAM`);
   });
 
   it('declines the payment and says so on the billing page', async () => {
     answers(pending);
-    const state = await settleCheckoutAction({ sessionId: SESSION, outcome: 'fail' });
+    await expect(
+      settleCheckoutAction({}, form({ sessionId: SESSION, outcome: 'fail' })),
+    ).rejects.toThrow('NEXT_REDIRECT');
     expect(posted()).toEqual([`/mock-provider/checkout-sessions/${SESSION}/fail`]);
-    expect(state).toEqual({ ok: true, redirectTo: `/workspaces/${WS}/billing?payment=declined` });
+    expect(redirect).toHaveBeenCalledWith(`/workspaces/${WS}/billing?payment=declined`);
   });
 
   it('pays and delivers the same event a second time', async () => {
     answers(pending);
-    await settleCheckoutAction({ sessionId: SESSION, outcome: 'pay_and_redeliver' });
+    await expect(
+      settleCheckoutAction({}, form({ sessionId: SESSION, outcome: 'pay_and_redeliver' })),
+    ).rejects.toThrow('NEXT_REDIRECT');
     expect(posted()).toEqual([
       `/mock-provider/checkout-sessions/${SESSION}/complete`,
       `/mock-provider/events/${EVENT}/redeliver`,
@@ -105,21 +124,26 @@ describe('settleCheckoutAction', () => {
   it('does not offer the re-send in staging', async () => {
     vi.stubEnv('APP_ENV', 'staging');
     answers(pending);
-    const state = await settleCheckoutAction({ sessionId: SESSION, outcome: 'pay_and_redeliver' });
+    const state = await settleCheckoutAction(
+      {},
+      form({ sessionId: SESSION, outcome: 'pay_and_redeliver' }),
+    );
     expect(state.formError).toBe('This option is not available here.');
     expect(apiServer).not.toHaveBeenCalled();
   });
 
   it('leaves a session that is already settled alone', async () => {
     answers({ ...pending, status: 'COMPLETED' });
-    const state = await settleCheckoutAction({ sessionId: SESSION, outcome: 'pay' });
+    const state = await settleCheckoutAction({}, form({ sessionId: SESSION, outcome: 'pay' }));
     expect(state.formError).toBe('This payment has already been settled.');
     expect(posted()).toEqual([]);
   });
 
   it('rejects an unknown outcome', async () => {
-    expect(await settleCheckoutAction({ sessionId: SESSION, outcome: 'refund' })).toEqual({
-      formError: 'Invalid request.',
-    });
+    expect(await settleCheckoutAction({}, form({ sessionId: SESSION, outcome: 'refund' }))).toEqual(
+      {
+        formError: 'Invalid request.',
+      },
+    );
   });
 });

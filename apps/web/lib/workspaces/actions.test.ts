@@ -4,11 +4,19 @@ import { ApiError } from '@/lib/api/errors';
 const { apiServer, revalidatePath, redirect } = vi.hoisted(() => ({
   apiServer: vi.fn(),
   revalidatePath: vi.fn(),
-  redirect: vi.fn(),
+  // like Next's, it ends the action by throwing
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`);
+  }),
 }));
 vi.mock('@/lib/api/server', () => ({ apiServer }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 vi.mock('next/navigation', () => ({ redirect }));
+const cookieJar = vi.hoisted(() => ({ set: vi.fn() }));
+vi.mock('next/headers', () => ({
+  cookies: async () => cookieJar,
+  headers: async () => new Headers({ 'x-forwarded-proto': 'http' }),
+}));
 
 import {
   acceptInviteAction,
@@ -44,14 +52,13 @@ describe('inviteMemberAction', () => {
     expect(apiServer).not.toHaveBeenCalled();
   });
 
-  it('sends the normalised invite; the page refresh is left to the caller', async () => {
+  it('sends the normalised invite and refreshes the pages that list invitations', async () => {
     const state = await inviteMemberAction({}, form(valid));
     expect(apiServer).toHaveBeenCalledWith(`/workspaces/${WS}/invites`, {
       method: 'POST',
       body: { email: 'grace@example.com', role: 'EDITOR' },
     });
-    // revalidating here would make the response carry the re-rendered page (see useActionFeedback)
-    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
     expect(state).toEqual({ ok: true, notice: 'Invitation sent to grace@example.com.' });
   });
 
@@ -90,7 +97,7 @@ describe('createWorkspaceAction', () => {
     expect(state.fieldErrors?.name).toEqual(['Enter a workspace name.']);
   });
 
-  it('creates the workspace and tells the client where to go', async () => {
+  it('creates the workspace and opens it', async () => {
     apiServer.mockResolvedValue({
       id: WS,
       name: 'Acme',
@@ -99,15 +106,18 @@ describe('createWorkspaceAction', () => {
       plan: 'FREE',
       createdAt: '2026-10-23T00:00:00Z',
     });
-    const state = await createWorkspaceAction({}, form({ name: ' Acme ' }));
-    expect(state).toEqual({
-      ok: true,
-      notice: 'Workspace created.',
-      redirectTo: `/workspaces/${WS}`,
-    });
-    // navigation and refresh are the caller's job: a server-side redirect/revalidate stalled the form
-    expect(redirect).not.toHaveBeenCalled();
-    expect(revalidatePath).not.toHaveBeenCalled();
+    await expect(createWorkspaceAction({}, form({ name: ' Acme ' }))).rejects.toThrow(
+      'NEXT_REDIRECT',
+    );
+    expect(redirect).toHaveBeenCalledWith(`/workspaces/${WS}`);
+    // the navbar switcher lists the new workspace
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    // the middleware does not see the page the redirect renders, so the action remembers the workspace itself
+    expect(cookieJar.set).toHaveBeenCalledWith(
+      'cd_ws',
+      WS,
+      expect.objectContaining({ httpOnly: true, sameSite: 'lax', secure: false, path: '/' }),
+    );
     expect(apiServer).toHaveBeenCalledWith(
       '/workspaces',
       expect.objectContaining({ method: 'POST', body: { name: 'Acme' } }),
@@ -134,7 +144,7 @@ describe('renameWorkspaceAction', () => {
       expect.objectContaining({ method: 'PATCH', body: { name: 'New' } }),
     );
     expect(state).toEqual({ ok: true, notice: 'Workspace renamed.', values: { name: 'New' } });
-    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
   it('reports a missing permission with the server message', async () => {
@@ -179,19 +189,18 @@ describe('member and invite actions', () => {
       method: 'DELETE',
     });
     expect(result).toEqual({ ok: true, notice: 'Invitation revoked.' });
-    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 });
 
 describe('acceptInviteAction', () => {
-  it('joins and tells the client to open the workspace', async () => {
+  it('joins and opens the workspace', async () => {
     apiServer.mockResolvedValue({ workspaceId: WS, role: 'EDITOR' });
-    const state = await acceptInviteAction({}, form({ token: 'tok_123' }));
-    expect(state).toEqual({
-      ok: true,
-      notice: 'You joined the workspace.',
-      redirectTo: `/workspaces/${WS}`,
-    });
+    await expect(acceptInviteAction({}, form({ token: 'tok_123' }))).rejects.toThrow(
+      'NEXT_REDIRECT',
+    );
+    expect(redirect).toHaveBeenCalledWith(`/workspaces/${WS}`);
+    expect(cookieJar.set).toHaveBeenCalledWith('cd_ws', WS, expect.anything());
     expect(apiServer).toHaveBeenCalledWith(
       '/invites/tok_123/accept',
       expect.objectContaining({ method: 'POST' }),

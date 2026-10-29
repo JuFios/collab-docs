@@ -72,6 +72,7 @@ class SnippetPartResponse {
 
 class SearchResultResponse {
   @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) workspaceId!: string;
   @ApiProperty() title!: string;
   @ApiProperty({ type: [SnippetPartResponse], description: 'Plain text parts, never markup' })
   snippet!: SnippetPartResponse[];

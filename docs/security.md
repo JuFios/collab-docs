@@ -182,9 +182,10 @@ api as well.
 
 ## Known limits
 
-- Email addresses are not verified (P11), so an address belongs to whoever registered it first. A workspace invitation
-  is safe, it needs the token from the email; a share by email is not: it is granted to the registered account at
-  once. The `share` limit bounds probing which addresses have an account; the dialog shows the account's name.
+- A document is shared only with an account whose address is confirmed (the link in the confirmation email, or an
+  accepted invitation), so registering somebody else's address gets nothing shared with it. The `share` limit bounds
+  probing which addresses have an account (unknown `404`, unconfirmed `409`). Accounts older than confirmation were
+  marked confirmed by its migration.
 - A published page's slug is its permanent public address: it is not a secret (title words and 6 hex digits), and
   publishing again after unpublishing brings the same URL back.
 

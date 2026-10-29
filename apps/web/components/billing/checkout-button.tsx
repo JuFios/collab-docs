@@ -1,11 +1,12 @@
 'use client';
 
 import type { CheckoutPlan } from '@collab-docs/shared';
+import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { startCheckoutAction } from '@/lib/billing/actions';
-import { useActionRunner } from './use-action-runner';
+import { useActionFeedback } from '@/components/workspaces/use-action-feedback';
 
-/** Starts a checkout for `plan` and follows the api to the payment page. */
+/** Starts a checkout for `plan`; the action redirects to the payment page the api points at. */
 export function CheckoutButton({
   workspaceId,
   plan,
@@ -17,10 +18,13 @@ export function CheckoutButton({
   label: string;
   variant?: 'default' | 'outline';
 }) {
-  const { state, pending, execute } = useActionRunner(startCheckoutAction);
+  const [state, formAction, pending] = useActionState(startCheckoutAction, {});
+  useActionFeedback(state);
   return (
-    <div className="grid gap-2">
-      <Button variant={variant} disabled={pending} onClick={() => execute({ workspaceId, plan })}>
+    <form action={formAction} className="grid gap-2">
+      <input type="hidden" name="workspaceId" value={workspaceId} />
+      <input type="hidden" name="plan" value={plan} />
+      <Button type="submit" variant={variant} disabled={pending}>
         {pending ? 'Opening checkout…' : label}
       </Button>
       {state.formError && !state.planLimit ? (
@@ -28,6 +32,6 @@ export function CheckoutButton({
           {state.formError}
         </p>
       ) : null}
-    </div>
+    </form>
   );
 }

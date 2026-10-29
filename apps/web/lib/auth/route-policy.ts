@@ -10,7 +10,13 @@ type RouteDecision =
   | { type: 'redirect'; location: string };
 
 /** Routes that anyone may open; everything else needs a session. */
-const PUBLIC_PREFIXES = ['/published/', '/edit-link/', '/invite/', '/mock-checkout/'];
+const PUBLIC_PREFIXES = [
+  '/published/',
+  '/edit-link/',
+  '/invite/',
+  '/verify-email/',
+  '/mock-checkout/',
+];
 /** Routes a signed-in user is bounced away from. */
 const GUEST_ONLY = ['/login', '/register'];
 

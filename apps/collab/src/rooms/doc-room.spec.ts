@@ -13,6 +13,7 @@ const LIMITS: RoomLimits = {
   maxDocumentBytes: 10 * 1024 * 1024,
   maxConnections: 100,
   maxAwarenessBytes: 4096,
+  snapshotIntervalMs: 60_000,
 };
 
 class Counters implements RoomObserver {
@@ -54,6 +55,8 @@ class HeldStore implements DocumentStore {
   enqueue(documentId: string, update: Uint8Array, seq: number): void {
     this.buffered.push({ documentId, update, seq });
   }
+
+  changeStarting(): void {}
 
   onPersisted = (documentId: string, listener: (sv: Uint8Array, seq: number) => void) =>
     this.durable.onPersisted(documentId, listener);
@@ -282,6 +285,69 @@ describe('DocRoom', () => {
       expect(watcher.value()).not.toContain('smuggled');
       expect(enqueue).not.toHaveBeenCalled();
       source.destroy();
+    });
+
+    it('hands the state before the first change to the store for the automatic version, once per interval', () => {
+      const { room, store } = setup({ snapshotIntervalMs: 60_000 });
+      const handed = jest.spyOn(store, 'changeStarting');
+      const client = new TestClient(room);
+      client.join();
+      client.settle();
+
+      client.text().insert(0, 'first');
+      client.settle();
+      expect(handed).toHaveBeenCalledTimes(1);
+      const before = new Y.Doc();
+      // the in-memory store ignores its arguments, so the spy is typed without them
+      const [, stateBefore] = handed.mock.calls[0] as unknown as [string, Uint8Array];
+      Y.applyUpdate(before, stateBefore);
+      // the version keeps what the change replaced
+      expect(before.getXmlFragment('content').toString()).not.toContain('first');
+      expect(room.doc.getXmlFragment('content').toString()).toContain('first');
+
+      client.text().insert(0, 'second');
+      client.settle();
+      expect(handed).toHaveBeenCalledTimes(1);
+    });
+
+    it('hands nothing over for an update that changes nothing', () => {
+      const source = new Y.Doc();
+      const text = new Y.XmlText();
+      source.getXmlFragment('content').insert(0, [text]);
+      text.insert(0, 'stored');
+      const stored = Y.encodeStateAsUpdate(source);
+      const { room, store } = setup({ snapshotIntervalMs: 0 }, stored);
+      const handed = jest.spyOn(store, 'changeStarting');
+      const client = new TestClient(room);
+      client.join();
+      client.sendRaw(frame(COLLAB_MESSAGE.sync, (e) => syncProtocol.writeUpdate(e, stored)));
+      client.settle();
+      expect(handed).not.toHaveBeenCalled();
+      source.destroy();
+    });
+
+    it('refuses an update outside the content model before it touches the room or the store', () => {
+      const { room, observer, store } = setup();
+      const sender = new TestClient(room);
+      const watcher = new TestClient(room);
+      sender.join();
+      watcher.join();
+      sender.settle();
+      watcher.settle();
+      const enqueue = jest.spyOn(store, 'enqueue');
+
+      // what a hostile client could send that the editor never would: an element the model does not have
+      const element = new Y.XmlElement('iframe');
+      element.setAttribute('srcdoc', '<script>alert(1)</script>');
+      sender.doc.getXmlFragment('content').insert(0, [element]);
+      sender.settle();
+      watcher.settle();
+
+      expect(observer.rejected).toEqual(['invalid']);
+      expect(sender.lastEvent('rejected')).toEqual({ type: 'rejected', reason: 'invalid' });
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('iframe');
+      expect(watcher.value()).not.toContain('iframe');
+      expect(enqueue).not.toHaveBeenCalled();
     });
 
     it('refuses updates that would push the document past its size limit', () => {

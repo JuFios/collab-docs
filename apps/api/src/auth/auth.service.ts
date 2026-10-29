@@ -4,6 +4,7 @@ import type { AuthSession, AuthUser } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { AccessTokenService } from './access-token.service';
 import type { LoginDto, RegisterDto } from './auth.dto';
+import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,10 +16,13 @@ export interface IssuedSession {
   refreshToken?: string;
 }
 
-const toAuthUser = (user: { id: string; email: string; name: string }): AuthUser => ({
+type UserRow = { id: string; email: string; name: string; emailVerifiedAt: Date | null };
+
+const toAuthUser = (user: UserRow): AuthUser => ({
   id: user.id,
   email: user.email,
   name: user.name,
+  emailVerified: user.emailVerifiedAt !== null,
 });
 
 const INVALID_CREDENTIALS = 'Invalid email or password';
@@ -30,6 +34,7 @@ export class AuthService {
     private readonly accessTokens: AccessTokenService,
     private readonly passwords: PasswordService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly verification: EmailVerificationService,
     @InjectPinoLogger(AuthService.name) private readonly logger: PinoLogger,
   ) {}
 
@@ -40,6 +45,10 @@ export class AuthService {
         data: { email: dto.email, name: dto.name, passwordHash },
       });
       logEvent(this.logger, 'auth.registered', { userId: user.id });
+      // the account works without it; a link that could not be queued is asked for again from the app
+      await this.verification.send(user).catch((error: unknown) => {
+        this.logger.warn({ err: error, userId: user.id }, 'confirmation email not queued');
+      });
       return this.start(user);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -63,8 +72,9 @@ export class AuthService {
     return this.start(user);
   }
 
-  async refresh(presented: string): Promise<IssuedSession> {
-    const result = await this.refreshTokens.rotate(presented);
+  /** `client` is `clientFingerprint()` of the request (see the grace window of `RefreshTokenService`). */
+  async refresh(presented: string, client: string): Promise<IssuedSession> {
+    const result = await this.refreshTokens.rotate(presented, client);
     const user = await this.prisma.user.findUnique({ where: { id: result.userId } });
     if (!user) throw new AppException('UNAUTHENTICATED', 'Invalid or expired session');
     const session = await this.session(user);
@@ -83,14 +93,14 @@ export class AuthService {
     return toAuthUser(user);
   }
 
-  private async start(user: { id: string; email: string; name: string }): Promise<IssuedSession> {
+  private async start(user: UserRow): Promise<IssuedSession> {
     return {
       session: await this.session(user),
       refreshToken: await this.refreshTokens.issue(user.id),
     };
   }
 
-  private async session(user: { id: string; email: string; name: string }): Promise<AuthSession> {
+  private async session(user: UserRow): Promise<AuthSession> {
     const { token, expiresIn } = await this.accessTokens.sign(user.id);
     return { user: toAuthUser(user), accessToken: token, expiresIn };
   }

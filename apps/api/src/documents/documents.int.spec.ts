@@ -9,6 +9,7 @@ import { DocumentStateWriter, type PrismaClient } from '@collab-docs/db';
 import { PERM_EVENT_CHANNELS, REALTIME_CHANNEL, type WorkspaceRole } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
+import { confirmEmail } from '../test/confirm-email';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PASSWORD = 'correct-horse-battery';
@@ -39,6 +40,7 @@ describe('documents', () => {
       .set('X-Forwarded-For', nextIp())
       .send({ email, password: PASSWORD, name: label })
       .expect(201);
+    await confirmEmail(prisma, response.body.user.id);
     return { id: response.body.user.id, email, token: response.body.accessToken };
   }
 
@@ -556,20 +558,49 @@ describe('documents', () => {
       ).not.toBeNull();
     });
 
-    it('deletes descendants the caller cannot see (permissions are not inherited)', async () => {
+    it('refuses to delete a page with a subpage the caller cannot edit, and trashes nothing', async () => {
       const team = await setupTeam();
       const parent = await createDoc(team.editor, team.workspaceId);
+      const open = await createDoc(team.editor, team.workspaceId, { parentId: parent.id });
       const hidden = await createDoc(team.owner, team.workspaceId, { parentId: parent.id });
-      await as(team.owner)
-        .patch(`/documents/${hidden.id}`)
-        .send({ visibility: 'RESTRICTED' })
-        .expect(200);
+      const readOnly = await createDoc(team.owner, team.workspaceId, { parentId: open.id });
+      for (const id of [hidden.id, readOnly.id]) {
+        await as(team.owner)
+          .patch(`/documents/${id}`)
+          .send({ visibility: 'RESTRICTED' })
+          .expect(200);
+      }
+      await share(team.owner, readOnly.id, team.editor, 'VIEWER');
       await as(team.editor).get(`/documents/${hidden.id}`).expect(404);
 
+      const refused = await as(team.editor).delete(`/documents/${parent.id}`).expect(403);
+      expect(refused.body).toMatchObject({
+        code: 'FORBIDDEN',
+        message: expect.stringContaining('2 subpages you cannot edit'),
+        details: { reason: 'SUBTREE_NOT_EDITABLE', blocked: 2 },
+      });
+      const live = await prisma.document.count({
+        where: { id: { in: [parent.id, open.id, hidden.id, readOnly.id] }, deletedAt: null },
+      });
+      expect(live).toBe(4);
+
+      // with EDIT on every page of the subtree it goes, and an owner or admin can always delete
+      await share(team.owner, hidden.id, team.editor, 'EDITOR');
+      await share(team.owner, readOnly.id, team.editor, 'EDITOR');
       await as(team.editor).delete(`/documents/${parent.id}`).expect(204);
       expect(
-        (await prisma.document.findUnique({ where: { id: hidden.id } }))?.deletedAt,
-      ).not.toBeNull();
+        await prisma.document.count({
+          where: { deletedRootId: parent.id, deletedAt: { not: null } },
+        }),
+      ).toBe(4);
+
+      const other = await createDoc(team.editor, team.workspaceId);
+      const secret = await createDoc(team.owner, team.workspaceId, { parentId: other.id });
+      await as(team.owner)
+        .patch(`/documents/${secret.id}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
+      await as(team.admin).delete(`/documents/${other.id}`).expect(204);
     });
   });
 
@@ -978,6 +1009,36 @@ describe('documents', () => {
       await as(team.owner).delete(`/documents/${doc.id}/shares/${guest.id}`).expect(404);
       await as(guest).get(`/documents/${doc.id}`).expect(404);
       expect((await as(guest).get('/me/shared-documents').expect(200)).body).toEqual([]);
+    });
+
+    it('refuses an account whose address is not confirmed, and accepts it once confirmed', async () => {
+      const team = await setupTeam();
+      const doc = await createDoc(team.owner, team.workspaceId, { title: 'payroll' });
+      await as(team.owner)
+        .patch(`/documents/${doc.id}`)
+        .send({ visibility: 'RESTRICTED' })
+        .expect(200);
+      // anyone could have registered this address
+      const squatter = await register('squatter');
+      await prisma.user.update({ where: { id: squatter.id }, data: { emailVerifiedAt: null } });
+
+      const refused = await as(team.owner)
+        .post(`/documents/${doc.id}/shares`)
+        .send({ email: squatter.email, role: 'EDITOR' })
+        .expect(409);
+      expect(refused.body.message).toMatch(/has not confirmed their email address/);
+      expect(await prisma.documentShare.count({ where: { documentId: doc.id } })).toBe(0);
+      await as(squatter).get(`/documents/${doc.id}`).expect(404);
+
+      await prisma.user.update({
+        where: { id: squatter.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+      await as(team.owner)
+        .post(`/documents/${doc.id}/shares`)
+        .send({ email: squatter.email, role: 'EDITOR' })
+        .expect(201);
+      await as(squatter).get(`/documents/${doc.id}`).expect(200);
     });
 
     it('a share overrides the workspace role, upwards and downwards', async () => {

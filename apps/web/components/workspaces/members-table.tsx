@@ -7,7 +7,6 @@ import {
   checkMemberRemoval,
   checkRoleChange,
 } from '@collab-docs/shared';
-import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -83,7 +82,6 @@ function MemberRow({
   isSelf: boolean;
   isLastOwner: boolean;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
 
@@ -112,7 +110,6 @@ function MemberRow({
       const result = await changeMemberRoleAction({ workspaceId, userId: member.userId, role });
       if (result.ok) {
         toast.success(result.notice ?? 'Role updated.');
-        router.refresh();
       } else toast.error(result.formError ?? 'Could not change the role.');
     });
   }
@@ -122,7 +119,6 @@ function MemberRow({
       const result = await removeMemberAction({ workspaceId, userId: member.userId });
       if (result.ok) {
         toast.success(result.notice ?? 'Member removed.');
-        router.refresh();
       } else toast.error(result.formError ?? 'Could not remove the member.');
       setConfirming(false);
     });

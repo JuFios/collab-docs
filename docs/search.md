@@ -3,9 +3,14 @@
 `GET /workspaces/:workspaceId/search?q=&limit=&cursor=` finds documents of a workspace by title and text. It is
 for members only (a guest with a share gets `404`, like for every other workspace route), limited per user
 (`RATE_SEARCH_PER_MIN_USER`, 60 a minute by default) and returns
-`{ items: [{ id, title, snippet: [{ text, match }], updatedAt }], nextCursor }`, best match first. The web page is
+`{ items: [{ id, workspaceId, title, snippet: [{ text, match }], updatedAt }], nextCursor }`, best match first. The web page is
 `/workspaces/[workspaceId]/search?q=`: a Server Component behind a plain GET form, snippets drawn as text and `<mark>` elements
 (never HTML), loading, empty and error states, and arrow-key navigation between the field and the results.
+
+A guest of a document has no workspace to search, so `GET /me/shared-documents/search` searches the documents
+shared with the caller directly, in any workspace (the same statement with the share as the scope instead of the
+membership; same matching, paging and limit). The "Shared with me" page (`/shared?q=`) has the form; results link
+into each document's own workspace.
 
 **Why Postgres full-text search and not Meilisearch.** The data is already in Postgres, the volume is a few
 thousand documents per workspace, and the one thing that must never be wrong is who may see a result. In SQL the

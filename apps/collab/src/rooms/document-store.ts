@@ -18,6 +18,12 @@ export interface DocumentStore {
   enqueue(documentId: string, update: Uint8Array, seq: number): void;
 
   /**
+   * The document as it was just before a change, handed over at most once per snapshot interval (the first change
+   * after a pause): the automatic version keeps the state the change replaced, not the one it produced.
+   */
+  changeStarting(documentId: string, stateBefore: Uint8Array): void;
+
+  /**
    * Registers a listener for "everything up to `persistedSeq` is durable". Returns the unsubscribe function.
    * Called with the state vector of what is stored and the sequence number of the last update it covers, after
    * each flush.
@@ -58,6 +64,10 @@ export class InMemoryDocumentStore implements DocumentStore {
     this.states.set(documentId, merged);
     const stateVector = Y.encodeStateVectorFromUpdate(merged);
     for (const listener of this.listeners.get(documentId) ?? []) listener(stateVector, seq);
+  }
+
+  changeStarting(): void {
+    // nothing to version in memory
   }
 
   onPersisted(
