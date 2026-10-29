@@ -86,6 +86,9 @@ const REJECTED: Record<CollabRejectReason, string> = {
 /** What the editor tells the user when the server refused a local change and the document was reloaded. */
 export const rejectionMessage = (reason: CollabRejectReason): string => REJECTED[reason];
 
+/** One toast for refusals in a row (a full document refuses every keystroke): a new one replaces the shown one. */
+export const REJECTION_TOAST_ID = 'collab-rejected';
+
 /** Consecutive failed rounds (ticket or connection) before the session gives up and offers a manual retry. */
 export const MAX_RECOVERY_ROUNDS = 5;
 

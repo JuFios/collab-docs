@@ -63,6 +63,11 @@ function parseExpiry(value: string | null | undefined): Date | null | undefined 
   return date;
 }
 
+/** The link now stops working sooner than before (`null` = never). */
+function expiresEarlier(before: Date | null, after: Date | null): boolean {
+  return after !== null && (before === null || after < before);
+}
+
 /**
  * Lifecycle of a document's public links (P4): one VIEW link whose slug never changes and one EDIT link
  * whose secret is new every time it is enabled. Callers hold EDIT (`@DocumentAccess`); managing links
@@ -129,8 +134,11 @@ export class PublicLinksService {
     });
     await this.expiry.reschedule(before, after);
     if (statusOf(before) !== 'active') await this.linkChanged(after, 'expiry_changed');
-    // open guest sockets keep a timer for the old expiry; a shorter one must not wait for the periodic check
-    if (after.mode === 'EDIT') await this.cutOffGuests(current);
+    // open guest sockets keep a timer for the old expiry, which also follows a later one; an earlier expiry must not
+    // wait for the periodic check
+    if (after.mode === 'EDIT' && expiresEarlier(before.expiresAt, after.expiresAt)) {
+      await this.cutOffGuests(current);
+    }
     return present(after);
   }
 

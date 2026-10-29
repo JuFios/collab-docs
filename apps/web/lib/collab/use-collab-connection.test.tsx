@@ -281,6 +281,17 @@ describe('useCollabConnection', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('opens the replacing session with the still fresh ticket instead of asking for another', async () => {
+    await connected();
+    const first = current();
+    expect(first.params.ticket).toBe('t1');
+    act(() => first.roomEvent({ type: 'rejected', reason: 'document_too_large' }));
+
+    await waitFor(() => expect(FakeProvider.instances).toHaveLength(2));
+    expect(current().params.ticket).toBe('t1');
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it('does not recreate the document for a viewer that was always read-only', async () => {
     const onDowngrade = vi.fn();
     await connected({ onDowngrade });

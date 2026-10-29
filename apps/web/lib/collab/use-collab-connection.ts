@@ -36,6 +36,14 @@ interface DowngradeNotice {
   discardedChanges: boolean;
 }
 
+/** Tickets live 60 s; one this young still opens a socket after the session is replaced. */
+const TICKET_REUSE_MS = 30_000;
+
+interface IssuedTicket extends CollabTicket {
+  documentId: string;
+  issuedAt: number;
+}
+
 interface RejectionNotice {
   reason: CollabRejectReason;
 }
@@ -114,6 +122,9 @@ export function useCollabConnection(
   onRejected.current = options.onRejected;
   const fetchTicket = useRef(options.fetchTicket);
   fetchTicket.current = options.fetchTicket;
+  // the session that replaces one whose change was refused connects with its ticket while it is fresh: a ticket may
+  // open more sockets within its lifetime, and a full document refusing every keystroke must not cost a request each
+  const carriedTicket = useRef<IssuedTicket | null>(null);
 
   useEffect(() => {
     const ydoc = new Y.Doc();
@@ -130,6 +141,7 @@ export function useCollabConnection(
     let dirty = false;
     // this session's document is being replaced; further events of its socket change nothing
     let restarting = false;
+    let lastTicket: IssuedTicket | null = null;
 
     const patch = (change: Partial<Snapshot>) => {
       if (alive) setSnapshot((current) => ({ ...current, ...change }));
@@ -159,8 +171,9 @@ export function useCollabConnection(
       scheduleConnect(action === 'backoff' ? backoffDelay(failedRounds) : 0);
     };
 
-    const restart = () => {
+    const restart = (keepTicket = false) => {
       restarting = true;
+      carriedTicket.current = keepTicket ? lastTicket : null;
       setSession((value) => value + 1);
     };
 
@@ -192,7 +205,7 @@ export function useCollabConnection(
       } else if (event.type === 'rejected') {
         // the refused change and everything typed after it can never reach the room: drop them with this document
         onRejected.current?.({ reason: event.reason });
-        restart();
+        restart(true);
       } else {
         giveUp(collabError('deleted'));
       }
@@ -222,9 +235,21 @@ export function useCollabConnection(
 
     async function connect(): Promise<void> {
       try {
-        const { ticket, wsUrl } = await (
-          fetchTicket.current ?? ((signal) => fetchCollabTicket(documentId, signal))
-        )(abort.signal);
+        const carried = carriedTicket.current;
+        carriedTicket.current = null;
+        if (
+          carried &&
+          carried.documentId === documentId &&
+          Date.now() - carried.issuedAt < TICKET_REUSE_MS
+        ) {
+          lastTicket = carried;
+        } else {
+          const issued = await (
+            fetchTicket.current ?? ((signal) => fetchCollabTicket(documentId, signal))
+          )(abort.signal);
+          lastTicket = { ...issued, documentId, issuedAt: Date.now() };
+        }
+        const { ticket, wsUrl } = lastTicket;
         if (!alive) return;
         if (provider) {
           // y-websocket builds the URL from `params` on every attempt

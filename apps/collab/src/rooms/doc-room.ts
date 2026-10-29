@@ -8,7 +8,6 @@ import {
   type Access,
   COLLAB_CLOSE,
   COLLAB_MESSAGE,
-  COLLAB_REJECT_REASONS,
   type CollabRejectReason,
   type CollabRoomEvent,
   accessAtLeast,
@@ -68,15 +67,6 @@ const RATE_WINDOW_MS = 10_000;
 const MAX_AWARENESS_IDS_PER_CONNECTION = 4;
 /** Update of a Y.Doc without structs and deletions. */
 const EMPTY_UPDATE_BYTES = 2;
-/**
- * The size estimate is re-measured only once it has drifted by this share of the limit, so a document that really is
- * close to its limit is not encoded again on every keystroke.
- */
-const MEASURE_SLACK_FRACTION = 64;
-
-const isUpdateRejection = (reason: RejectReason): reason is CollabRejectReason =>
-  (COLLAB_REJECT_REASONS as readonly string[]).includes(reason);
-
 interface ConnectionState {
   readonly conn: RoomConnection;
   access: Access;
@@ -323,6 +313,8 @@ export class DocRoom {
     if (state.messages <= this.limits.maxMessagesPer10s) return true;
     if (state.messages === this.limits.maxMessagesPer10s + 1) {
       this.observer.rateLimited();
+      // what it still sends while closing, even in a later window, changes nothing
+      state.closing = true;
       state.conn.close(COLLAB_CLOSE.rateLimited, 'rate limited');
     }
     return false;
@@ -353,8 +345,8 @@ export class DocRoom {
     if (state.readOnly) return this.reject(state, 'read_only');
     // the client starts over after a rejection; until then everything it sends builds on the refused update
     if (state.rejected) return;
-    if (update.byteLength > this.limits.maxUpdateBytes) return this.reject(state, 'too_large');
-    if (!this.fitsDocument(update.byteLength)) return this.reject(state, 'document_too_large');
+    if (update.byteLength > this.limits.maxUpdateBytes) return this.refuse(state, 'too_large');
+    if (!this.fitsDocument(update.byteLength)) return this.refuse(state, 'document_too_large');
     this.appliedChange = false;
     try {
       // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
@@ -362,7 +354,10 @@ export class DocRoom {
       Y.decodeUpdate(update);
       Y.applyUpdate(this.doc, update, state);
     } catch (error) {
-      return this.reject(state, 'invalid', error);
+      // a throw after the update was integrated (from an observer) leaves it in the room: it was not refused
+      return this.appliedChange
+        ? this.reject(state, 'invalid', error)
+        : this.refuse(state, 'invalid', error);
     }
     if (this.appliedChange) this.observer.updateApplied();
     else {
@@ -376,7 +371,8 @@ export class DocRoom {
   private fitsDocument(bytes: number): boolean {
     const limit = this.limits.maxDocumentBytes;
     if (this.measuredBytes + this.unmeasuredBytes + bytes <= limit) return true;
-    if (this.unmeasuredBytes >= limit / MEASURE_SLACK_FRACTION) {
+    // only applied updates make the estimate drift, so a document that really is full is encoded once, not per refusal
+    if (this.unmeasuredBytes > 0) {
       this.measuredBytes = Y.encodeStateAsUpdate(this.doc).byteLength;
       this.unmeasuredBytes = 0;
     }
@@ -445,11 +441,17 @@ export class DocRoom {
       },
       'collab.update_rejected',
     );
-    // the refused change stays in the client's own document; without being told it would never converge again
-    if (isUpdateRejection(reason) && !state.rejected) {
-      state.rejected = true;
-      this.sendEvent(state, { type: 'rejected', reason });
-    }
+  }
+
+  /**
+   * Refuses an update of `state` before it reached the room. The refused change stays in the client's own document and
+   * everything it sends later builds on it, so it is told once and its later updates are ignored until it reconnects.
+   */
+  private refuse(state: ConnectionState, reason: CollabRejectReason, error?: unknown): void {
+    this.reject(state, reason, error);
+    if (state.rejected) return;
+    state.rejected = true;
+    this.sendEvent(state, { type: 'rejected', reason });
   }
 
   // --- fan-out ----------------------------------------------------------------------------------------

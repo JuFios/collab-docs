@@ -23,10 +23,20 @@ export function parseTrustProxy(cidrs: string): boolean | string[] {
   return list.length > 0 ? list : false;
 }
 
+/**
+ * The origins that may call with credentials, normalised the way a browser sends `Origin` (no path, no trailing
+ * slash). CORS and the api's CSRF guard both use this list, so they cannot disagree.
+ */
 export function corsOrigins(
   config: Pick<AppConfig, 'WEB_ORIGIN' | 'CORS_ALLOWED_ORIGINS'>,
 ): string[] {
-  return [...new Set([config.WEB_ORIGIN, ...splitList(config.CORS_ALLOWED_ORIGINS)])];
+  return [
+    ...new Set(
+      [config.WEB_ORIGIN, ...splitList(config.CORS_ALLOWED_ORIGINS)].map(
+        (origin) => new URL(origin).origin,
+      ),
+    ),
+  ];
 }
 
 /**

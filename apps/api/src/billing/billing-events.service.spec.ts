@@ -18,7 +18,7 @@ interface Session {
   workspaceId: string;
   plan: PlanTier;
   amountCents: number;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELED';
 }
 
 /**
@@ -56,7 +56,7 @@ function fakeDatabase() {
           where,
           data,
         }: {
-          where: { id: string; status: 'PENDING' };
+          where: { id: string; status: Session['status'] };
           data: { status: Session['status'] };
         }) => {
           const session = sessions.get(where.id);
@@ -218,6 +218,7 @@ describe('BillingEventsService', () => {
     expect(await service.process(older)).toEqual({
       result: 'payment_not_applied',
       payment: {
+        reason: 'stale',
         workspaceId: WORKSPACE,
         checkoutSessionId: SESSION,
         plan: 'PRO',
@@ -231,6 +232,28 @@ describe('BillingEventsService', () => {
     expect(subscription.writes).toBe(1);
     expect(sessions.get(SESSION)!.status).toBe('COMPLETED');
     expect([...invoices.keys()].sort()).toEqual([SESSION, SESSION_2].sort());
+  });
+
+  it('records a payment for a session a newer checkout canceled, without changing the plan', async () => {
+    const { service, addSession, receive, subscription, sessions, invoices } = await setup();
+    addSession(SESSION, 'PRO', 1200);
+    sessions.get(SESSION)!.status = 'CANCELED';
+    const paid = receive(1, BILLING_EVENT_TYPES.checkoutCompleted, completed());
+
+    expect(await service.process(paid)).toEqual({
+      result: 'payment_not_applied',
+      payment: {
+        reason: 'session_canceled',
+        workspaceId: WORKSPACE,
+        checkoutSessionId: SESSION,
+        plan: 'PRO',
+        amountCents: 1200,
+      },
+    });
+    expect(subscription.plan).toBe('FREE');
+    expect(subscription.writes).toBe(0);
+    expect(sessions.get(SESSION)!.status).toBe('COMPLETED');
+    expect([...invoices.keys()]).toEqual([SESSION]);
   });
 
   it('ignores a cancellation that was overtaken by a later upgrade', async () => {

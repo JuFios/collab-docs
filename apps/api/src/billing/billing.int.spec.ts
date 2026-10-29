@@ -519,20 +519,25 @@ describe('billing', () => {
       ).toMatchObject({ status: 'CANCELED', settledAt: expect.any(Date) });
       await provider(`/checkout-sessions/${first.sessionId}/complete`).expect(409);
 
-      // an event for the canceled session (sent from elsewhere) does not charge it either
-      const stray = signedEvent(BILLING_EVENT_TYPES.checkoutCompleted, {
+      // the provider had collected it before the new checkout started; its event arrives only now. The money is
+      // recorded, the plan is left alone
+      const late = signedEvent(BILLING_EVENT_TYPES.checkoutCompleted, {
         checkoutSessionId: first.sessionId,
       });
-      await post(stray.text).expect(200);
-      await processed(stray.id);
-      expect(await invoiceCount(workspaceId)).toBe(0);
+      await post(late.text).expect(200);
+      await processed(late.id);
+      expect(await planOf(workspaceId)).toBe('FREE');
+      expect(
+        await prisma.checkoutSession.findUniqueOrThrow({ where: { id: first.sessionId } }),
+      ).toMatchObject({ status: 'COMPLETED' });
+      expect(await prisma.invoice.count({ where: { checkoutSessionId: first.sessionId } })).toBe(1);
 
       await provider(`/checkout-sessions/${second.sessionId}/complete`).expect(202);
       await until(
         () => planOf(workspaceId),
         (current) => current === 'PRO',
       );
-      expect(await invoiceCount(workspaceId)).toBe(1);
+      expect(await invoiceCount(workspaceId)).toBe(2);
     });
 
     it('recovers an event whose first delivery found the queue down', async () => {

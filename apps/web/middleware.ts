@@ -2,7 +2,11 @@ import { ACCESS_COOKIE, AccessTokenError, verifyAccessToken } from '@collab-docs
 import { type NextRequest, NextResponse } from 'next/server';
 import { jwtAccessSecret } from '@/lib/env';
 import { type SessionState, decideRoute, isPerRequestPage } from '@/lib/auth/route-policy';
-import { STRICT_TRANSPORT_SECURITY, contentSecurityPolicy } from '@/lib/security/headers';
+import {
+  CSP_DEFAULT_ORIGINS,
+  STRICT_TRANSPORT_SECURITY,
+  contentSecurityPolicy,
+} from '@/lib/security/headers';
 import {
   LAST_WORKSPACE_COOKIE,
   LAST_WORKSPACE_MAX_AGE_SECONDS,
@@ -28,8 +32,8 @@ async function sessionOf(request: NextRequest): Promise<SessionState> {
 /** Policy with a fresh nonce for a page rendered for this request; the origins are fixed at build time (next.config). */
 function noncePolicy(): string {
   return contentSecurityPolicy({
-    s3PublicEndpoint: process.env.CSP_S3_PUBLIC_ENDPOINT ?? 'http://localhost:9000',
-    collabPublicUrl: process.env.CSP_COLLAB_PUBLIC_URL ?? 'ws://localhost:4001',
+    s3PublicEndpoint: process.env.CSP_S3_PUBLIC_ENDPOINT ?? CSP_DEFAULT_ORIGINS.s3PublicEndpoint,
+    collabPublicUrl: process.env.CSP_COLLAB_PUBLIC_URL ?? CSP_DEFAULT_ORIGINS.collabPublicUrl,
     development: process.env.NODE_ENV !== 'production',
     nonce: btoa(crypto.randomUUID()),
   });

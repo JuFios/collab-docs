@@ -26,7 +26,7 @@ import { copyText } from '@/lib/clipboard';
 import type { Viewer } from '@/lib/comments/queries';
 import { useDocumentQuery, useTree } from '@/lib/documents/queries';
 import { descendantIds, pathTo } from '@/lib/documents/tree';
-import { rejectionMessage } from '@/lib/collab/errors';
+import { REJECTION_TOAST_ID, rejectionMessage } from '@/lib/collab/errors';
 import { type TitleSaveState, deriveSaveStatus } from '@/lib/collab/save-status';
 import { useCollabConnection } from '@/lib/collab/use-collab-connection';
 import { useOnlineStatus } from '@/lib/collab/use-online-status';
@@ -226,7 +226,7 @@ function Frame({
           ? 'Your access changed to read-only. Edits that were not saved were discarded.'
           : 'Your access changed to read-only.',
       ),
-    onRejected: ({ reason }) => toast.warning(rejectionMessage(reason)),
+    onRejected: ({ reason }) => toast.warning(rejectionMessage(reason), { id: REJECTION_TOAST_ID }),
   });
   const presence = usePresence(connection.provider);
   // the REST answer decides until the server reports the live level on connect

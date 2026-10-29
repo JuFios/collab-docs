@@ -247,8 +247,13 @@ describe('NotificationBell', () => {
     const user = userEvent.setup();
     mount(0);
     await user.click(screen.getByRole('button', { name: 'Notifications' }));
-    expect(await screen.findByText('Could not load notifications.')).toBeInTheDocument();
+    const menu = await screen.findByRole('menu');
+    expect(await within(menu).findByText('Could not load notifications.')).toBeInTheDocument();
     // a menu item, not a button: a menu may only contain items, labels and separators
-    expect(screen.getByRole('menuitem', { name: 'Try again' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Try again' })).toBeInTheDocument();
+    // focus moves to the retry, which the error describes, so a screen reader announces both
+    const retry = within(menu).getByRole('menuitem', { name: 'Try again' });
+    await waitFor(() => expect(retry).toHaveFocus());
+    expect(retry).toHaveAccessibleDescription('Could not load notifications.');
   });
 });
