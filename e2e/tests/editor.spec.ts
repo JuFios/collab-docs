@@ -127,31 +127,32 @@ test.describe('viewer access', () => {
     await expect(history.getByRole('button', { name: 'Save version' })).toHaveCount(0);
     await expect(history.getByRole('button', { name: 'Restore this version' })).toHaveCount(0);
 
-    // API: direct writes are refused
+    // API: direct writes are refused with 403: the viewer may read the document, so it exists for them (404 is for
+    // documents the caller may not know about)
     const patch = await viewer.request.patch(`/api/documents/${documentId}`, {
       data: { title: 'Hacked' },
       headers: { origin: ORIGIN },
     });
-    expect([403, 404]).toContain(patch.status());
+    expect(patch.status(), await patch.text()).toBe(403);
     const move = await viewer.request.post(`/api/documents/${documentId}/move`, {
       data: {},
       headers: { origin: ORIGIN },
     });
-    expect([403, 404]).toContain(move.status());
+    expect(move.status(), await move.text()).toBe(403);
     const restore = await viewer.request.post(
       `/api/documents/${documentId}/versions/${versionId}/restore`,
       { headers: { origin: ORIGIN } },
     );
-    expect([403, 404]).toContain(restore.status());
+    expect(restore.status(), await restore.text()).toBe(403);
     const publish = await viewer.request.post(`/api/documents/${documentId}/public-links`, {
       data: { mode: 'VIEW' },
       headers: { origin: ORIGIN },
     });
-    expect([403, 404]).toContain(publish.status());
+    expect(publish.status(), await publish.text()).toBe(403);
     const remove = await viewer.request.delete(`/api/documents/${documentId}`, {
       headers: { origin: ORIGIN },
     });
-    expect([403, 404]).toContain(remove.status());
+    expect(remove.status(), await remove.text()).toBe(403);
 
     // WebSocket: a raw client with a viewer ticket sends an update; the document does not change
     const raw = await connectRaw(context.request, documentId);
