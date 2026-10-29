@@ -20,9 +20,7 @@
             }
           }
         },
-        "tags": [
-          "ops"
-        ]
+        "tags": ["ops"]
       }
     },
     "/ready": {
@@ -50,9 +48,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -67,9 +63,7 @@
                       "example": {},
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -88,9 +82,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -124,9 +116,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -146,9 +136,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -171,9 +159,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -198,9 +184,7 @@
             }
           }
         },
-        "tags": [
-          "ops"
-        ]
+        "tags": ["ops"]
       }
     },
     "/api/auth/register": {
@@ -240,9 +224,7 @@
           }
         },
         "summary": "Create an account and sign in",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/api/auth/login": {
@@ -282,9 +264,7 @@
           }
         },
         "summary": "Sign in with email and password",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/api/auth/refresh": {
@@ -330,9 +310,7 @@
           }
         ],
         "summary": "Rotate the refresh token (cookie cd_rt) and issue a new access token",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       },
       "get": {
         "description": "The refresh cookie is scoped to /api/auth, so the web edge middleware cannot read it on page requests. When the access token has expired it redirects the browser here; on success the cookies are renewed and the browser is sent to `next`, otherwise to /login?next=<next>.",
@@ -379,9 +357,7 @@
           }
         ],
         "summary": "Browser navigation refresh: rotate the session and redirect to `next`",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/api/auth/logout": {
@@ -419,9 +395,7 @@
           }
         ],
         "summary": "Revoke the refresh token family and clear the cookies",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/api/auth/me": {
@@ -469,9 +443,7 @@
           }
         ],
         "summary": "The signed-in user",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/api/workspaces": {
@@ -529,9 +501,7 @@
           }
         ],
         "summary": "Create a workspace; the caller becomes its owner on the FREE plan",
-        "tags": [
-          "workspaces"
-        ]
+        "tags": ["workspaces"]
       },
       "get": {
         "operationId": "WorkspacesController_list",
@@ -580,9 +550,7 @@
           }
         ],
         "summary": "Workspaces the caller is a member of",
-        "tags": [
-          "workspaces"
-        ]
+        "tags": ["workspaces"]
       }
     },
     "/api/workspaces/{workspaceId}": {
@@ -639,9 +607,7 @@
           }
         ],
         "summary": "A workspace the caller belongs to (404 otherwise)",
-        "tags": [
-          "workspaces"
-        ]
+        "tags": ["workspaces"]
       },
       "patch": {
         "operationId": "WorkspacesController_rename",
@@ -706,9 +672,7 @@
           }
         ],
         "summary": "Rename the workspace (admin or owner)",
-        "tags": [
-          "workspaces"
-        ]
+        "tags": ["workspaces"]
       }
     },
     "/api/workspaces/{workspaceId}/usage": {
@@ -765,9 +729,7 @@
           }
         ],
         "summary": "Members, documents and storage against the plan limits",
-        "tags": [
-          "workspaces"
-        ]
+        "tags": ["workspaces"]
       }
     },
     "/api/workspaces/{workspaceId}/members": {
@@ -827,9 +789,7 @@
           }
         ],
         "summary": "Members of the workspace",
-        "tags": [
-          "members"
-        ]
+        "tags": ["members"]
       }
     },
     "/api/workspaces/{workspaceId}/members/{userId}": {
@@ -905,9 +865,7 @@
           }
         ],
         "summary": "Change a member role",
-        "tags": [
-          "members"
-        ]
+        "tags": ["members"]
       },
       "delete": {
         "description": "Removing others needs admin or owner; the last owner cannot leave (409).",
@@ -964,14 +922,12 @@
           }
         ],
         "summary": "Remove a member, or leave the workspace when userId is the caller",
-        "tags": [
-          "members"
-        ]
+        "tags": ["members"]
       }
     },
     "/api/workspaces/{workspaceId}/invites": {
       "post": {
-        "description": "Re-inviting a pending email issues a new token. Counts against the plan member limit (403 PLAN_LIMIT_EXCEEDED); an existing member gives 409.",
+        "description": "Re-inviting a pending email issues a new token. Counts against the plan member limit (403 PLAN_LIMIT_EXCEEDED); an existing member gives 409. Every call sends an email: 20 per hour per user.",
         "operationId": "InvitesController_create",
         "parameters": [
           {
@@ -1014,6 +970,9 @@
               }
             }
           },
+          "429": {
+            "description": "RATE_LIMITED"
+          },
           "default": {
             "description": "Error; see `code` for the reason",
             "content": {
@@ -1034,9 +993,7 @@
           }
         ],
         "summary": "Invite an email to the workspace (emailed, valid 7 days)",
-        "tags": [
-          "invites"
-        ]
+        "tags": ["invites"]
       },
       "get": {
         "operationId": "InvitesController_list",
@@ -1094,9 +1051,7 @@
           }
         ],
         "summary": "Pending invites of the workspace",
-        "tags": [
-          "invites"
-        ]
+        "tags": ["invites"]
       }
     },
     "/api/workspaces/{workspaceId}/invites/{inviteId}": {
@@ -1154,9 +1109,7 @@
           }
         ],
         "summary": "Revoke a pending invite",
-        "tags": [
-          "invites"
-        ]
+        "tags": ["invites"]
       }
     },
     "/api/invites/{token}": {
@@ -1195,9 +1148,7 @@
           }
         },
         "summary": "What an invite token is for (400 INVITE_INVALID if unusable)",
-        "tags": [
-          "invites"
-        ]
+        "tags": ["invites"]
       }
     },
     "/api/invites/{token}/accept": {
@@ -1255,9 +1206,7 @@
           }
         ],
         "summary": "Accept an invite as the signed-in user",
-        "tags": [
-          "invites"
-        ]
+        "tags": ["invites"]
       }
     },
     "/api/events/stream": {
@@ -1309,9 +1258,7 @@
           }
         ],
         "summary": "Server-sent events for a workspace and the caller",
-        "tags": [
-          "events"
-        ]
+        "tags": ["events"]
       }
     },
     "/api/workspaces/{workspaceId}/documents": {
@@ -1379,9 +1326,7 @@
           }
         ],
         "summary": "Create a document",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/workspaces/{workspaceId}/documents/tree": {
@@ -1442,9 +1387,7 @@
           }
         ],
         "summary": "Flat document tree, filtered by the caller permissions",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/workspaces/{workspaceId}/documents/recent": {
@@ -1516,9 +1459,7 @@
           }
         ],
         "summary": "Most recently changed documents the caller can open",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/workspaces/{workspaceId}/trash": {
@@ -1578,9 +1519,7 @@
           }
         ],
         "summary": "Deleted documents (roots of each deletion) the caller could access",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/documents/{id}": {
@@ -1628,9 +1567,7 @@
           }
         ],
         "summary": "Document metadata with the caller access level",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       },
       "patch": {
         "description": "Title and icon need EDIT; visibility needs MANAGE or EDIT as the author.",
@@ -1687,9 +1624,7 @@
           }
         ],
         "summary": "Update title, icon or visibility",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       },
       "delete": {
         "description": "Descendants are deleted too, whether or not the caller can see them.",
@@ -1729,9 +1664,7 @@
           }
         ],
         "summary": "Move the document and all its descendants to the trash",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/documents/{id}/restore": {
@@ -1789,9 +1722,7 @@
           }
         ],
         "summary": "Restore a deleted document with the descendants deleted together with it",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/documents/{id}/move": {
@@ -1859,9 +1790,7 @@
           }
         ],
         "summary": "Move or reorder a document",
-        "tags": [
-          "documents"
-        ]
+        "tags": ["documents"]
       }
     },
     "/api/me/shared-documents": {
@@ -1912,9 +1841,7 @@
           }
         ],
         "summary": "Documents shared with the caller",
-        "tags": [
-          "shares"
-        ]
+        "tags": ["shares"]
       }
     },
     "/api/documents/{id}/shares": {
@@ -1965,12 +1892,10 @@
           }
         ],
         "summary": "Shares of a document (MANAGE, or EDIT as the author)",
-        "tags": [
-          "shares"
-        ]
+        "tags": ["shares"]
       },
       "post": {
-        "description": "Unknown email: 404. An existing share is updated. Shares are not inherited.",
+        "description": "Unknown email: 404. An existing share is updated. Shares are not inherited. 30 per minute per user.",
         "operationId": "SharesController_add",
         "parameters": [],
         "requestBody": {
@@ -2004,6 +1929,9 @@
               }
             }
           },
+          "429": {
+            "description": "RATE_LIMITED"
+          },
           "default": {
             "description": "Error; see `code` for the reason",
             "content": {
@@ -2024,9 +1952,7 @@
           }
         ],
         "summary": "Share with a registered user by email",
-        "tags": [
-          "shares"
-        ]
+        "tags": ["shares"]
       }
     },
     "/api/documents/{id}/shares/{userId}": {
@@ -2093,9 +2019,7 @@
           }
         ],
         "summary": "Change a share role",
-        "tags": [
-          "shares"
-        ]
+        "tags": ["shares"]
       },
       "delete": {
         "operationId": "SharesController_remove",
@@ -2143,9 +2067,7 @@
           }
         ],
         "summary": "Revoke a share",
-        "tags": [
-          "shares"
-        ]
+        "tags": ["shares"]
       }
     },
     "/api/documents/{id}/collab-ticket": {
@@ -2197,9 +2119,7 @@
           }
         ],
         "summary": "Ticket for the collaboration WebSocket of a document",
-        "tags": [
-          "collab"
-        ]
+        "tags": ["collab"]
       }
     },
     "/api/documents/{id}/versions": {
@@ -2260,9 +2180,7 @@
           }
         ],
         "summary": "Version history, newest first",
-        "tags": [
-          "versions"
-        ]
+        "tags": ["versions"]
       },
       "post": {
         "description": "Needs EDIT. The collaboration service is asked to write its buffer first (2 s limit); if it cannot be reached the stored state is snapshotted and `flushed` is false. At most 100 saved versions per document.",
@@ -2331,9 +2249,7 @@
           }
         ],
         "summary": "Save the current content as a named version",
-        "tags": [
-          "versions"
-        ]
+        "tags": ["versions"]
       }
     },
     "/api/documents/{id}/versions/{versionId}": {
@@ -2398,9 +2314,7 @@
           }
         ],
         "summary": "One version with its content as sanitised ProseMirror JSON",
-        "tags": [
-          "versions"
-        ]
+        "tags": ["versions"]
       }
     },
     "/api/documents/{id}/versions/{versionId}/restore": {
@@ -2469,9 +2383,7 @@
           }
         ],
         "summary": "Replace the content with a version",
-        "tags": [
-          "versions"
-        ]
+        "tags": ["versions"]
       }
     },
     "/api/documents/{id}/attachments/presign": {
@@ -2545,9 +2457,7 @@
           }
         ],
         "summary": "Get a one-time form to upload an image straight to storage",
-        "tags": [
-          "attachments"
-        ]
+        "tags": ["attachments"]
       }
     },
     "/api/attachments/{id}/complete": {
@@ -2608,9 +2518,7 @@
           }
         ],
         "summary": "Verify an uploaded image and make it usable",
-        "tags": [
-          "attachments"
-        ]
+        "tags": ["attachments"]
       }
     },
     "/api/attachments/{id}/url": {
@@ -2668,9 +2576,7 @@
           }
         ],
         "summary": "Short-lived URL to read an image",
-        "tags": [
-          "attachments"
-        ]
+        "tags": ["attachments"]
       }
     },
     "/api/documents/{id}/public-links": {
@@ -2722,9 +2628,7 @@
           }
         ],
         "summary": "Public links of a document (MANAGE, or EDIT as the author)",
-        "tags": [
-          "publishing"
-        ]
+        "tags": ["publishing"]
       },
       "post": {
         "description": "MANAGE, or EDIT as the author; 10 per hour per user. VIEW: collab is asked to write its buffer first (2 s; `flushed` is false when it could not), the slug is created once and returned again when the page is published again. EDIT: every call issues a new secret and invalidates the previous URL, closing its open guest sessions.",
@@ -2784,9 +2688,7 @@
           }
         ],
         "summary": "Publish the page (VIEW) or enable editing by link (EDIT)",
-        "tags": [
-          "publishing"
-        ]
+        "tags": ["publishing"]
       }
     },
     "/api/documents/{id}/public-links/{linkId}": {
@@ -2856,9 +2758,7 @@
           }
         ],
         "summary": "Change or remove the expiry of a link",
-        "tags": [
-          "publishing"
-        ]
+        "tags": ["publishing"]
       },
       "delete": {
         "description": "Unpublishes the page (the slug stays reserved for it) or ends editing by link. Revoking an already revoked link does nothing.",
@@ -2907,9 +2807,7 @@
           }
         ],
         "summary": "Revoke a link",
-        "tags": [
-          "publishing"
-        ]
+        "tags": ["publishing"]
       }
     },
     "/api/public/documents/{slug}": {
@@ -2952,9 +2850,7 @@
           }
         },
         "summary": "Sanitised content of a published page",
-        "tags": [
-          "public"
-        ]
+        "tags": ["public"]
       }
     },
     "/api/public/media/{attachmentId}": {
@@ -2999,9 +2895,7 @@
           }
         },
         "summary": "Image of a published page",
-        "tags": [
-          "public"
-        ]
+        "tags": ["public"]
       }
     },
     "/api/public/links/{token}": {
@@ -3047,9 +2941,7 @@
           }
         },
         "summary": "State of an edit link",
-        "tags": [
-          "public"
-        ]
+        "tags": ["public"]
       }
     },
     "/api/public/links/{token}/ticket": {
@@ -3098,9 +2990,7 @@
           }
         },
         "summary": "Collab ticket for a guest with an edit link",
-        "tags": [
-          "public"
-        ]
+        "tags": ["public"]
       }
     },
     "/api/workspaces/{workspaceId}/search": {
@@ -3191,9 +3081,7 @@
           }
         ],
         "summary": "Full-text search in a workspace",
-        "tags": [
-          "search"
-        ]
+        "tags": ["search"]
       }
     },
     "/api/notifications": {
@@ -3273,9 +3161,7 @@
           }
         ],
         "summary": "Notifications of the caller, newest first",
-        "tags": [
-          "notifications"
-        ]
+        "tags": ["notifications"]
       }
     },
     "/api/notifications/unread-count": {
@@ -3323,9 +3209,7 @@
           }
         ],
         "summary": "Number of unread notifications that the list shows",
-        "tags": [
-          "notifications"
-        ]
+        "tags": ["notifications"]
       }
     },
     "/api/notifications/read": {
@@ -3384,9 +3268,7 @@
           }
         ],
         "summary": "Mark notifications as read",
-        "tags": [
-          "notifications"
-        ]
+        "tags": ["notifications"]
       }
     },
     "/api/documents/{id}/threads": {
@@ -3409,11 +3291,7 @@
             "schema": {
               "default": "all",
               "type": "string",
-              "enum": [
-                "open",
-                "resolved",
-                "all"
-              ]
+              "enum": ["open", "resolved", "all"]
             }
           }
         ],
@@ -3461,9 +3339,7 @@
           }
         ],
         "summary": "Comment threads of a document",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       },
       "post": {
         "description": "Needs permission to comment (editors and up; viewers get 403). Mentioned users who can view the document get a notification and an email.",
@@ -3532,9 +3408,7 @@
           }
         ],
         "summary": "Start a thread on a block",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       }
     },
     "/api/documents/{id}/mentionable": {
@@ -3605,9 +3479,7 @@
           }
         ],
         "summary": "Users that can be mentioned in a comment",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       }
     },
     "/api/threads/{threadId}/comments": {
@@ -3679,9 +3551,7 @@
           }
         ],
         "summary": "Reply in a thread",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       }
     },
     "/api/threads/{threadId}/resolve": {
@@ -3740,9 +3610,7 @@
           }
         ],
         "summary": "Resolve a thread",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       }
     },
     "/api/threads/{threadId}/reopen": {
@@ -3801,9 +3669,7 @@
           }
         ],
         "summary": "Reopen a resolved thread",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       }
     },
     "/api/comments/{commentId}": {
@@ -3875,9 +3741,7 @@
           }
         ],
         "summary": "Edit a comment",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       },
       "delete": {
         "description": "The author, or an owner/admin of the workspace. The text is erased and the notifications it caused are removed; a thread without comments is no longer listed.",
@@ -3927,9 +3791,7 @@
           }
         ],
         "summary": "Delete a comment",
-        "tags": [
-          "comments"
-        ]
+        "tags": ["comments"]
       }
     },
     "/api/billing/plans": {
@@ -3980,9 +3842,7 @@
           }
         ],
         "summary": "The plans, their prices and limits",
-        "tags": [
-          "billing"
-        ]
+        "tags": ["billing"]
       }
     },
     "/api/workspaces/{workspaceId}/billing": {
@@ -4040,9 +3900,7 @@
           }
         ],
         "summary": "Plan, subscription status, usage against the limits, over-limit figures, invoices",
-        "tags": [
-          "billing"
-        ]
+        "tags": ["billing"]
       }
     },
     "/api/workspaces/{workspaceId}/billing/checkout": {
@@ -4113,9 +3971,7 @@
           }
         ],
         "summary": "Starts a checkout for a paid plan",
-        "tags": [
-          "billing"
-        ]
+        "tags": ["billing"]
       }
     },
     "/api/workspaces/{workspaceId}/billing/cancel": {
@@ -4176,9 +4032,7 @@
           }
         ],
         "summary": "Cancels the paid plan",
-        "tags": [
-          "billing"
-        ]
+        "tags": ["billing"]
       }
     },
     "/api/billing/webhooks/mock": {
@@ -4221,9 +4075,7 @@
           }
         },
         "summary": "Receives an event of the mock payment provider",
-        "tags": [
-          "billing"
-        ]
+        "tags": ["billing"]
       }
     },
     "/api/mock-provider/checkout-sessions/{id}": {
@@ -4262,9 +4114,7 @@
           }
         },
         "summary": "The checkout session shown on the payment page",
-        "tags": [
-          "mock-provider"
-        ]
+        "tags": ["mock-provider"]
       }
     },
     "/api/mock-provider/checkout-sessions/{id}/complete": {
@@ -4307,9 +4157,7 @@
           }
         },
         "summary": "Pays the session",
-        "tags": [
-          "mock-provider"
-        ]
+        "tags": ["mock-provider"]
       }
     },
     "/api/mock-provider/checkout-sessions/{id}/fail": {
@@ -4351,9 +4199,7 @@
           }
         },
         "summary": "Declines the payment (`checkout.session.failed`)",
-        "tags": [
-          "mock-provider"
-        ]
+        "tags": ["mock-provider"]
       }
     },
     "/api/mock-provider/events/{id}/redeliver": {
@@ -4393,9 +4239,7 @@
           }
         },
         "summary": "Delivers an event to the webhook again",
-        "tags": [
-          "mock-provider"
-        ]
+        "tags": ["mock-provider"]
       }
     }
   },
@@ -4444,11 +4288,7 @@
             "maxLength": 100
           }
         },
-        "required": [
-          "email",
-          "password",
-          "name"
-        ]
+        "required": ["email", "password", "name"]
       },
       "AuthUserResponse": {
         "type": "object",
@@ -4464,11 +4304,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "name"
-        ]
+        "required": ["id", "email", "name"]
       },
       "AuthSessionResponse": {
         "type": "object",
@@ -4485,11 +4321,7 @@
             "description": "Access token lifetime in seconds."
           }
         },
-        "required": [
-          "user",
-          "accessToken",
-          "expiresIn"
-        ]
+        "required": ["user", "accessToken", "expiresIn"]
       },
       "LoginDto": {
         "type": "object",
@@ -4502,10 +4334,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "email",
-          "password"
-        ]
+        "required": ["email", "password"]
       },
       "CreateWorkspaceDto": {
         "type": "object",
@@ -4516,9 +4345,7 @@
             "maxLength": 80
           }
         },
-        "required": [
-          "name"
-        ]
+        "required": ["name"]
       },
       "WorkspaceResponse": {
         "type": "object",
@@ -4535,34 +4362,18 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "OWNER",
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ],
+            "enum": ["OWNER", "ADMIN", "EDITOR", "VIEWER"],
             "description": "The caller's role"
           },
           "plan": {
             "type": "string",
-            "enum": [
-              "FREE",
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["FREE", "PRO", "TEAM"]
           },
           "createdAt": {
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "slug",
-          "role",
-          "plan",
-          "createdAt"
-        ]
+        "required": ["id", "name", "slug", "role", "plan", "createdAt"]
       },
       "UpdateWorkspaceDto": {
         "type": "object",
@@ -4573,9 +4384,7 @@
             "maxLength": 80
           }
         },
-        "required": [
-          "name"
-        ]
+        "required": ["name"]
       },
       "UsageMembers": {
         "type": "object",
@@ -4590,11 +4399,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "current",
-          "pendingInvites",
-          "limit"
-        ]
+        "required": ["current", "pendingInvites", "limit"]
       },
       "UsageDocuments": {
         "type": "object",
@@ -4608,9 +4413,7 @@
             "description": "null = unlimited"
           }
         },
-        "required": [
-          "current"
-        ]
+        "required": ["current"]
       },
       "UsageStorage": {
         "type": "object",
@@ -4622,21 +4425,14 @@
             "type": "number"
           }
         },
-        "required": [
-          "currentBytes",
-          "limitBytes"
-        ]
+        "required": ["currentBytes", "limitBytes"]
       },
       "UsageResponse": {
         "type": "object",
         "properties": {
           "plan": {
             "type": "string",
-            "enum": [
-              "FREE",
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["FREE", "PRO", "TEAM"]
           },
           "members": {
             "$ref": "#/components/schemas/UsageMembers"
@@ -4648,12 +4444,7 @@
             "$ref": "#/components/schemas/UsageStorage"
           }
         },
-        "required": [
-          "plan",
-          "members",
-          "documents",
-          "storage"
-        ]
+        "required": ["plan", "members", "documents", "storage"]
       },
       "MemberResponse": {
         "type": "object",
@@ -4670,41 +4461,23 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "OWNER",
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ]
+            "enum": ["OWNER", "ADMIN", "EDITOR", "VIEWER"]
           },
           "joinedAt": {
             "type": "string"
           }
         },
-        "required": [
-          "userId",
-          "name",
-          "email",
-          "role",
-          "joinedAt"
-        ]
+        "required": ["userId", "name", "email", "role", "joinedAt"]
       },
       "UpdateMemberDto": {
         "type": "object",
         "properties": {
           "role": {
             "type": "string",
-            "enum": [
-              "OWNER",
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ]
+            "enum": ["OWNER", "ADMIN", "EDITOR", "VIEWER"]
           }
         },
-        "required": [
-          "role"
-        ]
+        "required": ["role"]
       },
       "CreateInviteDto": {
         "type": "object",
@@ -4715,17 +4488,10 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ]
+            "enum": ["ADMIN", "EDITOR", "VIEWER"]
           }
         },
-        "required": [
-          "email",
-          "role"
-        ]
+        "required": ["email", "role"]
       },
       "InviteResponse": {
         "type": "object",
@@ -4739,12 +4505,7 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "OWNER",
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ]
+            "enum": ["OWNER", "ADMIN", "EDITOR", "VIEWER"]
           },
           "expiresAt": {
             "type": "string"
@@ -4757,14 +4518,7 @@
             "format": "uuid"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "role",
-          "expiresAt",
-          "createdAt",
-          "invitedBy"
-        ]
+        "required": ["id", "email", "role", "expiresAt", "createdAt", "invitedBy"]
       },
       "InvitePreviewResponse": {
         "type": "object",
@@ -4777,12 +4531,7 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "OWNER",
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ]
+            "enum": ["OWNER", "ADMIN", "EDITOR", "VIEWER"]
           },
           "inviterName": {
             "type": "string"
@@ -4791,13 +4540,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "workspaceName",
-          "email",
-          "role",
-          "inviterName",
-          "expiresAt"
-        ]
+        "required": ["workspaceName", "email", "role", "inviterName", "expiresAt"]
       },
       "AcceptInviteResponse": {
         "type": "object",
@@ -4808,18 +4551,10 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "OWNER",
-              "ADMIN",
-              "EDITOR",
-              "VIEWER"
-            ]
+            "enum": ["OWNER", "ADMIN", "EDITOR", "VIEWER"]
           }
         },
-        "required": [
-          "workspaceId",
-          "role"
-        ]
+        "required": ["workspaceId", "role"]
       },
       "CreateDocumentDto": {
         "type": "object",
@@ -4835,9 +4570,7 @@
             "example": "Meeting notes"
           }
         },
-        "required": [
-          "title"
-        ]
+        "required": ["title"]
       },
       "DocumentResponse": {
         "type": "object",
@@ -4868,10 +4601,7 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "WORKSPACE",
-              "RESTRICTED"
-            ]
+            "enum": ["WORKSPACE", "RESTRICTED"]
           },
           "createdBy": {
             "type": "string",
@@ -4882,12 +4612,7 @@
           },
           "myAccess": {
             "type": "string",
-            "enum": [
-              "VIEW",
-              "COMMENT",
-              "EDIT",
-              "MANAGE"
-            ]
+            "enum": ["VIEW", "COMMENT", "EDIT", "MANAGE"]
           },
           "createdAt": {
             "type": "string"
@@ -4935,30 +4660,14 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "WORKSPACE",
-              "RESTRICTED"
-            ]
+            "enum": ["WORKSPACE", "RESTRICTED"]
           },
           "myAccess": {
             "type": "string",
-            "enum": [
-              "VIEW",
-              "COMMENT",
-              "EDIT",
-              "MANAGE"
-            ]
+            "enum": ["VIEW", "COMMENT", "EDIT", "MANAGE"]
           }
         },
-        "required": [
-          "id",
-          "parentId",
-          "title",
-          "icon",
-          "position",
-          "visibility",
-          "myAccess"
-        ]
+        "required": ["id", "parentId", "title", "icon", "position", "visibility", "myAccess"]
       },
       "RecentDocumentResponse": {
         "type": "object",
@@ -4976,24 +4685,13 @@
           },
           "myAccess": {
             "type": "string",
-            "enum": [
-              "VIEW",
-              "COMMENT",
-              "EDIT",
-              "MANAGE"
-            ]
+            "enum": ["VIEW", "COMMENT", "EDIT", "MANAGE"]
           },
           "updatedAt": {
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "title",
-          "icon",
-          "myAccess",
-          "updatedAt"
-        ]
+        "required": ["id", "title", "icon", "myAccess", "updatedAt"]
       },
       "TrashItemResponse": {
         "type": "object",
@@ -5021,14 +4719,7 @@
             "description": "Whether the caller may restore it"
           }
         },
-        "required": [
-          "id",
-          "title",
-          "icon",
-          "deletedAt",
-          "documentCount",
-          "canRestore"
-        ]
+        "required": ["id", "title", "icon", "deletedAt", "documentCount", "canRestore"]
       },
       "UpdateDocumentDto": {
         "type": "object",
@@ -5045,10 +4736,7 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "WORKSPACE",
-              "RESTRICTED"
-            ]
+            "enum": ["WORKSPACE", "RESTRICTED"]
           }
         }
       },
@@ -5072,9 +4760,7 @@
             "description": "Place the document right after this sibling"
           }
         },
-        "required": [
-          "parentId"
-        ]
+        "required": ["parentId"]
       },
       "MovedDocumentResponse": {
         "type": "object",
@@ -5092,11 +4778,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "parentId",
-          "position"
-        ]
+        "required": ["id", "parentId", "position"]
       },
       "SharedDocumentResponse": {
         "type": "object",
@@ -5118,19 +4800,10 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "VIEWER",
-              "EDITOR"
-            ]
+            "enum": ["VIEWER", "EDITOR"]
           }
         },
-        "required": [
-          "id",
-          "workspaceId",
-          "title",
-          "icon",
-          "role"
-        ]
+        "required": ["id", "workspaceId", "title", "icon", "role"]
       },
       "ShareResponse": {
         "type": "object",
@@ -5147,18 +4820,10 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "VIEWER",
-              "EDITOR"
-            ]
+            "enum": ["VIEWER", "EDITOR"]
           }
         },
-        "required": [
-          "userId",
-          "email",
-          "name",
-          "role"
-        ]
+        "required": ["userId", "email", "name", "role"]
       },
       "CreateShareDto": {
         "type": "object",
@@ -5170,31 +4835,20 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "VIEWER",
-              "EDITOR"
-            ]
+            "enum": ["VIEWER", "EDITOR"]
           }
         },
-        "required": [
-          "email",
-          "role"
-        ]
+        "required": ["email", "role"]
       },
       "UpdateShareDto": {
         "type": "object",
         "properties": {
           "role": {
             "type": "string",
-            "enum": [
-              "VIEWER",
-              "EDITOR"
-            ]
+            "enum": ["VIEWER", "EDITOR"]
           }
         },
-        "required": [
-          "role"
-        ]
+        "required": ["role"]
       },
       "CollabTicketResponse": {
         "type": "object",
@@ -5209,10 +4863,7 @@
             "example": "ws://localhost:4001/ws"
           }
         },
-        "required": [
-          "ticket",
-          "wsUrl"
-        ]
+        "required": ["ticket", "wsUrl"]
       },
       "VersionAuthorResponse": {
         "type": "object",
@@ -5225,10 +4876,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name"
-        ]
+        "required": ["id", "name"]
       },
       "VersionResponse": {
         "type": "object",
@@ -5239,11 +4887,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "AUTO",
-              "MANUAL",
-              "PRE_RESTORE"
-            ]
+            "enum": ["AUTO", "MANUAL", "PRE_RESTORE"]
           },
           "label": {
             "type": "object",
@@ -5267,14 +4911,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "label",
-          "title",
-          "author",
-          "createdAt"
-        ]
+        "required": ["id", "kind", "label", "title", "author", "createdAt"]
       },
       "VersionContentResponse": {
         "type": "object",
@@ -5285,11 +4922,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "AUTO",
-              "MANUAL",
-              "PRE_RESTORE"
-            ]
+            "enum": ["AUTO", "MANUAL", "PRE_RESTORE"]
           },
           "label": {
             "type": "object",
@@ -5318,15 +4951,7 @@
             "description": "The content as sanitised ProseMirror JSON ({ type: \"doc\", content: [...] })"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "label",
-          "title",
-          "author",
-          "createdAt",
-          "content"
-        ]
+        "required": ["id", "kind", "label", "title", "author", "createdAt", "content"]
       },
       "CreateVersionDto": {
         "type": "object",
@@ -5347,11 +4972,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "AUTO",
-              "MANUAL",
-              "PRE_RESTORE"
-            ]
+            "enum": ["AUTO", "MANUAL", "PRE_RESTORE"]
           },
           "label": {
             "type": "object",
@@ -5379,15 +5000,7 @@
             "description": "false when the collaboration service could not write its buffer first, so the snapshot may miss the last seconds of editing"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "label",
-          "title",
-          "author",
-          "createdAt",
-          "flushed"
-        ]
+        "required": ["id", "kind", "label", "title", "author", "createdAt", "flushed"]
       },
       "RestoredVersionResponse": {
         "type": "object",
@@ -5397,9 +5010,7 @@
             "description": "documents.revision after the restore"
           }
         },
-        "required": [
-          "revision"
-        ]
+        "required": ["revision"]
       },
       "PresignAttachmentDto": {
         "type": "object",
@@ -5412,12 +5023,7 @@
           },
           "mime": {
             "type": "string",
-            "enum": [
-              "image/png",
-              "image/jpeg",
-              "image/webp",
-              "image/gif"
-            ]
+            "enum": ["image/png", "image/jpeg", "image/webp", "image/gif"]
           },
           "size": {
             "type": "number",
@@ -5425,11 +5031,7 @@
             "description": "Exact file size in bytes"
           }
         },
-        "required": [
-          "filename",
-          "mime",
-          "size"
-        ]
+        "required": ["filename", "mime", "size"]
       },
       "PresignedAttachmentResponse": {
         "type": "object",
@@ -5453,12 +5055,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "attachmentId",
-          "url",
-          "fields",
-          "expiresAt"
-        ]
+        "required": ["attachmentId", "url", "fields", "expiresAt"]
       },
       "AttachmentResponse": {
         "type": "object",
@@ -5473,12 +5070,7 @@
           },
           "mime": {
             "type": "string",
-            "enum": [
-              "image/png",
-              "image/jpeg",
-              "image/webp",
-              "image/gif"
-            ]
+            "enum": ["image/png", "image/jpeg", "image/webp", "image/gif"]
           },
           "size": {
             "type": "number",
@@ -5486,23 +5078,13 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "PENDING",
-              "READY"
-            ]
+            "enum": ["PENDING", "READY"]
           },
           "createdAt": {
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "documentId",
-          "mime",
-          "size",
-          "status",
-          "createdAt"
-        ]
+        "required": ["id", "documentId", "mime", "size", "status", "createdAt"]
       },
       "AttachmentUrlResponse": {
         "type": "object",
@@ -5515,10 +5097,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "url",
-          "expiresAt"
-        ]
+        "required": ["url", "expiresAt"]
       },
       "PublicLinkResponse": {
         "type": "object",
@@ -5529,10 +5108,7 @@
           },
           "mode": {
             "type": "string",
-            "enum": [
-              "VIEW",
-              "EDIT"
-            ]
+            "enum": ["VIEW", "EDIT"]
           },
           "slug": {
             "type": "object",
@@ -5541,11 +5117,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "active",
-              "expired",
-              "revoked"
-            ]
+            "enum": ["active", "expired", "revoked"]
           },
           "expiresAt": {
             "type": "object",
@@ -5559,25 +5131,14 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "mode",
-          "slug",
-          "status",
-          "expiresAt",
-          "revokedAt",
-          "createdAt"
-        ]
+        "required": ["id", "mode", "slug", "status", "expiresAt", "revokedAt", "createdAt"]
       },
       "CreatePublicLinkDto": {
         "type": "object",
         "properties": {
           "mode": {
             "type": "string",
-            "enum": [
-              "VIEW",
-              "EDIT"
-            ],
+            "enum": ["VIEW", "EDIT"],
             "description": "VIEW publishes the page at /published/<slug>; EDIT lets anyone with the secret URL edit the document as a guest"
           },
           "expiresAt": {
@@ -5587,9 +5148,7 @@
             "description": "When the link stops working; must lie in the future. Omitted or null: never."
           }
         },
-        "required": [
-          "mode"
-        ]
+        "required": ["mode"]
       },
       "CreatedPublicLinkResponse": {
         "type": "object",
@@ -5600,10 +5159,7 @@
           },
           "mode": {
             "type": "string",
-            "enum": [
-              "VIEW",
-              "EDIT"
-            ]
+            "enum": ["VIEW", "EDIT"]
           },
           "slug": {
             "type": "object",
@@ -5612,11 +5168,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "active",
-              "expired",
-              "revoked"
-            ]
+            "enum": ["active", "expired", "revoked"]
           },
           "expiresAt": {
             "type": "object",
@@ -5662,9 +5214,7 @@
             "description": "The new expiry; null removes it"
           }
         },
-        "required": [
-          "expiresAt"
-        ]
+        "required": ["expiresAt"]
       },
       "PublicDocumentResponse": {
         "type": "object",
@@ -5685,21 +5235,14 @@
             "type": "string"
           }
         },
-        "required": [
-          "title",
-          "description",
-          "content",
-          "updatedAt"
-        ]
+        "required": ["title", "description", "content", "updatedAt"]
       },
       "EditLinkStateResponse": {
         "type": "object",
         "properties": {
           "mode": {
             "type": "string",
-            "enum": [
-              "EDIT"
-            ]
+            "enum": ["EDIT"]
           },
           "documentId": {
             "type": "string",
@@ -5713,12 +5256,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "mode",
-          "documentId",
-          "title",
-          "expiresAt"
-        ]
+        "required": ["mode", "documentId", "title", "expiresAt"]
       },
       "SnippetPartResponse": {
         "type": "object",
@@ -5731,10 +5269,7 @@
             "description": "The part matches the query (to be highlighted)"
           }
         },
-        "required": [
-          "text",
-          "match"
-        ]
+        "required": ["text", "match"]
       },
       "SearchResultResponse": {
         "type": "object",
@@ -5757,12 +5292,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "title",
-          "snippet",
-          "updatedAt"
-        ]
+        "required": ["id", "title", "snippet", "updatedAt"]
       },
       "SearchPageResponse": {
         "type": "object",
@@ -5779,10 +5309,7 @@
             "description": "Pass as `cursor` to get the next page"
           }
         },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
+        "required": ["items", "nextCursor"]
       },
       "MentionActorResponse": {
         "type": "object",
@@ -5795,10 +5322,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name"
-        ]
+        "required": ["id", "name"]
       },
       "NotificationPayloadResponse": {
         "type": "object",
@@ -5850,9 +5374,7 @@
           },
           "type": {
             "type": "string",
-            "enum": [
-              "MENTION"
-            ]
+            "enum": ["MENTION"]
           },
           "payload": {
             "$ref": "#/components/schemas/NotificationPayloadResponse"
@@ -5864,13 +5386,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "type",
-          "payload",
-          "read",
-          "createdAt"
-        ]
+        "required": ["id", "type", "payload", "read", "createdAt"]
       },
       "NotificationPageResponse": {
         "type": "object",
@@ -5886,10 +5402,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
+        "required": ["items", "nextCursor"]
       },
       "UnreadCountResponse": {
         "type": "object",
@@ -5899,9 +5412,7 @@
             "minimum": 0
           }
         },
-        "required": [
-          "count"
-        ]
+        "required": ["count"]
       },
       "MarkReadDto": {
         "type": "object",
@@ -5919,9 +5430,7 @@
           "all": {
             "type": "boolean",
             "description": "Mark every notification of the caller as read",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         }
       },
@@ -5934,9 +5443,7 @@
             "description": "Notifications that were unread and are read now"
           }
         },
-        "required": [
-          "updated"
-        ]
+        "required": ["updated"]
       },
       "PersonResponse": {
         "type": "object",
@@ -5949,10 +5456,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name"
-        ]
+        "required": ["id", "name"]
       },
       "CommentMentionResponse": {
         "type": "object",
@@ -5965,10 +5469,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "userId",
-          "name"
-        ]
+        "required": ["userId", "name"]
       },
       "CommentResponse": {
         "type": "object",
@@ -6002,15 +5503,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "author",
-          "body",
-          "deleted",
-          "mentions",
-          "createdAt",
-          "editedAt"
-        ]
+        "required": ["id", "author", "body", "deleted", "mentions", "createdAt", "editedAt"]
       },
       "ThreadResponse": {
         "type": "object",
@@ -6074,20 +5567,14 @@
             "description": "Id of the block the thread is about (the `id` attribute of the block in the document). Not checked against the stored content, which can be a few seconds behind the editor."
           }
         },
-        "required": [
-          "body",
-          "blockId"
-        ]
+        "required": ["body", "blockId"]
       },
       "MentionWarningResponse": {
         "type": "object",
         "properties": {
           "code": {
             "type": "string",
-            "enum": [
-              "MENTION_IGNORED",
-              "MENTION_LIMIT"
-            ],
+            "enum": ["MENTION_IGNORED", "MENTION_LIMIT"],
             "description": "`MENTION_IGNORED`: the user does not exist or cannot view the document. `MENTION_LIMIT`: more than 20 mentions."
           },
           "userId": {
@@ -6095,10 +5582,7 @@
             "format": "uuid"
           }
         },
-        "required": [
-          "code",
-          "userId"
-        ]
+        "required": ["code", "userId"]
       },
       "ThreadWriteResponse": {
         "type": "object",
@@ -6113,10 +5597,7 @@
             }
           }
         },
-        "required": [
-          "thread",
-          "warnings"
-        ]
+        "required": ["thread", "warnings"]
       },
       "MentionableUserResponse": {
         "type": "object",
@@ -6132,11 +5613,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "email"
-        ]
+        "required": ["id", "name", "email"]
       },
       "CreateCommentDto": {
         "type": "object",
@@ -6148,9 +5625,7 @@
             "description": "Plain text, at most 4000 characters, shown as text and never as HTML. `@[<user id>]` mentions a user who can view the document; a mention of anyone else is removed and reported in `warnings`."
           }
         },
-        "required": [
-          "body"
-        ]
+        "required": ["body"]
       },
       "CommentWriteResponse": {
         "type": "object",
@@ -6165,10 +5640,7 @@
             }
           }
         },
-        "required": [
-          "comment",
-          "warnings"
-        ]
+        "required": ["comment", "warnings"]
       },
       "UpdateCommentDto": {
         "type": "object",
@@ -6180,20 +5652,14 @@
             "description": "Plain text, at most 4000 characters, shown as text and never as HTML. `@[<user id>]` mentions a user who can view the document; a mention of anyone else is removed and reported in `warnings`."
           }
         },
-        "required": [
-          "body"
-        ]
+        "required": ["body"]
       },
       "PlanInfoResponse": {
         "type": "object",
         "properties": {
           "plan": {
             "type": "string",
-            "enum": [
-              "FREE",
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["FREE", "PRO", "TEAM"]
           },
           "priceCents": {
             "type": "number",
@@ -6211,24 +5677,14 @@
             "type": "number"
           }
         },
-        "required": [
-          "plan",
-          "priceCents",
-          "maxMembers",
-          "maxDocuments",
-          "maxStorageBytes"
-        ]
+        "required": ["plan", "priceCents", "maxMembers", "maxDocuments", "maxStorageBytes"]
       },
       "UsageFigureResponse": {
         "type": "object",
         "properties": {
           "kind": {
             "type": "string",
-            "enum": [
-              "members",
-              "documents",
-              "storage"
-            ]
+            "enum": ["members", "documents", "storage"]
           },
           "current": {
             "type": "number",
@@ -6240,11 +5696,7 @@
             "description": "null = unlimited"
           }
         },
-        "required": [
-          "kind",
-          "current",
-          "limit"
-        ]
+        "required": ["kind", "current", "limit"]
       },
       "InvoiceResponse": {
         "type": "object",
@@ -6255,11 +5707,7 @@
           },
           "plan": {
             "type": "string",
-            "enum": [
-              "FREE",
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["FREE", "PRO", "TEAM"]
           },
           "amountCents": {
             "type": "number",
@@ -6270,30 +5718,18 @@
             "format": "date-time"
           }
         },
-        "required": [
-          "id",
-          "plan",
-          "amountCents",
-          "createdAt"
-        ]
+        "required": ["id", "plan", "amountCents", "createdAt"]
       },
       "BillingOverviewResponse": {
         "type": "object",
         "properties": {
           "plan": {
             "type": "string",
-            "enum": [
-              "FREE",
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["FREE", "PRO", "TEAM"]
           },
           "status": {
             "type": "string",
-            "enum": [
-              "ACTIVE",
-              "CANCELED"
-            ]
+            "enum": ["ACTIVE", "CANCELED"]
           },
           "currentPeriodEnd": {
             "type": "string",
@@ -6322,29 +5758,17 @@
             }
           }
         },
-        "required": [
-          "plan",
-          "status",
-          "currentPeriodEnd",
-          "usage",
-          "overLimit",
-          "invoices"
-        ]
+        "required": ["plan", "status", "currentPeriodEnd", "usage", "overLimit", "invoices"]
       },
       "CreateCheckoutDto": {
         "type": "object",
         "properties": {
           "plan": {
             "type": "string",
-            "enum": [
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["PRO", "TEAM"]
           }
         },
-        "required": [
-          "plan"
-        ]
+        "required": ["plan"]
       },
       "CheckoutStartedResponse": {
         "type": "object",
@@ -6359,10 +5783,7 @@
             "description": "Path of the page where the payment is made"
           }
         },
-        "required": [
-          "sessionId",
-          "checkoutUrl"
-        ]
+        "required": ["sessionId", "checkoutUrl"]
       },
       "CancelRequestedResponse": {
         "type": "object",
@@ -6373,9 +5794,7 @@
             "description": "The provider was asked; the plan changes when its webhook event is applied"
           }
         },
-        "required": [
-          "requested"
-        ]
+        "required": ["requested"]
       },
       "WebhookAckResponse": {
         "type": "object",
@@ -6404,11 +5823,7 @@
           },
           "plan": {
             "type": "string",
-            "enum": [
-              "FREE",
-              "PRO",
-              "TEAM"
-            ]
+            "enum": ["FREE", "PRO", "TEAM"]
           },
           "amountCents": {
             "type": "number",
@@ -6416,21 +5831,10 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "PENDING",
-              "COMPLETED",
-              "FAILED",
-              "CANCELED"
-            ]
+            "enum": ["PENDING", "COMPLETED", "FAILED", "CANCELED"]
           }
         },
-        "required": [
-          "id",
-          "workspaceId",
-          "plan",
-          "amountCents",
-          "status"
-        ]
+        "required": ["id", "workspaceId", "plan", "amountCents", "status"]
       },
       "EventIssuedResponse": {
         "type": "object",
@@ -6440,9 +5844,7 @@
             "example": "evt_0f0e0d0c0b0a09080706050403020100"
           }
         },
-        "required": [
-          "eventId"
-        ]
+        "required": ["eventId"]
       },
       "ErrorResponse": {
         "type": "object",
@@ -6484,10 +5886,7 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": [
-                    "field",
-                    "messages"
-                  ],
+                  "required": ["field", "messages"],
                   "properties": {
                     "field": {
                       "type": "string"
@@ -6512,12 +5911,7 @@
             "description": "The same id is returned in the `x-correlation-id` header."
           }
         },
-        "required": [
-          "statusCode",
-          "code",
-          "message",
-          "correlationId"
-        ]
+        "required": ["statusCode", "code", "message", "correlationId"]
       }
     }
   }
