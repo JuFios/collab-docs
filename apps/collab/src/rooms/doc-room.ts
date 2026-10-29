@@ -18,6 +18,7 @@ import {
   encodeAwarenessUpdate,
 } from './awareness-codec';
 import type { DocumentStore } from './document-store';
+import { structureViolation } from './update-structure';
 
 /** One WebSocket as the room sees it; the transport (and its tests) provide the implementation. */
 export interface RoomConnection {
@@ -351,7 +352,10 @@ export class DocRoom {
     try {
       // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
       // decode first, or an update called "rejected" has already changed the document
-      Y.decodeUpdate(update);
+      const violation = structureViolation(Y.decodeUpdate(update));
+      if (violation) {
+        return this.refuse(state, 'invalid', new Error(`outside the content model: ${violation}`));
+      }
       Y.applyUpdate(this.doc, update, state);
     } catch (error) {
       // a throw after the update was integrated (from an observer) leaves it in the room: it was not refused

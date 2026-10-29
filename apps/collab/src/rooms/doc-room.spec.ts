@@ -284,6 +284,30 @@ describe('DocRoom', () => {
       source.destroy();
     });
 
+    it('refuses an update outside the content model before it touches the room or the store', () => {
+      const { room, observer, store } = setup();
+      const sender = new TestClient(room);
+      const watcher = new TestClient(room);
+      sender.join();
+      watcher.join();
+      sender.settle();
+      watcher.settle();
+      const enqueue = jest.spyOn(store, 'enqueue');
+
+      // what a hostile client could send that the editor never would: an element the model does not have
+      const element = new Y.XmlElement('iframe');
+      element.setAttribute('srcdoc', '<script>alert(1)</script>');
+      sender.doc.getXmlFragment('content').insert(0, [element]);
+      sender.settle();
+      watcher.settle();
+
+      expect(observer.rejected).toEqual(['invalid']);
+      expect(sender.lastEvent('rejected')).toEqual({ type: 'rejected', reason: 'invalid' });
+      expect(room.doc.getXmlFragment('content').toString()).not.toContain('iframe');
+      expect(watcher.value()).not.toContain('iframe');
+      expect(enqueue).not.toHaveBeenCalled();
+    });
+
     it('refuses updates that would push the document past its size limit', () => {
       const { room, observer } = setup({ maxDocumentBytes: 300 });
       const client = new TestClient(room);
