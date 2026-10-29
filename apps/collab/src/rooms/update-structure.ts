@@ -156,7 +156,10 @@ function inElement(name: string, content: ItemContent, parentSub: string | null)
   const spec = nodeSpec(name);
   if (!spec) return `element "${name}"`;
   if (parentSub !== null) {
-    if (!(parentSub in spec.attrs)) return `attribute "${parentSub}"`;
+    // y-tiptap stores the marks of a node that is not text (a mention, a line break) as attributes named after
+    // the mark, `name--hash` when they overlap; the editor allows them there, the model strips them on the way out
+    const mark = parentSub.split('--')[0] ?? '';
+    if (!(parentSub in spec.attrs) && !MARKS.has(mark)) return `attribute "${parentSub}"`;
     return content instanceof Y.ContentAny
       ? null
       : `content ${content.constructor.name} as attribute`;

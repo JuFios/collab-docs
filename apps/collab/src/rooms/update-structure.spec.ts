@@ -159,6 +159,18 @@ describe('structureViolation', () => {
     ).toBe('attribute "style"');
   });
 
+  it('accepts the marks y-tiptap keeps as attributes of a mention or a line break', () => {
+    const update = updateOf((doc) => {
+      const element = new Y.XmlElement('paragraph');
+      doc.getXmlFragment('content').insert(0, [element]);
+      const hardBreak = new Y.XmlElement('hardBreak');
+      element.insert(0, [hardBreak]);
+      hardBreak.setAttribute('bold', {} as unknown as string);
+      hardBreak.setAttribute('link--9f86d081', { href: 'https://a.b' } as unknown as string);
+    });
+    expect(check(update)).toBeNull();
+  });
+
   it('accepts an overlapping mark the way y-tiptap names it', () => {
     const update = updateOf((doc) => {
       const text = new Y.XmlText();
