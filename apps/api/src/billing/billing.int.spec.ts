@@ -484,6 +484,31 @@ describe('billing', () => {
       expect(await invoiceCount(workspaceId)).toBe(1);
     });
 
+    it('records a payment overtaken by a cancellation without bringing the plan back', async () => {
+      const { owner, workspaceId } = await setup();
+      await upgrade(owner, workspaceId, 'PRO');
+      const team = await checkout(owner, workspaceId, 'TEAM');
+      const now = Date.now();
+      const paid = signedEvent(
+        BILLING_EVENT_TYPES.checkoutCompleted,
+        { checkoutSessionId: team.sessionId },
+        now - 5000,
+      );
+      const canceled = signedEvent(BILLING_EVENT_TYPES.subscriptionDeleted, { workspaceId }, now);
+
+      await post(canceled.text).expect(200);
+      await processed(canceled.id);
+      await post(paid.text).expect(200);
+      await processed(paid.id);
+
+      expect(await planOf(workspaceId)).toBe('FREE');
+      expect(
+        await prisma.checkoutSession.findUniqueOrThrow({ where: { id: team.sessionId } }),
+      ).toMatchObject({ status: 'COMPLETED' });
+      expect(await prisma.invoice.count({ where: { checkoutSessionId: team.sessionId } })).toBe(1);
+      expect(await invoiceCount(workspaceId)).toBe(2);
+    });
+
     it('cancels an open checkout when a new one starts, so only the newer one can be paid', async () => {
       const { owner, workspaceId } = await setup();
       const first = await checkout(owner, workspaceId, 'PRO');

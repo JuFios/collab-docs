@@ -401,8 +401,8 @@ than gaps.
   digests.
 - Sharing is not inherited down the tree _by design_: a child copies its parent's visibility and shares when it is created and is independent
   afterwards. A guest who holds an edit link cannot comment.
-- Billing is a mock: no renewals, proration, taxes, payment methods or dunning, and no reconciliation job for events
-  ignored as stale. The 80 % usage warning is shown on the meters, but nothing warns before the action that would cross it.
+- Billing is a mock: no renewals, proration, taxes, payment methods, dunning or refunds (a payment overtaken by a newer
+  event is invoiced and logged as `billing.payment_not_applied`, not refunded). The 80 % usage warning is shown on the meters, but nothing warns before the action that would cross it.
 - Search has no typo tolerance and no stemming (Postgres ships no Ukrainian dictionary); a trigram index on titles exists
   for a fuzzy fallback that is not wired up. Code blocks have no syntax highlighting; versions cannot be compared side by side.
 - Not built (Could items): command palette, dark theme, transfer of workspace ownership, generated Open Graph images,
