@@ -1,10 +1,9 @@
-import { PUBLIC_SLUG_MAX_LENGTH, PUBLIC_SLUG_PATTERN } from '@collab-docs/shared';
+import { PUBLIC_SLUG_MAX_LENGTH, PUBLIC_SLUG_PATTERN, UUID_PATTERN } from '@collab-docs/shared';
 import { NextResponse } from 'next/server';
 import { apiInternalUrl } from '@/lib/env';
 
 export const runtime = 'nodejs';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** The api signs the URL for 5 minutes; the browser may reuse the redirect for less than that. */
 const REDIRECT_CACHE_SECONDS = 120;
 
@@ -20,7 +19,7 @@ export async function GET(
   const { attachmentId } = await params;
   const slug = new URL(request.url).searchParams.get('slug') ?? '';
   if (
-    !UUID.test(attachmentId) ||
+    !UUID_PATTERN.test(attachmentId) ||
     slug.length > PUBLIC_SLUG_MAX_LENGTH ||
     !PUBLIC_SLUG_PATTERN.test(slug)
   ) {

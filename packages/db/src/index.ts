@@ -16,3 +16,4 @@ export type {
   DocumentVersion,
 } from './generated/client';
 export * from './crdt';
+export * from './access';

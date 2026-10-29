@@ -2,7 +2,7 @@ import type { IncomingMessage } from 'node:http';
 import { Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { RawData, WebSocket } from 'ws';
-import { COLLAB_CLOSE } from '@collab-docs/shared';
+import { COLLAB_CLOSE, UUID_PATTERN } from '@collab-docs/shared';
 import {
   type AppConfig,
   resolveCorrelationId,
@@ -21,8 +21,6 @@ import { WsConnection } from './ws-connection';
 const PING_INTERVAL_MS = 30_000;
 /** Messages a client may send while its ticket and permissions are still being checked. */
 const MAX_PENDING_MESSAGES = 64;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function toBytes(data: RawData): Uint8Array {
   if (Array.isArray(data)) return Buffer.concat(data);
@@ -131,7 +129,7 @@ export class ConnectionService implements OnModuleInit, OnApplicationShutdown {
     }
     log.setBindings({ documentId });
 
-    if (!UUID.test(documentId)) return fail(COLLAB_CLOSE.notFound, 'document not found');
+    if (!UUID_PATTERN.test(documentId)) return fail(COLLAB_CLOSE.notFound, 'document not found');
 
     let identity: Identity;
     let ticketCorrelationId: string | undefined;

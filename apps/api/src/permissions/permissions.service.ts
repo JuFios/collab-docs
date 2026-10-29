@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@collab-docs/db';
+import {
+  type DocumentAccessSubject,
+  Prisma,
+  PrismaClient,
+  findDocumentForAccess,
+  findDocumentMembership,
+} from '@collab-docs/db';
 import {
   type Access,
   type Decision,
   type ShareRole,
-  type DocumentVisibility,
   type WorkspaceRole,
+  UUID_PATTERN,
   decideDocumentAccess,
   resolveDocumentAccess,
   resolveWorkspaceRole,
@@ -19,19 +25,11 @@ export interface DocumentAccessResult {
   workspaceRole: WorkspaceRole | null;
   /** The caller's explicit share on the document, if any. */
   shareRole: ShareRole | null;
-  document: {
-    id: string;
-    workspaceId: string;
-    visibility: DocumentVisibility;
-    createdBy: string;
-    deletedAt: Date | null;
-  };
+  document: DocumentAccessSubject;
 }
 
 /** Either the client or an open transaction, so callers can re-check permissions inside their transaction. */
 type Db = PrismaClient | Prisma.TransactionClient;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Absent resources and resources the caller may not know about are both reported as 404. */
 export const notFound = (what: string) => new AppException('NOT_FOUND', `${what} not found`);
@@ -52,7 +50,7 @@ export class PermissionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getWorkspaceRole(userId: string, workspaceId: string): Promise<WorkspaceRole | null> {
-    if (!UUID.test(workspaceId)) return null;
+    if (!UUID_PATTERN.test(workspaceId)) return null;
     const member = await this.prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId, userId } },
       select: { role: true },
@@ -77,37 +75,18 @@ export class PermissionsService {
     documentId: string,
     db: Db = this.prisma,
   ): Promise<DocumentAccessResult | null> {
-    if (!UUID.test(documentId)) return null;
-    const document = await db.document.findUnique({
-      where: { id: documentId },
-      select: {
-        id: true,
-        workspaceId: true,
-        visibility: true,
-        createdBy: true,
-        deletedAt: true,
-      },
-    });
+    if (!UUID_PATTERN.test(documentId)) return null;
+    const document = await findDocumentForAccess(db, documentId);
     if (!document) return null;
-    const [member, share] = await Promise.all([
-      db.workspaceMember.findUnique({
-        where: { workspaceId_userId: { workspaceId: document.workspaceId, userId } },
-        select: { role: true },
-      }),
-      db.documentShare.findUnique({
-        where: { documentId_userId: { documentId, userId } },
-        select: { role: true },
-      }),
-    ]);
-    const workspaceRole = member?.role ?? null;
+    const { workspaceRole, shareRole } = await findDocumentMembership(db, document, userId);
     const access = resolveDocumentAccess({
       deleted: document.deletedAt !== null,
       workspaceRole,
-      shareRole: share?.role ?? null,
+      shareRole,
       visibility: document.visibility,
       isAuthor: document.createdBy === userId,
     });
-    return { access, workspaceRole, shareRole: share?.role ?? null, document };
+    return { access, workspaceRole, shareRole, document };
   }
 
   /** Throws 404 when the caller has no access at all (or the document does not exist) and 403 below `min`. */

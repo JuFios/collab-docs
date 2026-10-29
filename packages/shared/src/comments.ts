@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UUID_SOURCE } from './ids';
 
 export const COMMENT_BODY_MAX_LENGTH = 4000;
 /** Mentions beyond this in one comment are ignored: each one is a notification and an email. */
@@ -29,10 +30,8 @@ export type CreateThreadInput = z.infer<typeof createThreadInputSchema>;
 export const createCommentInputSchema = z.object({ body: commentBodySchema });
 export type CreateCommentInput = z.infer<typeof createCommentInputSchema>;
 
-const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
-
 /** A mention inside a comment body: `@[<user id>]`. The client turns a name picked from the autocomplete into it. */
-export const MENTION_TOKEN = new RegExp(`@\\[(${UUID})\\]`, 'g');
+export const MENTION_TOKEN = new RegExp(`@\\[(${UUID_SOURCE})\\]`, 'gi');
 
 export interface ParsedMentions {
   /** Distinct user ids in order of first appearance, lower-case. */
