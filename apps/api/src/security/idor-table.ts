@@ -318,6 +318,8 @@ export const IDOR_TABLE: Record<string, Row> = {
     ...ws(r),
     query: { q: 'doc' },
   })),
+  // nobody's documents but the caller's own shares: the same answer for every signed-in persona
+  'GET /api/me/shared-documents/search': authRow(200, () => ({ query: { q: 'doc' } })),
 
   // --- comments ---
   'GET /api/documents/{id}/threads': docRow('VIEW', 200, doc),

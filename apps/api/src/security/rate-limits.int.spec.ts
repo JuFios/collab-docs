@@ -21,6 +21,7 @@ const PRESETS: Record<string, string> = {
   'POST /api/documents/{id}/collab-ticket': 'ticket',
   'POST /api/documents/{id}/public-links': 'publicLink',
   'GET /api/workspaces/{workspaceId}/search': 'search',
+  'GET /api/me/shared-documents/search': 'search',
   'POST /api/documents/{id}/threads': 'comment',
   'POST /api/threads/{threadId}/comments': 'comment',
   'PATCH /api/comments/{commentId}': 'comment',

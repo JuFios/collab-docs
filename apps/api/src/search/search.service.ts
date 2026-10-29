@@ -30,6 +30,7 @@ const TSQUERY_SYNTAX = String.raw`[\s&|!():*<>'\\]`;
 
 interface SearchRow {
   id: string;
+  workspace_id: string;
   title: string;
   updated_at: Date;
   rank: string;
@@ -37,15 +38,21 @@ interface SearchRow {
 }
 
 /**
- * Full-text search of one workspace (spec §7). The index holds no permissions: the access rules (resolver, spec §4)
- * are part of this one statement, evaluated when the request is made, so a revoked share or a deleted document
- * stops matching at once, however far the index lags behind.
+ * Full-text search of one workspace (spec §7), or of the documents shared with the caller in any workspace (what a
+ * guest of a document can reach). The index holds no permissions: the access rules (resolver, spec §4) are part of
+ * this one statement, evaluated when the request is made, so a revoked share or a deleted document stops matching
+ * at once, however far the index lags behind.
  */
 @Injectable()
 export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async search(userId: string, workspaceId: string, dto: SearchQueryDto): Promise<SearchPage> {
+  /** `workspaceId` null: the documents explicitly shared with the caller, across workspaces. */
+  async search(
+    userId: string,
+    workspaceId: string | null,
+    dto: SearchQueryDto,
+  ): Promise<SearchPage> {
     // the DTO has validated it
     const cursor = dto.cursor === undefined ? null : decodeCursor(dto.cursor);
     const tokens = tokenizeSearchQuery(dto.q);
@@ -57,6 +64,7 @@ export class SearchService {
     return {
       items: page.map((row) => ({
         id: row.id,
+        workspaceId: row.workspace_id,
         title: row.title,
         snippet: parseSnippet(row.headline ?? ''),
         updatedAt: row.updated_at.toISOString(),
@@ -68,7 +76,7 @@ export class SearchService {
 
   private query(
     userId: string,
-    workspaceId: string,
+    workspaceId: string | null,
     tokens: string[],
     limit: number,
     cursor: SearchCursor | null,
@@ -86,7 +94,8 @@ export class SearchService {
  */
 export function buildSearchStatement(args: {
   userId: string;
-  workspaceId: string;
+  /** `null`: the documents shared with `userId`, in any workspace. */
+  workspaceId: string | null;
   tokens: string[];
   limit: number;
   cursor: SearchCursor | null;
@@ -96,24 +105,35 @@ export function buildSearchStatement(args: {
     ? Prisma.sql`WHERE (hits.rank, hits.id) < (${cursor.rank}::float4, ${cursor.id}::uuid)`
     : Prisma.empty;
   const tsquery = searchTsquery(tokens);
+  const scope =
+    workspaceId === null
+      ? // a share grants access by itself (it overrides the workspace role), so no membership is needed
+        Prisma.sql`
+        JOIN document_shares sh ON sh.document_id = d.id AND sh.user_id = ${userId}::uuid
+        WHERE ds.tsv @@ ${tsquery}
+          AND d.deleted_at IS NULL`
+      : Prisma.sql`
+        JOIN workspace_members m ON m.workspace_id = d.workspace_id AND m.user_id = ${userId}::uuid
+        WHERE ds.workspace_id = ${workspaceId}::uuid
+          AND ds.tsv @@ ${tsquery}
+          AND d.workspace_id = ds.workspace_id
+          AND ${viewableDocumentSql(Prisma.sql`${userId}::uuid`)}`;
   return Prisma.sql`
       WITH hits AS (
         SELECT d.id,
+               d.workspace_id,
                d.title,
                ts_rank_cd(ds.tsv, ${tsquery}) AS rank,
                GREATEST(d.updated_at, d.content_updated_at) AS updated_at
         FROM document_search ds
         JOIN documents d ON d.id = ds.document_id
-        JOIN workspace_members m ON m.workspace_id = d.workspace_id AND m.user_id = ${userId}::uuid
-        WHERE ds.workspace_id = ${workspaceId}::uuid
-          AND ds.tsv @@ ${tsquery}
-          AND d.workspace_id = ds.workspace_id
-          AND ${viewableDocumentSql(Prisma.sql`${userId}::uuid`)}
+        ${scope}
       ),
       page AS (
         SELECT * FROM hits ${after} ORDER BY hits.rank DESC, hits.id DESC LIMIT ${limit}
       )
       SELECT page.id,
+             page.workspace_id,
              page.title,
              page.updated_at,
              page.rank::text AS rank,

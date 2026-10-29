@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from '../fixtures';
-import { ORIGIN, createDocument, createWorkspace, invitedMember } from '../workspace';
+import { expect, newUser, registerViaApi, test } from '../fixtures';
+import { confirmEmail } from '../mailpit';
+import { ORIGIN, createDocument, createWorkspace, invitedMember, signedIn } from '../workspace';
 
 const editorOf = (page: Page) => page.getByRole('textbox', { name: 'Document content' });
 const saveStatus = (page: Page) => page.locator('[data-testid="save-status"]:visible');
@@ -36,6 +37,38 @@ async function searchUntil(
 }
 
 test.describe('search', () => {
+  test('a guest searches the documents shared with them from "Shared with me"', async ({
+    browser,
+    baseURL,
+    signedInPage: owner,
+  }) => {
+    const workspaceId = await createWorkspace(owner, 'Guest search');
+    const shared = await createDocument(owner, workspaceId, 'Okapi field guide');
+    const hidden = await createDocument(owner, workspaceId, 'Okapi budget');
+    await write(owner, workspaceId, shared, 'okapi sightings by the river');
+    await write(owner, workspaceId, hidden, 'okapi costs');
+
+    const guestRequest = (await browser.newContext({ baseURL })).request;
+    const guest = await registerViaApi(guestRequest, newUser('guest'));
+    await confirmEmail(guestRequest, guest.email);
+    const share = await owner.request.post(`/api/documents/${shared}/shares`, {
+      data: { email: guest.email, role: 'VIEWER' },
+      headers: { origin: ORIGIN },
+    });
+    expect(share.status(), await share.text()).toBe(201);
+
+    const { page } = await signedIn(browser, baseURL, guest);
+    await expect(async () => {
+      await page.goto(`/shared?q=${encodeURIComponent('okapi')}`);
+      await expect(resultLinks(page).filter({ hasText: 'Okapi field guide' })).toBeVisible({
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 30_000, intervals: [1_000] });
+    await expect(resultLinks(page)).toHaveCount(1);
+    await resultLinks(page).first().click();
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${workspaceId}/documents/${shared}$`));
+  });
+
   test('finds a document by its text once indexed, marks the match and opens it from the keyboard', async ({
     signedInPage: page,
   }) => {

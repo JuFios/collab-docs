@@ -3,14 +3,16 @@ import type { SearchPage } from '@collab-docs/shared';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isApiError } from '@/lib/api/errors';
-import { searchDocuments } from '@/lib/workspaces/data';
+import { searchDocuments, searchSharedDocuments } from '@/lib/workspaces/data';
 import { formatRelative } from '@/lib/workspaces/labels';
 import { Snippet } from './snippet';
 
-const searchHref = (workspaceId: string, q: string, cursor?: string) => {
+/** `workspaceId` null: the search of the documents shared with the user, on the "Shared with me" page. */
+const searchHref = (workspaceId: string | null, q: string, cursor?: string) => {
   const params = new URLSearchParams({ q });
   if (cursor) params.set('cursor', cursor);
-  return `/workspaces/${workspaceId}/search?${params.toString()}`;
+  const page = workspaceId === null ? '/shared' : `/workspaces/${workspaceId}/search`;
+  return `${page}?${params.toString()}`;
 };
 
 export function SearchResultsSkeleton() {
@@ -33,7 +35,7 @@ export function SearchResultList({
   isFirstPage,
   page,
 }: {
-  workspaceId: string;
+  workspaceId: string | null;
   q: string;
   isFirstPage: boolean;
   page: SearchPage;
@@ -57,7 +59,7 @@ export function SearchResultList({
           <li key={item.id}>
             <Link
               data-search-result
-              href={`/workspaces/${workspaceId}/documents/${item.id}`}
+              href={`/workspaces/${item.workspaceId}/documents/${item.id}`}
               className="grid gap-1 px-4 py-3 outline-none hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <span className="font-medium">{item.title || 'Untitled'}</span>
@@ -98,13 +100,16 @@ export async function SearchResults({
   q,
   cursor,
 }: {
-  workspaceId: string;
+  workspaceId: string | null;
   q: string;
   cursor?: string;
 }) {
   let page: SearchPage;
   try {
-    page = await searchDocuments(workspaceId, q, cursor);
+    page =
+      workspaceId === null
+        ? await searchSharedDocuments(q, cursor)
+        : await searchDocuments(workspaceId, q, cursor);
   } catch (error) {
     if (!isApiError(error)) throw error;
     return (

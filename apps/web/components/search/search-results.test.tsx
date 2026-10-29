@@ -21,6 +21,7 @@ const page = (overrides: Partial<SearchPage> = {}): SearchPage => ({
   items: [
     {
       id: DOCUMENT,
+      workspaceId: WORKSPACE,
       title: 'Quarterly plan',
       snippet: [
         { text: 'the ', match: false },
@@ -44,6 +45,29 @@ describe('SearchResultList', () => {
     expect(marks).toHaveLength(1);
   });
 
+  it('links a shared result to its own workspace and pages through /shared', () => {
+    const other = '0198a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a99';
+    render(
+      <SearchResultList
+        workspaceId={null}
+        q="plan"
+        isFirstPage
+        page={page({
+          items: [{ ...page().items[0]!, workspaceId: other }],
+          nextCursor: 'next-page',
+        })}
+      />,
+    );
+    expect(screen.getByRole('link', { name: /Quarterly plan/ })).toHaveAttribute(
+      'href',
+      `/workspaces/${other}/documents/${DOCUMENT}`,
+    );
+    expect(screen.getByRole('link', { name: 'More results' })).toHaveAttribute(
+      'href',
+      '/shared?q=plan&cursor=next-page',
+    );
+  });
+
   it('shows markup in a title or snippet as text', () => {
     const hostile = '<img src=x onerror=alert(1)>';
     const { container } = render(
@@ -55,6 +79,7 @@ describe('SearchResultList', () => {
           items: [
             {
               id: DOCUMENT,
+              workspaceId: WORKSPACE,
               title: hostile,
               snippet: [{ text: hostile, match: true }],
               updatedAt: '2020-01-01T00:00:00.000Z',

@@ -82,3 +82,12 @@ export const searchDocuments = cache((id: string, q: string, cursor?: string) =>
     schema: searchPageSchema,
   });
 });
+
+/** Search of the documents shared with the user, in any workspace (a guest has no workspace to search). */
+export const searchSharedDocuments = cache((q: string, cursor?: string) => {
+  const params = new URLSearchParams({ q });
+  if (cursor) params.set('cursor', cursor);
+  return apiServer(`/me/shared-documents/search?${params.toString()}`, {
+    schema: searchPageSchema,
+  });
+});
