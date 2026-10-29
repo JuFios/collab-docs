@@ -37,7 +37,7 @@ sequenceDiagram
 | `POST /billing/webhooks/mock`                                  | the provider | Public, signed. `200 { received: true }`, or `200 { duplicate: true }`; `401 WEBHOOK_SIGNATURE_INVALID`; `503` if it could not queue.                                      |
 | `GET /mock-provider/checkout-sessions/:id`                     | public       | What the payment page shows (plan, amount, status, workspace).                                                                                                             |
 | `POST /mock-provider/checkout-sessions/:id/complete`, `…/fail` | public       | The customer pays / the payment is declined. `202 { eventId }`. A session has one outcome; a second call is `409`.                                                         |
-| `POST /mock-provider/events/:id/redeliver`                     | public       | Delivers an issued event again (the "resend" button of a provider dashboard).                                                                                              |
+| `POST /mock-provider/events/:id/redeliver`                     | public       | Delivers an issued event again (the "resend" button of a provider dashboard). An id that is not `evt_` + 32 hex characters is `404`.                                       |
 
 The mock provider's routes are public like a hosted checkout page is: the id of a checkout session is a random
 UUID v4 and is all it takes to pay for that session. `BILLING_PROVIDER=mock` (the only value, and the default in

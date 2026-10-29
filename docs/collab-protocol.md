@@ -90,7 +90,10 @@ Sync step 2 and update messages from a client are applied to the room's `Y.Doc` 
   `COLLAB_MAX_DOCUMENT_BYTES`. The room estimates the size as the encoded state at load plus every update applied
   since; that sum also counts deleted content, so before it refuses an update the room encodes the document and
   measures it again whenever an update was applied since the last measurement (a document that really is full is
-  encoded once, not on every refused keystroke),
+  encoded once, not on every refused keystroke). Updates Yjs holds back because one they build on has not
+  arrived count towards that size too, since they join the document as soon as it does; if they outgrow
+  `COLLAB_MAX_UPDATE_BYTES` they are dropped and the sender is refused with `too_large` (a client on one socket
+  sends its updates in order and never produces them),
 - it decodes as a whole before anything is applied, so a malformed update never reaches the document, the other
   clients or the store, and
 - the connection has had no update refused before (see `rejected` above), and
