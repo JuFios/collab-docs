@@ -42,6 +42,15 @@ beforeEach(() => {
   apiServer.mockResolvedValue(undefined);
 });
 
+/** The switcher is refreshed through the signed-in app's layouts; the root layout (and so every published page) is left alone. */
+function expectAppRefreshed(): void {
+  expect(revalidatePath.mock.calls).toEqual([
+    ['/workspaces', 'layout'],
+    ['/shared', 'layout'],
+    ['/notifications', 'layout'],
+  ]);
+}
+
 describe('inviteMemberAction', () => {
   const valid = { workspaceId: WS, email: ' Grace@Example.com ', role: 'EDITOR' };
 
@@ -58,7 +67,7 @@ describe('inviteMemberAction', () => {
       method: 'POST',
       body: { email: 'grace@example.com', role: 'EDITOR' },
     });
-    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expectAppRefreshed();
     expect(state).toEqual({ ok: true, notice: 'Invitation sent to grace@example.com.' });
   });
 
@@ -111,7 +120,7 @@ describe('createWorkspaceAction', () => {
     );
     expect(redirect).toHaveBeenCalledWith(`/workspaces/${WS}`);
     // the navbar switcher lists the new workspace
-    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expectAppRefreshed();
     // the middleware does not see the page the redirect renders, so the action remembers the workspace itself
     expect(cookieJar.set).toHaveBeenCalledWith(
       'cd_ws',
@@ -144,7 +153,7 @@ describe('renameWorkspaceAction', () => {
       expect.objectContaining({ method: 'PATCH', body: { name: 'New' } }),
     );
     expect(state).toEqual({ ok: true, notice: 'Workspace renamed.', values: { name: 'New' } });
-    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expectAppRefreshed();
   });
 
   it('reports a missing permission with the server message', async () => {
@@ -189,7 +198,7 @@ describe('member and invite actions', () => {
       method: 'DELETE',
     });
     expect(result).toEqual({ ok: true, notice: 'Invitation revoked.' });
-    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expectAppRefreshed();
   });
 });
 

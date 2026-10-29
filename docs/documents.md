@@ -19,7 +19,7 @@ in `documents.position` (`COLLATE "C"`), so a reorder rewrites one row and never
   `deleted_root_id`. A page takes its subpages with it, so the caller needs `EDIT` on every page of the subtree
   (resolved per page with the same rules as any access check, inside the transaction): an editor of a parent
   cannot trash a restricted subpage that was not shared with them, or one they may only view. Otherwise the answer
-  is `403` with `details: { reason: 'SUBTREE_NOT_EDITABLE', blocked }` and a message the app shows as it is, and
+  is `403` with `details: { reason: 'SUBTREE_NOT_EDITABLE' }` and a message the app shows as it is (it gives no count, which would reveal restricted subpages the caller cannot see), and
   nothing is deleted; an Owner or Admin can always delete. The trash lists the root of each deletion that the
   caller would see were it live (filtered in the query, so the 200-entry cap applies to those).
   **Restore** brings back exactly the nodes of that deletion (a child deleted earlier stays in the trash), needs

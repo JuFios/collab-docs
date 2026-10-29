@@ -18,7 +18,7 @@ import {
   encodeAwarenessUpdate,
 } from './awareness-codec';
 import type { DocumentStore } from './document-store';
-import { structureViolation } from './update-structure';
+import { heldBackViolation, structureViolation } from './update-structure';
 
 /** One WebSocket as the room sees it; the transport (and its tests) provide the implementation. */
 export interface RoomConnection {
@@ -356,9 +356,21 @@ export class DocRoom {
     try {
       // structs are integrated before the delete set is read, so a throw from applyUpdate can come too late:
       // decode first, or an update called "rejected" has already changed the document
-      const violation = structureViolation(Y.decodeUpdate(update));
+      const decoded = Y.decodeUpdate(update);
+      const violation = structureViolation(decoded, this.doc);
       if (violation) {
         return this.refuse(state, 'invalid', new Error(`outside the content model: ${violation}`));
+      }
+      // changes held back until now are integrated with this one, so they are checked against it
+      const heldViolation = heldBackViolation(decoded, this.doc);
+      if (heldViolation) {
+        this.doc.store.pendingStructs = null;
+        this.doc.store.pendingDs = null;
+        return this.refuse(
+          state,
+          'invalid',
+          new Error(`held-back change outside the content model: ${heldViolation}`),
+        );
       }
       // the version keeps what the change replaces; encoded only when one may be due, not on every keystroke
       const now = this.clock();

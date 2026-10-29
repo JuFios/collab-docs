@@ -301,7 +301,7 @@ test.describe('document tree', () => {
     await editor.getByRole('menuitem', { name: 'Move to trash' }).click();
     await editor.getByRole('dialog').getByRole('button', { name: 'Move to trash' }).click();
 
-    await expect(editor.getByText(/has a subpage you cannot edit/)).toBeVisible();
+    await expect(editor.getByText(/has subpages you cannot edit/)).toBeVisible();
     await editor.reload();
     await expect(editor.getByRole('treeitem', { name: 'Shared parent' })).toBeVisible();
     // the restricted subpage is untouched

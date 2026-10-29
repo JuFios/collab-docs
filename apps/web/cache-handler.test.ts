@@ -55,6 +55,12 @@ describe('ISR cache handler', () => {
     expect(await one.get('fetch-key', { kind: 'FETCH', tags: ['doc:8'] })).not.toBeNull();
   });
 
+  it('lets the revalidation marks expire with the entries they could invalidate', async () => {
+    const store = new MemoryStore();
+    await new CacheHandler({}, store).revalidateTag(['doc:1', 'pub:a']);
+    expect([...store.expiries.values()]).toEqual([30 * 24 * 3600]);
+  });
+
   it('treats a store that fails as a miss and drops the write, but reports a lost revalidation', async () => {
     const broken = {
       get: () => Promise.reject(new Error('down')),
@@ -62,6 +68,7 @@ describe('ISR cache handler', () => {
       del: () => Promise.reject(new Error('down')),
       hmget: () => Promise.reject(new Error('down')),
       hset: () => Promise.reject(new Error('down')),
+      expire: () => Promise.reject(new Error('down')),
     };
     const handler = new CacheHandler({}, broken);
     expect(await handler.get('/x', {})).toBeNull();

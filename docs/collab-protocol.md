@@ -76,6 +76,15 @@ state.
   hostile client therefore cannot store a `<script>` element or an `onclick` attribute at all, instead of relying on
   the sanitiser that strips them on the way out. Values are not checked here (an `href` with `javascript:` is only
   text in the document); the sanitiser still runs before anything is rendered or indexed.
+  Yjs omits the parent of an item inserted next to another, so the container of each item is found through that
+  neighbour (in the update, in the changes the room holds back, or in the document), and the item is checked
+  against it: nesting follows `children` of `NODE_SPECS`, attributes follow `attrs` of the node, the position map
+  holds plain data under `client:clock` keys. Changes held back for a missing dependency are checked again when it
+  arrives and dropped if they do not fit. Known limits: marks inside a code block are not rejected, and the
+  attributes y-tiptap writes for the marks of a mention or a line break (named after the mark) are accepted on every
+  node. **Any difference between this model and what the editor writes now refuses the edit instead of being
+  cleaned on the way out**, so a change to the editor's schema (`components/editor/extensions.ts`) goes with a change
+  to `NODE_SPECS` and to this check.
 
 ## Presence
 

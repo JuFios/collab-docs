@@ -18,7 +18,7 @@ Server Component is the default: anything that reads data and needs no browser s
 | `components/workspaces/leave-workspace-button.tsx`                                                          | Confirmation dialog; the action runs from an event handler, then navigation and refresh                                                      |
 | `components/workspaces/workspace-switcher.tsx`                                                              | Radix menu; the current workspace comes from the pathname, the list arrives as typed props                                                   |
 | `components/workspaces/workspace-nav.tsx`                                                                   | `usePathname` marks the active section                                                                                                       |
-| `components/workspaces/use-action-feedback.ts`, `use-validated-action.ts`                                   | Hooks: success toast and plan-limit event; `useActionState` that runs the zod schema in the browser before calling the action                |
+| `components/workspaces/use-action-feedback.ts`                                                              | Hook: success toast and plan-limit event after an action                                                                                     |
 | `components/workspaces/workspace-provider.tsx`                                                              | Owns the tab's single SSE connection and hands the workspace role, the initial tree and the connection state to the sidebar                  |
 | `components/documents/document-tree.tsx`, `tree-row.tsx`, `workspace-sidebar.tsx`                           | TanStack Query, drag and drop (pointer events), roving focus and keyboard handling; none of it exists on the server                          |
 | `components/documents/document-shell.tsx`, `document-title.tsx`, `document-gone.tsx`                        | Debounced inline title, live refetch when the document is renamed or deleted elsewhere, restore button                                       |
@@ -292,9 +292,8 @@ Server Actions call the api through `lib/api/server.ts` (cookies, `x-forwarded-f
 their input with the zod schemas of `@collab-docs/shared` (arguments of actions that are not form posts are
 validated too, since they are public endpoints), and report failures as data (`ActionState`): field errors,
 a plain-language plan-limit explanation (`PLAN_LIMIT_EXCEEDED` also fires the window event the limit dialog
-listens to), or a generic message. Forms run the same schema in the browser first, inside the action
-function (`use-validated-action.ts`), so field errors appear without a round trip. Authorization is always the
-api's; hiding admin controls in the UI is convenience only.
+listens to), or a generic message. Forms are checked on the server only (the action parses the same schema), so
+they behave the same with and without JavaScript. Authorization is always the api's; hiding admin controls in the UI is convenience only.
 
 **Forms work without JavaScript.** Every form posts to its Server Action directly (`useActionState(action)`, no
 client-side wrapper), and the action finishes the job on the server: `redirect` after creating a workspace,
@@ -309,8 +308,8 @@ Two things make this hold:
 
 - **Pages with forms are not streamed.** A `loading.tsx` (or any `<Suspense>`) above a page makes Next send the
   skeleton first and the content later, in a hidden element that an inline script reveals; without JavaScript only
-  the skeleton is ever shown. The workspace list, settings, billing, the invitation and the mock payment page
-  therefore have no `loading.tsx` and render in one piece; the route-state audit (`app/route-states.test.ts`) fails
+  the skeleton is ever shown. The workspace list, settings, billing, the invitation, the mock payment page and the email
+  confirmation page therefore have no `loading.tsx` and render in one piece; the route-state audit (`app/route-states.test.ts`) fails
   if one gets a boundary back. While JavaScript navigates to one of them, the link that was clicked shows the wait
   (`useLinkStatus`, `components/link-pending.tsx`) instead of a skeleton. The dashboard keeps its streamed blocks
   (it has no form), with its skeleton scoped to the `(overview)` route group so that it does not wrap the pages

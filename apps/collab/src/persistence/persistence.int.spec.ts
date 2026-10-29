@@ -268,7 +268,9 @@ describe('document persistence', () => {
       expect(metrics).toMatch(/collab_bad_log_rows_total [1-9]/);
 
       // the room keeps working
-      client.doc.getXmlFragment('content').insert(1, [new Y.XmlText('more')]);
+      const added = new Y.XmlElement('paragraph');
+      added.insert(0, [new Y.XmlText('more')]);
+      client.doc.getXmlFragment('content').insert(1, [added]);
       await internal('flush', { documentId: documentId });
       expect(await content(documentId)).toContain('more');
     });

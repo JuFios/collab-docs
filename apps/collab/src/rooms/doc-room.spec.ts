@@ -350,6 +350,24 @@ describe('DocRoom', () => {
       expect(enqueue).not.toHaveBeenCalled();
     });
 
+    it('refuses a type written over an entry the room already holds', () => {
+      const { room, observer } = setup();
+      const sender = new TestClient(room);
+      sender.join();
+      sender.settle();
+      const positions = sender.doc.getMap('__tiptap_position_migrations:root:content');
+      positions.set('1:2', 1);
+      sender.settle();
+      expect(observer.rejected).toEqual([]);
+
+      // the new item has an origin, so Yjs leaves out its parent: it is found through the entry it replaces
+      positions.set('1:2', new Y.Text('junk'));
+      sender.settle();
+
+      expect(observer.rejected).toEqual(['invalid']);
+      expect(room.doc.getMap('__tiptap_position_migrations:root:content').get('1:2')).toBe(1);
+    });
+
     it('refuses updates that would push the document past its size limit', () => {
       const { room, observer } = setup({ maxDocumentBytes: 300 });
       const client = new TestClient(room);

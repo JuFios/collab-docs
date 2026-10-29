@@ -61,14 +61,15 @@ family (`family_id`). The rotation claim is a single conditional `UPDATE ... WHE
 two parallel refreshes with the same token exactly one rotates. A rotated token that is presented again within
 10 s **by the client that rotated it** (parallel requests, several tabs, a response lost on the wire) only yields
 a new access token and no second rotation, so the user is not logged out by a race. The client is the SHA-256
-of the User-Agent and the address the api resolves through its trusted proxies (`rotated_by`; nothing about the
-client is stored in the clear). Presented by another client, or later, a rotated token means it was copied: the
+of the User-Agent and the network of the address the api resolves through its trusted proxies: the /24 of an
+IPv4 address, the /64 of an IPv6 one (`rotated_by`; nothing about the client is stored in the clear). Presented by another client, or later, a rotated token means it was copied: the
 whole family is revoked, the request gets `401`, and `auth.refresh_reuse_detected` is logged with the reason
 (`other_client` or `after_grace`). Logout revokes the family too.
 
-The trade-off: a thief who copied the cookie and also matches the victim's browser and address (the same network
-behind one NAT) can still use it within those 10 s, and a phone that switches networks in the middle of a refresh
-race is logged out. A shorter window would make the second case likelier without removing the first; binding the
+The trade-off: a thief who copied the cookie and also matches the victim's browser and network (the same /24 or
+/64, e.g. behind one NAT) can still use it within those 10 s. A phone that switches networks in the middle of a
+refresh race is logged out, and so is a browser whose parallel refreshes leave over IPv4 and IPv6 (dual-stack
+connection racing): the families are different networks, and merging them would mean trusting any address. A shorter window would make the second case likelier without removing the first; binding the
 token to a key held by the browser (DPoP) would remove both and is out of scope.
 
 **CSRF.** `SameSite=Lax` plus a global guard: a state-changing request authenticated by cookies (`cd_at` or

@@ -61,6 +61,10 @@ export class MemoryStore {
   constructor() {
     this.strings = new Map();
     this.hashes = new Map();
+    this.expiries = new Map();
+  }
+  async expire(key, seconds) {
+    this.expiries.set(key, seconds);
   }
   async get(key) {
     return this.strings.get(key) ?? null;
@@ -149,6 +153,8 @@ export default class CacheHandler {
     const now = Date.now();
     try {
       await this.store.hset(this.tagsKey, Object.fromEntries(list.map((tag) => [tag, now])));
+      // a mark older than every entry invalidates nothing, so the hash of a finished build goes away with them
+      await this.store.expire(this.tagsKey, ENTRY_TTL_SECONDS);
     } catch (error) {
       // the caller must know: a revalidation that was not recorded leaves stale pages behind
       warn('revalidate', error);

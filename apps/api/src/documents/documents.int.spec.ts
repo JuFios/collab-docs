@@ -576,8 +576,8 @@ describe('documents', () => {
       const refused = await as(team.editor).delete(`/documents/${parent.id}`).expect(403);
       expect(refused.body).toMatchObject({
         code: 'FORBIDDEN',
-        message: expect.stringContaining('2 subpages you cannot edit'),
-        details: { reason: 'SUBTREE_NOT_EDITABLE', blocked: 2 },
+        message: expect.stringContaining('subpages you cannot edit'),
+        details: { reason: 'SUBTREE_NOT_EDITABLE' },
       });
       const live = await prisma.document.count({
         where: { id: { in: [parent.id, open.id, hidden.id, readOnly.id] }, deletedAt: null },
