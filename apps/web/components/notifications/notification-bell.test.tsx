@@ -221,6 +221,23 @@ describe('NotificationBell', () => {
     expect(menu.querySelector('img, script')).toBeNull();
   });
 
+  it('shows the loading state as a disabled menu item, with nothing a menu may not contain', async () => {
+    request.mockImplementation((path: string) =>
+      path === '/notifications/unread-count'
+        ? Promise.resolve({ count: 0 })
+        : new Promise(() => undefined),
+    );
+    const user = userEvent.setup();
+    mount(0);
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: /Loading notifications/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(within(menu).queryByRole('status')).toBeNull();
+  });
+
   it('offers a retry when the list cannot be loaded', async () => {
     request.mockImplementation((path: string) =>
       path === '/notifications/unread-count'
@@ -230,7 +247,8 @@ describe('NotificationBell', () => {
     const user = userEvent.setup();
     mount(0);
     await user.click(screen.getByRole('button', { name: 'Notifications' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load notifications');
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(await screen.findByText('Could not load notifications.')).toBeInTheDocument();
+    // a menu item, not a button: a menu may only contain items, labels and separators
+    expect(screen.getByRole('menuitem', { name: 'Try again' })).toBeInTheDocument();
   });
 });

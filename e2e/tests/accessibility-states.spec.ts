@@ -149,6 +149,9 @@ for (const viewport of VIEWPORTS) {
       await page.goto(`/workspaces/${workspaceId}/billing`);
       await page.getByRole('button', { name: 'Upgrade to Pro' }).click();
       await expect(page).toHaveURL(/\/mock-checkout\//);
+      // the URL changes while the route's loading state is shown; the page and its title arrive after it
+      await expect(page.getByRole('heading', { name: 'Collab Docs Pro' })).toBeVisible();
+      await expect(page).toHaveTitle(/Checkout/);
       await check('checkout');
 
       expect(problems, problems.join('\n')).toEqual([]);

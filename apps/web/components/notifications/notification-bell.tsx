@@ -1,9 +1,8 @@
 'use client';
 
-import { Bell } from 'lucide-react';
+import { Bell, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { LoadingState } from '@/components/states';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -72,14 +71,28 @@ export function NotificationBell({ initialCount }: { initialCount?: number }) {
             </DropdownMenuItem>
           ) : null}
         </div>
-        {list.isPending && open ? <LoadingState label="Loading notifications…" /> : null}
+        {/* a menu may only hold menu items, labels and separators, so the states are built from those */}
+        {list.isPending && open ? (
+          <DropdownMenuItem disabled className="justify-center py-6 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Loading notifications…
+          </DropdownMenuItem>
+        ) : null}
         {list.isError ? (
-          <div role="alert" className="grid gap-2 px-2 py-3 text-sm">
-            <p className="text-destructive">Could not load notifications.</p>
-            <Button type="button" variant="outline" size="sm" onClick={() => void list.refetch()}>
+          <>
+            <DropdownMenuLabel className="font-normal text-destructive">
+              Could not load notifications.
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                // keeps the menu open, so the list replaces the error in place
+                event.preventDefault();
+                void list.refetch();
+              }}
+            >
               Try again
-            </Button>
-          </div>
+            </DropdownMenuItem>
+          </>
         ) : null}
         {list.data && items.length === 0 ? (
           <p className="px-2 py-6 text-center text-sm text-muted-foreground">
