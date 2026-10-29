@@ -543,6 +543,31 @@ describe('collab gateway', () => {
       await waitFor(() => client.closes.includes(COLLAB_CLOSE.forbidden), 'the 4403 close');
     });
 
+    it('closes the socket of a removed member who held a share, once the share goes with the membership', async () => {
+      const { editor, workspace, documentId } = await setup();
+      await prisma.document.update({ where: { id: documentId }, data: { visibility: 'RESTRICTED' } });
+      await prisma.documentShare.create({ data: { documentId, userId: editor.id, role: 'EDITOR' } });
+      const client = await connect(editor, documentId);
+      await waitFor(() => client.synced, 'sync');
+      // what the api's removal does in one transaction
+      await prisma.$transaction([
+        prisma.workspaceMember.delete({
+          where: { workspaceId_userId: { workspaceId: workspace.id, userId: editor.id } },
+        }),
+        prisma.documentShare.deleteMany({
+          where: { userId: editor.id, document: { workspaceId: workspace.id } },
+        }),
+      ]);
+      await publish(PERM_EVENT_CHANNELS.permChanged, {
+        workspaceId: workspace.id,
+        userId: editor.id,
+        reason: 'member_removed',
+      });
+      await waitFor(() => client.closes.includes(COLLAB_CLOSE.forbidden), 'the 4403 close');
+      const ticket = await signCollabTicket(SECRET, { docId: documentId, sub: editor.id });
+      await expect(closeCodeOf(documentId, ticket)).resolves.toBe(COLLAB_CLOSE.forbidden);
+    });
+
     it('re-evaluates everybody when a document changes visibility (no user in the event)', async () => {
       const { editor, viewer, workspace, documentId } = await setup();
       const a = await connect(editor, documentId);

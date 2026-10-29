@@ -130,6 +130,10 @@ export class MembersService {
       await tx.workspaceMember.delete({
         where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
       });
+      // A share would otherwise keep a former member in as a guest of the documents shared with them.
+      await tx.documentShare.deleteMany({
+        where: { userId: targetUserId, document: { workspaceId } },
+      });
     });
     logEvent(this.logger, 'member.removed', {
       workspaceId,

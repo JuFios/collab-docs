@@ -401,6 +401,49 @@ describe('workspaces, members, invites', () => {
       expect(owners).toBe(1);
     });
 
+    it('takes away the documents shared with a removed member, and a member who leaves', async () => {
+      const team = await setupTeam();
+      const base = `/workspaces/${team.workspaceId}/members`;
+      const restricted = async () => {
+        const doc = await as(team.owner)
+          .post(`/workspaces/${team.workspaceId}/documents`)
+          .send({ title: 'Payroll' })
+          .expect(201);
+        const id = (doc.body as { id: string }).id;
+        await as(team.owner).patch(`/documents/${id}`).send({ visibility: 'RESTRICTED' }).expect(200);
+        return id;
+      };
+      const forEditor = await restricted();
+      const forViewer = await restricted();
+      for (const [id, user] of [
+        [forEditor, team.editor],
+        [forViewer, team.viewer],
+      ] as const) {
+        await as(team.owner)
+          .post(`/documents/${id}/shares`)
+          .send({ email: user.email, role: 'EDITOR' })
+          .expect(201);
+        await as(user).get(`/documents/${id}`).expect(200);
+      }
+
+      await as(team.owner).delete(`${base}/${team.editor.id}`).expect(204);
+      await as(team.viewer).delete(`${base}/${team.viewer.id}`).expect(204);
+
+      for (const [id, user] of [
+        [forEditor, team.editor],
+        [forViewer, team.viewer],
+      ] as const) {
+        await as(user).get(`/documents/${id}`).expect(404);
+        await as(user).patch(`/documents/${id}`).send({ title: 'mine now' }).expect(404);
+        // the ticket is what opens the WebSocket
+        await as(user).post(`/documents/${id}/collab-ticket`).expect(404);
+        expect((await as(user).get('/me/shared-documents').expect(200)).body).toEqual([]);
+      }
+      expect(
+        await prisma.documentShare.count({ where: { documentId: { in: [forEditor, forViewer] } } }),
+      ).toBe(0);
+    });
+
     it('publishes perm.changed after a role change and a removal', async () => {
       const team = await setupTeam();
       const subscriber = new Redis(process.env.REDIS_URL as string);
