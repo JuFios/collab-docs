@@ -558,20 +558,41 @@ describe('documents', () => {
       ).not.toBeNull();
     });
 
-    it('deletes descendants the caller cannot see (permissions are not inherited)', async () => {
+    it('refuses to delete a page with a subpage the caller cannot edit, and trashes nothing', async () => {
       const team = await setupTeam();
       const parent = await createDoc(team.editor, team.workspaceId);
+      const open = await createDoc(team.editor, team.workspaceId, { parentId: parent.id });
       const hidden = await createDoc(team.owner, team.workspaceId, { parentId: parent.id });
-      await as(team.owner)
-        .patch(`/documents/${hidden.id}`)
-        .send({ visibility: 'RESTRICTED' })
-        .expect(200);
+      const readOnly = await createDoc(team.owner, team.workspaceId, { parentId: open.id });
+      for (const id of [hidden.id, readOnly.id]) {
+        await as(team.owner).patch(`/documents/${id}`).send({ visibility: 'RESTRICTED' }).expect(200);
+      }
+      await share(team.owner, readOnly.id, team.editor, 'VIEWER');
       await as(team.editor).get(`/documents/${hidden.id}`).expect(404);
 
+      const refused = await as(team.editor).delete(`/documents/${parent.id}`).expect(403);
+      expect(refused.body).toMatchObject({
+        code: 'FORBIDDEN',
+        message: expect.stringContaining('2 subpages you cannot edit'),
+        details: { reason: 'SUBTREE_NOT_EDITABLE', blocked: 2 },
+      });
+      const live = await prisma.document.count({
+        where: { id: { in: [parent.id, open.id, hidden.id, readOnly.id] }, deletedAt: null },
+      });
+      expect(live).toBe(4);
+
+      // with EDIT on every page of the subtree it goes, and an owner or admin can always delete
+      await share(team.owner, hidden.id, team.editor, 'EDITOR');
+      await share(team.owner, readOnly.id, team.editor, 'EDITOR');
       await as(team.editor).delete(`/documents/${parent.id}`).expect(204);
       expect(
-        (await prisma.document.findUnique({ where: { id: hidden.id } }))?.deletedAt,
-      ).not.toBeNull();
+        await prisma.document.count({ where: { deletedRootId: parent.id, deletedAt: { not: null } } }),
+      ).toBe(4);
+
+      const other = await createDoc(team.editor, team.workspaceId);
+      const secret = await createDoc(team.owner, team.workspaceId, { parentId: other.id });
+      await as(team.owner).patch(`/documents/${secret.id}`).send({ visibility: 'RESTRICTED' }).expect(200);
+      await as(team.admin).delete(`/documents/${other.id}`).expect(204);
     });
   });
 

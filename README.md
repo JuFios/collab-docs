@@ -403,9 +403,9 @@ than gaps.
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.
 - Sharing is not inherited down the tree _by design_: a child copies its parent's visibility and shares when it is created and is independent
-  afterwards. Deleting a document trashes its whole subtree _by design_ (as in Notion), restricted subpages the caller
-  cannot edit or see included; restoring those needs an Owner or Admin, or the author. A guest who holds an edit link
-  cannot comment.
+  afterwards. Deleting a document trashes its whole subtree (as in Notion), so it needs `EDIT` on every subpage; a
+  page with a subpage the caller cannot edit is refused with an explanation. A guest who holds an edit link cannot
+  comment.
 - Billing is a mock: no renewals, proration, taxes, payment methods, dunning or refunds (a payment overtaken by a newer
   event or checkout is invoiced and logged as `billing.payment_not_applied`, not refunded). The 80 % usage warning is shown on the meters, but nothing warns before the action that would cross it.
 - Search has no typo tolerance and no stemming (Postgres ships no Ukrainian dictionary); a trigram index on titles exists

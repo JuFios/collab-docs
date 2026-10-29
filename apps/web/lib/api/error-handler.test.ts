@@ -51,6 +51,20 @@ describe('mutation errors', () => {
     expect(toastError.mock.calls[1]?.[0]).toMatch(/Too many requests/);
   });
 
+  it('shows the words of a 403 that gives its reason', () => {
+    const { onMutationError, toastError } = setup();
+    onMutationError(
+      new ApiError(403, 'FORBIDDEN', 'This page has a subpage you cannot edit', 'c-3', {
+        reason: 'SUBTREE_NOT_EDITABLE',
+        blocked: 1,
+      }),
+    );
+    expect(toastError).toHaveBeenCalledWith(
+      'This page has a subpage you cannot edit',
+      'Reference: c-3',
+    );
+  });
+
   it('stays silent on 401 (the client already redirected) and toasts unknown errors generically', () => {
     const { onMutationError, toastError } = setup();
     onMutationError(new ApiError(401, 'UNAUTHENTICATED', 'x'));
