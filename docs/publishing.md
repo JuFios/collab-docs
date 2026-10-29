@@ -85,6 +85,14 @@ flowchart LR
 - Contract of `POST {WEB_INTERNAL_URL}/internal/revalidate`: header `x-revalidate-secret`, body
   `{tags: ["pub:<slug>"]}` (`revalidateRequestSchema` in `@collab-docs/shared`, up to 20 tags).
 - Because the tag is derived from the slug, the web app needs nothing but the slug to cache or invalidate a page.
+- **Several web replicas.** `revalidateTag` acts on the cache of the process that runs it, and the worker's call
+  reaches one replica. The ISR cache therefore lives in Redis (`apps/web/cache-handler.mjs`, `cacheHandler` in
+  `next.config.ts`, the approach of the Next.js self-hosting guide), with the in-process memory cache off: an entry
+  is stored with the time it was written and a revalidated tag with the time of its revalidation, and an entry with
+  a tag revalidated at or after it was written is a miss on every replica, as in Next's own file-system cache.
+  Keys carry the build id, so a deployment never serves the pages of the previous one. Without `REDIS_URL` (a build,
+  `next dev`) the handler keeps a per-process map; when Redis is down a read is a miss (the page is rendered) and a
+  lost revalidation fails the call, which the worker retries.
 
 **Expiry.** Moving or setting `expiresAt` plans a delayed job in `link-expiry` (one per link and expiry time;
 the old one is removed). When it runs it logs `public_link.expired`, then invalidates the page of a `VIEW` link or

@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
   },
   // trace workspace packages from the monorepo root so the standalone bundle includes them
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // one ISR cache for every replica, in Redis (cache-handler.mjs); the per-process memory layer would hide a
+  // revalidation done by another replica
+  cacheHandler: path.join(__dirname, 'cache-handler.mjs'),
+  cacheMaxMemorySize: 0,
   reactStrictMode: true,
   poweredByHeader: false,
   async rewrites() {

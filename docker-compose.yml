@@ -209,6 +209,8 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-jwt-access-secret-change-me}
       # authorises the worker's POST /internal/revalidate (read at request time)
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:-dev-only-revalidate-secret-change-me}
+      # the ISR cache shared by every web replica (apps/web/cache-handler.mjs)
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       # test hook: delays every dashboard block so the streaming test can see skeletons first (0 = off, ignored in staging)
       DASHBOARD_BLOCK_DELAY_MS: ${DASHBOARD_BLOCK_DELAY_MS:-0}
     # not published: browsers reach it through `proxy`, which owns X-Forwarded-For
@@ -218,6 +220,8 @@ services:
       default:
         ipv4_address: ${NETWORK_PREFIX:-10.89.0}.11
     depends_on:
+      redis:
+        condition: service_healthy
       api:
         condition: service_healthy
       collab:

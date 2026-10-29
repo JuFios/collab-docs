@@ -218,7 +218,9 @@ index is, and `reindex` rebuilds it. Details, query semantics and language behav
 The worker (`public-revalidate`, debounced 3 s for content, immediate for publish / unpublish / expiry) calls the web app's
 `POST /internal/revalidate` with a shared secret and the tag `pub:<slug>`. The call is retried with backoff, and after an
 unpublish or expiry the job verifies the page really answers 404, because Next may store a render started before the
-invalidation. Editing never waits for any of this: the editor only enqueues. Details: [Publishing](docs/publishing.md).
+invalidation. Editing never waits for any of this: the editor only enqueues. The ISR cache itself is in Redis
+(`apps/web/cache-handler.mjs`), so a revalidation received by one web replica holds for all of them. Details:
+[Publishing](docs/publishing.md).
 
 ## Security
 
