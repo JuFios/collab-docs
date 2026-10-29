@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
-import { WorkspacesModule } from '../workspaces/workspaces.module';
+import { PlanLimitsModule } from '../workspaces/plan-limits.module';
 import { AttachmentCleanupProcessor } from './attachment-cleanup.processor';
 import { AttachmentSweeper } from './attachment-sweeper';
 import { AttachmentAccessGuard } from './attachment-access';
@@ -11,7 +11,7 @@ import { DocumentAttachmentsController } from './document-attachments.controller
 import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [StorageModule, WorkspacesModule, PermissionsModule],
+  imports: [StorageModule, PlanLimitsModule, PermissionsModule],
   controllers: [DocumentAttachmentsController, AttachmentsController],
   providers: [AttachmentsService, AttachmentSweeper, AttachmentAccessGuard],
   exports: [AttachmentSweeper],
