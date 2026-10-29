@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DocumentStateReader, Prisma } from '@collab-docs/db';
+import { Prisma } from '@collab-docs/db';
 import {
   type MentionWarning,
   MENTIONABLE_MAX_RESULTS,
@@ -8,9 +8,9 @@ import {
   parseMentions,
   stripMentions,
 } from '@collab-docs/shared';
-import { extractBlockIds, yDocToContentJson } from '@collab-docs/shared/content';
 import { AppException, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CommentBlocksService } from './comment-blocks.service';
 import { viewableDocumentSql } from '../permissions/document-access-sql';
 import { PermissionsService, notFound } from '../permissions/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,7 +52,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
-    private readonly reader: DocumentStateReader,
+    private readonly blocks: CommentBlocksService,
     private readonly notifications: NotificationsService,
     @InjectPinoLogger(CommentsService.name) private readonly logger: PinoLogger,
   ) {}
@@ -69,7 +69,7 @@ export class CommentsService {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       include: threadInclude,
     });
-    const blockIds = threads.length > 0 ? await this.currentBlockIds(documentId) : null;
+    const blockIds = threads.length > 0 ? await this.blocks.of(documentId) : null;
     return threads.map((thread) =>
       toThread(thread, blockIds !== null && !blockIds.has(thread.blockId)),
     );
@@ -201,7 +201,7 @@ export class CommentsService {
         include: threadInclude,
       });
     });
-    const blockIds = await this.currentBlockIds(updated.documentId);
+    const blockIds = await this.blocks.of(updated.documentId);
     return toThread(updated, blockIds !== null && !blockIds.has(updated.blockId));
   }
 
@@ -223,24 +223,6 @@ export class CommentsService {
         AND (u.name ILIKE ${pattern} ESCAPE '\\' OR u.email ILIKE ${pattern} ESCAPE '\\')
       ORDER BY lower(u.name), u.id
       LIMIT ${MENTIONABLE_MAX_RESULTS}`;
-  }
-
-  /** `null` when the stored state cannot be read: the list is still useful without the orphan flags. */
-  private async currentBlockIds(documentId: string): Promise<Set<string> | null> {
-    try {
-      const doc = await this.reader.readDoc(documentId);
-      try {
-        return new Set(extractBlockIds(yDocToContentJson(doc)));
-      } finally {
-        doc.destroy();
-      }
-    } catch (error) {
-      this.logger.warn(
-        { err: error, documentId },
-        'could not read the document to flag orphaned threads',
-      );
-      return null;
-    }
   }
 
   /** Just enough to address a reply: the thread exists and still has a comment. */
