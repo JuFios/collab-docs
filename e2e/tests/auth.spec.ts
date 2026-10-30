@@ -37,6 +37,7 @@ test.describe('authentication', () => {
     // until the address is confirmed nobody can share a document with it, and the app says so
     const notice = page.getByRole('status').filter({ hasText: 'Confirm your email address' });
     await expect(notice).toContainText(user.email);
+    await expect(notice).toContainText('can lose this address to a new registration');
     await page.goto(await confirmationLinkFor(user.email));
     await expect(page.getByText('Email address confirmed')).toBeVisible();
     await page.getByRole('link', { name: 'Go to your workspaces' }).click();

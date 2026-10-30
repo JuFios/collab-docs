@@ -46,7 +46,8 @@ The old account is **not deleted**, because it may own workspaces and documents 
 under the placeholder address `<user id>@released.invalid`, and nothing can use that address:
 
 - registering it is refused (`.invalid` never resolves, and the placeholder of an account must always be free
-  when the account is released, so nobody can register it in advance to make the release collide);
+  when the account is released, so nobody can register it in advance to make the release collide), and so is
+  inviting it, since the mail would go to a domain that does not exist and be retried;
 - sign-in with it fails like an unknown address, `GET /auth/me` and the confirmation resend answer `401`, and a
   refresh token that was issued while the release ran is revoked on its first use;
 - every refresh token of the account is revoked in the same transaction, and its pending link is void;
@@ -57,6 +58,10 @@ link or the invitation was meant for, so a confirmation that races with a releas
 or finds the account gone (`400`), and a released account joins no workspace. The release is logged as
 `auth.address_released`. The access token of the old session stays valid for its remaining 15 minutes, like any
 access token.
+
+Nothing here is silent for the user: the confirmation email and the banner shown until the address is confirmed
+both say that an account still unconfirmed 48 hours after sign-up can lose its address (`EMAIL_CONFIRMATION_HOURS`
+in `@collab-docs/shared` is the one number behind the link's life, the release and both texts).
 
 The trade-off: whoever knows an address can displace an account that stayed unconfirmed for over 48 hours, and its
 owner can no longer sign in with that address (nothing is lost, and the workspaces of the account stay with it, but

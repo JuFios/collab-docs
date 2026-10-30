@@ -16,6 +16,14 @@ describe('renderVerifyEmail', () => {
     }
   });
 
+  it('says that the address can be lost if it is not confirmed in time', () => {
+    const email = renderVerifyEmail(data);
+    for (const body of [email.html, email.text]) {
+      expect(body).toContain('within 48 hours of signing up');
+      expect(body).toContain('can lose this address to a new registration');
+    }
+  });
+
   it('escapes user-controlled values in the HTML body', () => {
     const email = renderVerifyEmail({
       ...data,

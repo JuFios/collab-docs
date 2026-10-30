@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@collab-docs/db';
-import { isReleasedEmail } from '@collab-docs/shared';
+import { EMAIL_CONFIRMATION_HOURS, isReleasedEmail } from '@collab-docs/shared';
 import {
   AppException,
   type AppConfig,
@@ -14,7 +14,7 @@ import { MailQueueService } from '../mail/mail-queue.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashToken } from './refresh-token.service';
 
-export const EMAIL_VERIFICATION_TTL_MS = 48 * 3600 * 1000;
+export const EMAIL_VERIFICATION_TTL_MS = EMAIL_CONFIRMATION_HOURS * 3600 * 1000;
 /** Well-formed tokens are 43 base64url characters (256 bits); anything else cannot match and skips the lookup. */
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const invalidLink = () =>
