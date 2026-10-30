@@ -2,6 +2,7 @@ import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Transporter, createTransport } from 'nodemailer';
 import { type AppConfig, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
+import { isReleasedAddress } from './released-address';
 
 export interface MailMessage {
   to: string;
@@ -21,6 +22,14 @@ export class MailerService implements OnApplicationShutdown {
   ) {}
 
   async send(message: MailMessage): Promise<void> {
+    // an account that gave up its address has none to write to; the job is done, not retried
+    if (isReleasedAddress(message.to)) {
+      logEvent(this.logger, 'mail.skipped', {
+        subject: message.subject,
+        reason: 'released_address',
+      });
+      return;
+    }
     try {
       await this.getTransport().sendMail({
         from: this.config.get('SMTP_FROM', { infer: true }),
