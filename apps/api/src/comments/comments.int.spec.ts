@@ -11,6 +11,7 @@ import type {
   ThreadResponse,
   CommentResponse,
 } from '@collab-docs/shared';
+import { releasedEmail } from '@collab-docs/shared';
 import { QUEUE_NAMES, QueueService } from '@collab-docs/nest';
 import { createTestApp } from '../test/test-app';
 import { confirmEmail } from '../test/confirm-email';
@@ -1060,6 +1061,24 @@ describe('comments and notifications', () => {
       const [row] = await rowsFor(team.viewer.id);
       expect(await mentions.deliver(row!.id)).toBe('skipped');
       await as(team.owner).delete(`/comments/${thread.comments[0]!.id}`).expect(204);
+      expect(await mentions.deliver(row!.id)).toBe('skipped');
+      expect(sent.length).toBe(before);
+    });
+
+    it('does not send to an account that gave up its address, and says it skipped', async () => {
+      const team = await setup();
+      const mentions = app.get(MentionMailService, { strict: false });
+      const documentId = await createDocument(team.owner, team.workspaceId);
+      await startThread(team.editor, documentId, `hi ${mention(team.viewer)}`);
+      await until(() => emailsTo(team.viewer.email).length === 1);
+      const [row] = await rowsFor(team.viewer.id);
+      const before = sent.length;
+
+      await prisma.user.update({
+        where: { id: team.viewer.id },
+        data: { email: releasedEmail(team.viewer.id) },
+      });
+
       expect(await mentions.deliver(row!.id)).toBe('skipped');
       expect(sent.length).toBe(before);
     });

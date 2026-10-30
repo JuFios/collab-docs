@@ -10,6 +10,7 @@ export class CollabMetrics implements RoomObserver, PersistenceObserver {
   private readonly applied: Counter;
   private readonly duplicate: Counter;
   private readonly rejected: Counter<'reason'>;
+  private readonly heldBackDroppedTotal: Counter;
   private readonly rateLimitedTotal: Counter;
   private readonly wsClose: Counter<'code'>;
   private readonly accessChanges: Counter<'outcome'>;
@@ -39,6 +40,11 @@ export class CollabMetrics implements RoomObserver, PersistenceObserver {
       name: 'collab_updates_rejected_total',
       help: 'Messages refused by the server, by reason',
       labelNames: ['reason'],
+      registers,
+    });
+    this.heldBackDroppedTotal = new Counter({
+      name: 'collab_held_back_dropped_total',
+      help: 'Times the changes held back for a missing dependency were discarded because one is outside the content model',
       registers,
     });
     this.rateLimitedTotal = new Counter({
@@ -119,6 +125,10 @@ export class CollabMetrics implements RoomObserver, PersistenceObserver {
 
   updateRejected(reason: RejectReason): void {
     this.rejected.inc({ reason });
+  }
+
+  heldBackDropped(): void {
+    this.heldBackDroppedTotal.inc();
   }
 
   rateLimited(): void {

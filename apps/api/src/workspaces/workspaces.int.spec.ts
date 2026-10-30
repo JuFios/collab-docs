@@ -3,12 +3,13 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import { type PrismaClient } from '@collab-docs/db';
-import { PERM_EVENT_CHANNELS, type WorkspaceRole } from '@collab-docs/shared';
+import { PERM_EVENT_CHANNELS, type WorkspaceRole, releasedEmail } from '@collab-docs/shared';
 import { MailQueueService } from '../mail/mail-queue.service';
 import { MailWorkerModule } from '../mail/mail.module';
 import { createTestApp } from '../test/test-app';
 import { confirmEmail } from '../test/confirm-email';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanLimitsService } from './plan-limits.service';
 
 const PASSWORD = 'correct-horse-battery';
 const MAILPIT_URL = process.env.MAILPIT_URL;
@@ -532,6 +533,17 @@ describe('workspaces, members, invites', () => {
       expect(revoked.body.code).toBe('INVITE_INVALID');
     });
 
+    it('does not invite the placeholder address of a released account', async () => {
+      const owner = await register();
+      const workspaceId = await createWorkspace(owner);
+      const denied = await as(owner)
+        .post(`/workspaces/${workspaceId}/invites`)
+        .send({ email: releasedEmail(owner.id), role: 'VIEWER' })
+        .expect(400);
+      expect(denied.body.code).toBe('VALIDATION_FAILED');
+      expect(await prisma.workspaceInvite.count({ where: { workspaceId } })).toBe(0);
+    });
+
     it('refuses an account with a different email, and keeps the invite usable', async () => {
       const team = await setupTeam();
       const invitee = await register('right');
@@ -581,6 +593,40 @@ describe('workspaces, members, invites', () => {
       const fresh = tokenFor(invitee.email);
       await as(invitee).post(`/invites/${fresh}/accept`).expect(200);
       await as(invitee).post(`/invites/${fresh}/accept`).expect(400);
+    });
+
+    it('joins nothing when the account lost its address while the invitation was accepted', async () => {
+      const owner = await register();
+      const invitee = await register();
+      const workspaceId = await createWorkspace(owner);
+      await as(owner)
+        .post(`/workspaces/${workspaceId}/invites`)
+        .send({ email: invitee.email, role: 'VIEWER' })
+        .expect(201);
+      const token = tokenFor(invitee.email);
+
+      // released to a new registration after the address was compared and before the acceptance ends
+      const limits = app.get(PlanLimitsService, { strict: false });
+      const check = limits.assertCanAddMember.bind(limits);
+      jest.spyOn(limits, 'assertCanAddMember').mockImplementationOnce(async (...args) => {
+        await prisma.user.update({
+          where: { id: invitee.id },
+          data: { email: releasedEmail(invitee.id), emailVerifiedAt: null },
+        });
+        return check(...args);
+      });
+
+      const denied = await as(invitee).post(`/invites/${token}/accept`).expect(403);
+      expect(denied.body.code).toBe('FORBIDDEN');
+      expect(
+        await prisma.workspaceMember.count({ where: { workspaceId, userId: invitee.id } }),
+      ).toBe(0);
+      expect(
+        await prisma.workspaceInvite.count({ where: { workspaceId, acceptedAt: { not: null } } }),
+      ).toBe(0);
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id: invitee.id } })).emailVerifiedAt,
+      ).toBeNull();
     });
 
     it('lets exactly one of two parallel accepts through', async () => {

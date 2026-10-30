@@ -49,6 +49,8 @@ export interface RoomObserver {
   updateApplied(): void;
   updateDuplicate(): void;
   updateRejected(reason: RejectReason): void;
+  /** Changes held back for a missing dependency were discarded because one of them is outside the content model. */
+  heldBackDropped(): void;
   rateLimited(): void;
 }
 
@@ -60,6 +62,7 @@ const NOOP_OBSERVER: RoomObserver = {
   updateApplied: () => undefined,
   updateDuplicate: () => undefined,
   updateRejected: () => undefined,
+  heldBackDropped: () => undefined,
   rateLimited: () => undefined,
 };
 
@@ -363,15 +366,7 @@ export class DocRoom {
       }
       // changes held back until now are integrated with this one, so they are checked against it
       const heldViolation = heldBackViolation(decoded, this.doc);
-      if (heldViolation) {
-        this.doc.store.pendingStructs = null;
-        this.doc.store.pendingDs = null;
-        return this.refuse(
-          state,
-          'invalid',
-          new Error(`held-back change outside the content model: ${heldViolation}`),
-        );
-      }
+      if (heldViolation) this.dropHeldBack(heldViolation);
       // the version keeps what the change replaces; encoded only when one may be due, not on every keystroke
       const now = this.clock();
       const before =
@@ -401,6 +396,19 @@ export class DocRoom {
       // a client repeats what it holds after reconnecting; answering says whether that is stored or still pending
       this.sendEvent(state, this.persistedEvent());
     }
+  }
+
+  /**
+   * Discards the changes Yjs holds back, because one of them does not fit the content model. The sender of the
+   * update being applied is not at fault: it only supplied what they waited for (a client can build a change on the
+   * id another client will use next), so that update is applied as usual. Nobody is told, since the author of the
+   * held-back change is not known.
+   */
+  private dropHeldBack(violation: string): void {
+    this.doc.store.pendingStructs = null;
+    this.doc.store.pendingDs = null;
+    this.observer.heldBackDropped();
+    this.warn('collab.held_back_dropped', {}, new Error(violation));
   }
 
   /** Would the document stay within its size limit with `bytes` more? */
@@ -473,17 +481,27 @@ export class DocRoom {
 
   private reject(state: ConnectionState, reason: RejectReason, error?: unknown): void {
     this.observer.updateRejected(reason);
-    this.logger.warn(
+    this.warn(
+      'collab.update_rejected',
       {
-        event: 'collab.update_rejected',
         reason,
-        documentId: this.documentId,
         connectionId: state.conn.id,
         userId: state.conn.userId,
         correlationId: state.conn.correlationId,
+      },
+      error,
+    );
+  }
+
+  private warn(event: string, fields: Record<string, unknown>, error?: unknown): void {
+    this.logger.warn(
+      {
+        event,
+        ...fields,
+        documentId: this.documentId,
         err: error instanceof Error ? error.message : undefined,
       },
-      'collab.update_rejected',
+      event,
     );
   }
 

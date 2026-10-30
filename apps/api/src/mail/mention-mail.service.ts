@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@collab-docs/db';
-import { mentionNotificationPayloadSchema } from '@collab-docs/shared';
+import { isReleasedEmail, mentionNotificationPayloadSchema } from '@collab-docs/shared';
 import { type AppConfig, InjectPinoLogger, PinoLogger, logEvent } from '@collab-docs/nest';
 import { viewableDocumentSql } from '../permissions/document-access-sql';
 import { PrismaService } from '../prisma/prisma.service';
@@ -34,6 +34,10 @@ export class MentionMailService {
       return 'skipped';
     }
     const { documentId, workspaceId, threadId, documentTitle, actor, excerpt } = payload.data;
+    if (isReleasedEmail(notification.user.email)) {
+      logEvent(this.logger, 'mail.skipped', { notificationId, reason: 'released_address' });
+      return 'skipped';
+    }
 
     const [row] = await this.prisma.$queryRaw<{ viewable: boolean }[]>`
       SELECT EXISTS (

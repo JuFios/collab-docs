@@ -399,8 +399,9 @@ than gaps.
 **Product**
 
 - Password reset, a change of email address and "sign out everywhere"; the access token cannot be revoked before it
-  expires (15 minutes). An unconfirmed account can use the app, only sharing with it waits for the confirmation
-  ([auth](docs/auth.md)).
+  expires (15 minutes). An unconfirmed account can use the app, only sharing with it waits for the confirmation; its
+  address is free for a new registration after 48 hours, which shuts the old account out (its data stays) instead
+  of letting the address be blocked for good ([auth](docs/auth.md)).
 - Mentions in the **body** of a document (only comments carry @mentions); editing and deleting one's own comment from the
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.
@@ -422,8 +423,8 @@ than gaps.
   serialise on the workspace row lock, which is simple and correct but becomes the bottleneck of a very busy workspace.
 - One collab instance _by design_; horizontal scaling needs consistent routing by document id or a Redis fan-out between
   instances ([CRDT](docs/crdt.md#scaling-the-collab-service)). The web app and the api scale out as they are: the
-  ISR cache of the web replicas is shared in Redis, so a revalidation that reaches one replica holds for all
-  ([Publishing](docs/publishing.md)). No load test of the gateway and no Lighthouse measurements.
+  ISR cache of the web replicas is shared in Redis, so a revalidation that reaches one replica holds for all, as
+  long as their clocks are synchronised with NTP ([Publishing](docs/publishing.md)). No load test of the gateway and no Lighthouse measurements.
 - Email is delivered at least once, so a retry after a crash can send an invitation twice.
 - A duplicated character can appear when two people type their first character into an empty document at the same
   instant (behaviour of `@tiptap/y-tiptap`); it is a known limit, not a data loss.

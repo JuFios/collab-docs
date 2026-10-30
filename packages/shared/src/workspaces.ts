@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { planTierSchema } from './plans';
-import { emailInput } from './auth';
+import { usableEmail } from './auth';
 import { WORKSPACE_ROLES } from './permissions';
 
 export const workspaceRoleSchema = z.enum(WORKSPACE_ROLES);
@@ -35,7 +35,7 @@ export const renameWorkspaceInputSchema = createWorkspaceInputSchema;
 export const INVITABLE_ROLES = WORKSPACE_ROLES.filter((role) => role !== 'OWNER');
 
 export const inviteInputSchema = z.object({
-  email: emailInput,
+  email: usableEmail,
   role: z.enum(INVITABLE_ROLES, { error: 'Choose a role.' }),
 });
 
