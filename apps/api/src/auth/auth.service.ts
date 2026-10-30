@@ -41,9 +41,17 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<IssuedSession> {
     const passwordHash = await this.passwords.hash(dto.password);
     try {
-      const user = await this.prisma.user.create({
-        data: { email: dto.email, name: dto.name, passwordHash },
+      const { user, released } = await this.prisma.$transaction(async (tx) => {
+        // an address held by an account that never confirmed it, for longer than a link lives, is taken over
+        const released = await this.verification.releaseStale(tx, dto.email);
+        const user = await tx.user.create({
+          data: { email: dto.email, name: dto.name, passwordHash },
+        });
+        return { user, released };
       });
+      if (released) {
+        logEvent(this.logger, 'auth.address_released', { userId: released, replacedBy: user.id });
+      }
       logEvent(this.logger, 'auth.registered', { userId: user.id });
       // the account works without it; a link that could not be queued is asked for again from the app
       await this.verification.send(user).catch((error: unknown) => {

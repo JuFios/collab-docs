@@ -399,8 +399,9 @@ than gaps.
 **Product**
 
 - Password reset, a change of email address and "sign out everywhere"; the access token cannot be revoked before it
-  expires (15 minutes). An unconfirmed account can use the app, only sharing with it waits for the confirmation
-  ([auth](docs/auth.md)).
+  expires (15 minutes). An unconfirmed account can use the app, only sharing with it waits for the confirmation; its
+  address is free for a new registration after 48 hours, which shuts the old account out (its data stays) instead
+  of letting the address be blocked for good ([auth](docs/auth.md)).
 - Mentions in the **body** of a document (only comments carry @mentions); editing and deleting one's own comment from the
   UI (the API has both); live updates of other people's replies inside an open panel; per-user notification settings and
   digests.

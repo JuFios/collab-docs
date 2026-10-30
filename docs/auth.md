@@ -4,7 +4,7 @@ Own JWT auth in the API (`apps/api/src/auth`), no external identity provider.
 
 | Endpoint                             | Purpose                                                                                         |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `POST /api/auth/register`            | Create an account and sign in (409 if the email exists)                                         |
+| `POST /api/auth/register`            | Create an account and sign in (409 if the email is taken, see _An address nobody confirmed_)    |
 | `POST /api/auth/login`               | Sign in                                                                                         |
 | `POST /api/auth/refresh`             | Rotate the refresh token, issue a new access token                                              |
 | `GET /api/auth/refresh`              | Same rotation for browser navigations; `302` to `?next=` (relative paths only) or to `/login`   |
@@ -32,6 +32,19 @@ same. Sending a new link replaces the old one. Accepting a workspace invitation 
 came by email to that address. Until then the account works normally, the app shows a notice with a button to send
 the link again, and `POST /documents/:id/shares` answers `409` for it. Accounts that existed before confirmation
 was introduced were marked confirmed by the migration (`0009_email_verification`).
+
+**An address nobody confirmed.** Registering somebody else's address must not lock its owner out for good, and
+there is no password reset to get back in. An account that is still unconfirmed 48 hours after it was created (the
+life of one link, counted from the account, so asking for a new link does not extend it) no longer holds its
+address: the next registration with that address takes it, in the transaction that creates the new account
+(`EmailVerificationService.releaseStale`). Until then, and for any confirmed account however old, registering the
+address answers `409`. Of two registrations that arrive together exactly one succeeds. The old account is **not
+deleted**, because it may own workspaces and documents (their foreign keys are `RESTRICT`, and a purge job would
+either skip every account that owns something or destroy data): it keeps them under the placeholder address
+`<user id>@released.invalid`, all its refresh tokens are revoked, its pending link is void, and mail addressed to the
+placeholder is skipped (`mail.skipped`, reason `released_address`). The release is logged as `auth.address_released`.
+The trade-off: whoever knows an address can displace an account that stayed unconfirmed for over 48 hours, and its
+owner cannot sign in any more, although nothing is lost. The workspaces of such an account stay with it.
 
 For other modules: every route requires a valid access token unless it is marked `@Public()`; the user is
 available through `@CurrentUser()` (`{ id, jti }`). The guard verifies the JWT locally and never touches the

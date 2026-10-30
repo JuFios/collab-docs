@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Prisma } from '@collab-docs/db';
 import {
   AppException,
   type AppConfig,
@@ -9,6 +10,7 @@ import {
   PinoLogger,
 } from '@collab-docs/nest';
 import { MailQueueService } from '../mail/mail-queue.service';
+import { releasedAddress } from '../mail/released-address';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashToken } from './refresh-token.service';
 
@@ -49,6 +51,39 @@ export class EmailVerificationService {
       expiresAt: expiresAt.toISOString(),
     });
     logEvent(this.logger, 'auth.verification_sent', { userId: user.id });
+  }
+
+  /**
+   * Frees `email` for a new account when the account holding it was never confirmed and is older than a link lives,
+   * so registering someone else's address blocks its owner for those 48 hours at most. The account is not deleted
+   * (it may own workspaces and documents, which nothing here may destroy): it keeps its data under a placeholder
+   * address, its sessions are revoked and its link is void. Returns the id of the account that was released.
+   * Runs in the transaction that creates the new account, so a failed registration releases nothing; of two
+   * registrations that arrive together, the second one finds the address taken.
+   */
+  async releaseStale(tx: Prisma.TransactionClient, email: string): Promise<string | null> {
+    const now = new Date();
+    const stale = await tx.user.findFirst({
+      where: {
+        email,
+        emailVerifiedAt: null,
+        createdAt: { lt: new Date(now.getTime() - EMAIL_VERIFICATION_TTL_MS) },
+      },
+      select: { id: true },
+    });
+    if (!stale) return null;
+    const released = await tx.user.updateMany({
+      where: { id: stale.id, email, emailVerifiedAt: null },
+      data: { email: releasedAddress(stale.id) },
+    });
+    // another registration (or the owner's confirmation) got there first
+    if (released.count === 0) return null;
+    await tx.refreshToken.updateMany({
+      where: { userId: stale.id, revokedAt: null },
+      data: { revokedAt: now },
+    });
+    await tx.emailVerification.deleteMany({ where: { userId: stale.id } });
+    return stale.id;
   }
 
   async resend(userId: string): Promise<void> {
