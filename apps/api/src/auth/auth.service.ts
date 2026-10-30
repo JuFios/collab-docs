@@ -71,12 +71,11 @@ export class AuthService {
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
     }
-    let released: string | null = null;
     try {
-      const user = await this.prisma.$transaction(async (tx) => {
-        released = await this.releaseStale(tx, dto.email);
+      const { user, released } = await this.prisma.$transaction(async (tx) => {
+        const released = await this.releaseStale(tx, dto.email);
         if (!released) throw emailTaken();
-        return tx.user.create({ data });
+        return { user: await tx.user.create({ data }), released };
       });
       logEvent(this.logger, 'auth.address_released', { userId: released, replacedBy: user.id });
       return user;
