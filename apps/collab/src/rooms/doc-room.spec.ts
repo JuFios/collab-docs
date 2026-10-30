@@ -35,9 +35,10 @@ function setupWith<T extends DocumentStore>(
   store: T,
   limits: Partial<RoomLimits> = {},
   initial: Uint8Array | null = null,
+  logger?: ConstructorParameters<typeof DocRoom>[5],
 ) {
   const observer = new Counters();
-  const room = new DocRoom('doc-1', initial, store, { ...LIMITS, ...limits }, observer);
+  const room = new DocRoom('doc-1', initial, store, { ...LIMITS, ...limits }, observer, logger);
   rooms.push(room);
   return { store, observer, room };
 }
@@ -366,6 +367,60 @@ describe('DocRoom', () => {
 
       expect(observer.rejected).toEqual(['invalid']);
       expect(room.doc.getMap('__tiptap_position_migrations:root:content').get('1:2')).toBe(1);
+    });
+
+    it('drops invalid held-back changes without refusing the client whose update unblocks them', () => {
+      const warn = jest.fn();
+      const { room, observer } = setupWith(new InMemoryDocumentStore(), {}, null, { warn });
+      const attacker = new TestClient(room);
+      const victim = new TestClient(room);
+      attacker.join();
+      victim.join();
+      victim.text().insert(0, 'a');
+      TestClient.settleAll(attacker, victim);
+      const delta = () =>
+        ((room.doc.getXmlFragment('content').get(0) as Y.XmlElement).get(0) as Y.XmlText).toDelta();
+
+      // the victim's next keystroke, kept back for now
+      victim.text().insert(1, 'b');
+      const [typed] = victim.outbox.splice(0);
+
+      // a change the editor never writes, built on that keystroke: the room cannot place it yet, so it waits
+      const forged = new Y.Doc();
+      Y.applyUpdate(forged, Y.encodeStateAsUpdate(victim.doc));
+      const beforeForging = Y.encodeStateVector(forged);
+      const text = (forged.getXmlFragment('content').get(0) as Y.XmlElement).get(0) as Y.XmlText;
+      text.insertEmbed(2, { x: 1 });
+      attacker.sendRaw(
+        frame(COLLAB_MESSAGE.sync, (e) =>
+          syncProtocol.writeUpdate(e, Y.encodeStateAsUpdate(forged, beforeForging)),
+        ),
+      );
+      expect(room.doc.store.pendingStructs).not.toBeNull();
+      expect(observer.rejected).toEqual([]);
+
+      // the keystroke arrives: it is legitimate, so it is applied, and what waited for it is dropped on the spot
+      room.receive(victim, typed!);
+      expect(room.doc.store.pendingStructs).toBeNull();
+      expect(delta()).toEqual([{ insert: 'ab' }]);
+      expect(observer.rejected).toEqual(['invalid']);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toMatchObject({
+        event: 'collab.update_rejected',
+        reason: 'invalid',
+        documentId: 'doc-1',
+      });
+      expect(warn.mock.calls[0]?.[0]).not.toHaveProperty('connectionId');
+      // nobody is told: the sender of the dropped change is not known, and the victim did nothing wrong
+      expect(victim.events.filter((e) => e.type === 'rejected')).toEqual([]);
+      expect(attacker.events.filter((e) => e.type === 'rejected')).toEqual([]);
+
+      // the victim keeps editing
+      victim.text().insert(2, 'c');
+      TestClient.settleAll(attacker, victim);
+      expect(delta()).toEqual([{ insert: 'abc' }]);
+      expect(attacker.value()).toBe('abc');
+      expect(observer.rejected).toEqual(['invalid']);
     });
 
     it('refuses updates that would push the document past its size limit', () => {

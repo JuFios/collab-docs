@@ -363,15 +363,7 @@ export class DocRoom {
       }
       // changes held back until now are integrated with this one, so they are checked against it
       const heldViolation = heldBackViolation(decoded, this.doc);
-      if (heldViolation) {
-        this.doc.store.pendingStructs = null;
-        this.doc.store.pendingDs = null;
-        return this.refuse(
-          state,
-          'invalid',
-          new Error(`held-back change outside the content model: ${heldViolation}`),
-        );
-      }
+      if (heldViolation) this.dropHeldBack(heldViolation);
       // the version keeps what the change replaces; encoded only when one may be due, not on every keystroke
       const now = this.clock();
       const before =
@@ -401,6 +393,26 @@ export class DocRoom {
       // a client repeats what it holds after reconnecting; answering says whether that is stored or still pending
       this.sendEvent(state, this.persistedEvent());
     }
+  }
+
+  /**
+   * Discards the changes Yjs holds back, because one of them does not fit the content model. This sender is not at
+   * fault: its update only supplied what they waited for (anyone can build a change on the next id of another
+   * client), so it is applied as usual and nobody is told, as the author of the held-back change is not known.
+   */
+  private dropHeldBack(violation: string): void {
+    this.doc.store.pendingStructs = null;
+    this.doc.store.pendingDs = null;
+    this.observer.updateRejected('invalid');
+    this.logger.warn(
+      {
+        event: 'collab.update_rejected',
+        reason: 'invalid',
+        documentId: this.documentId,
+        err: `held-back change outside the content model: ${violation}`,
+      },
+      'collab.update_rejected',
+    );
   }
 
   /** Would the document stay within its size limit with `bytes` more? */
