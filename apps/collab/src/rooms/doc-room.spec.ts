@@ -20,10 +20,12 @@ class Counters implements RoomObserver {
   applied = 0;
   duplicate = 0;
   rejected: RejectReason[] = [];
+  dropped = 0;
   limited = 0;
   updateApplied = () => void (this.applied += 1);
   updateDuplicate = () => void (this.duplicate += 1);
   updateRejected = (reason: RejectReason) => void this.rejected.push(reason);
+  heldBackDropped = () => void (this.dropped += 1);
   rateLimited = () => void (this.limited += 1);
 }
 
@@ -369,23 +371,18 @@ describe('DocRoom', () => {
       expect(room.doc.getMap('__tiptap_position_migrations:root:content').get('1:2')).toBe(1);
     });
 
-    it('drops invalid held-back changes without refusing the client whose update unblocks them', () => {
-      const warn = jest.fn();
-      const { room, observer } = setupWith(new InMemoryDocumentStore(), {}, null, { warn });
-      const attacker = new TestClient(room);
-      const victim = new TestClient(room);
+    /**
+     * A hostile client builds a change the editor never writes on the id the victim's next keystroke will get. The
+     * room cannot place it yet, so it waits. Returns the keystroke (not yet delivered) and a reader of the text.
+     */
+    function holdBackForgedChange(room: DocRoom, attacker: TestClient, victim: TestClient) {
       attacker.join();
       victim.join();
       victim.text().insert(0, 'a');
       TestClient.settleAll(attacker, victim);
-      const delta = () =>
-        ((room.doc.getXmlFragment('content').get(0) as Y.XmlElement).get(0) as Y.XmlText).toDelta();
-
-      // the victim's next keystroke, kept back for now
       victim.text().insert(1, 'b');
       const [typed] = victim.outbox.splice(0);
 
-      // a change the editor never writes, built on that keystroke: the room cannot place it yet, so it waits
       const forged = new Y.Doc();
       Y.applyUpdate(forged, Y.encodeStateAsUpdate(victim.doc));
       const beforeForging = Y.encodeStateVector(forged);
@@ -397,17 +394,29 @@ describe('DocRoom', () => {
         ),
       );
       expect(room.doc.store.pendingStructs).not.toBeNull();
+      const delta = () =>
+        ((room.doc.getXmlFragment('content').get(0) as Y.XmlElement).get(0) as Y.XmlText).toDelta();
+      return { typed: typed!, delta };
+    }
+
+    it('drops invalid held-back changes without refusing the client whose update unblocks them', () => {
+      const warn = jest.fn();
+      const { room, observer } = setupWith(new InMemoryDocumentStore(), {}, null, { warn });
+      const attacker = new TestClient(room);
+      const victim = new TestClient(room);
+      const { typed, delta } = holdBackForgedChange(room, attacker, victim);
       expect(observer.rejected).toEqual([]);
 
       // the keystroke arrives: it is legitimate, so it is applied, and what waited for it is dropped on the spot
-      room.receive(victim, typed!);
+      room.receive(victim, typed);
       expect(room.doc.store.pendingStructs).toBeNull();
       expect(delta()).toEqual([{ insert: 'ab' }]);
-      expect(observer.rejected).toEqual(['invalid']);
+      // counted and logged as what it is, not as a refused update
+      expect(observer.dropped).toBe(1);
+      expect(observer.rejected).toEqual([]);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0]?.[0]).toMatchObject({
-        event: 'collab.update_rejected',
-        reason: 'invalid',
+        event: 'collab.held_back_dropped',
         documentId: 'doc-1',
       });
       expect(warn.mock.calls[0]?.[0]).not.toHaveProperty('connectionId');
@@ -420,6 +429,23 @@ describe('DocRoom', () => {
       TestClient.settleAll(attacker, victim);
       expect(delta()).toEqual([{ insert: 'abc' }]);
       expect(attacker.value()).toBe('abc');
+      expect(observer.rejected).toEqual([]);
+      expect(observer.dropped).toBe(1);
+    });
+
+    it('counts the drop and an update that fails right after it separately, not twice', () => {
+      const { room, observer, store } = setup();
+      const attacker = new TestClient(room);
+      const victim = new TestClient(room);
+      const { typed } = holdBackForgedChange(room, attacker, victim);
+      // an observer of the document throws while the update is being applied
+      jest.spyOn(store, 'enqueue').mockImplementationOnce(() => {
+        throw new Error('store is down');
+      });
+
+      room.receive(victim, typed);
+
+      expect(observer.dropped).toBe(1);
       expect(observer.rejected).toEqual(['invalid']);
     });
 

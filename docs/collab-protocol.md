@@ -82,12 +82,13 @@ state.
   holds plain data under `client:clock` keys. Changes held back for a missing dependency are checked again when it
   arrives and dropped if they do not fit. The update that supplied the dependency is applied as usual and its
   sender is **not** refused: it need not be the author, since a client can build a change on the id that another
-  client will use next. Nobody is told (the author is not known); the drop is logged as `collab.update_rejected`
-  without a connection and counted in `collab_updates_rejected_total{reason="invalid"}`. Known limits: marks inside a code block are not rejected, and the
-  attributes y-tiptap writes for the marks of a mention or a line break (named after the mark) are accepted on every
-  node. **Any difference between this model and what the editor writes now refuses the edit instead of being
-  cleaned on the way out**, so a change to the editor's schema (`components/editor/extensions.ts`) goes with a change
-  to `NODE_SPECS` and to this check.
+  client will use next. Nobody is told (the author is not known). The drop is its own event, not a refusal: it is
+  logged as `collab.held_back_dropped` and counted in `collab_held_back_dropped_total`, so
+  `collab_updates_rejected_total` stays the count of updates that were refused. Known limits: marks inside a code
+  block are not rejected, and the attributes y-tiptap writes for the marks of a mention or a line break (named after
+  the mark) are accepted on every node. **Any difference between this model and what the editor writes now refuses
+  the edit instead of being cleaned on the way out**, so a change to the editor's schema
+  (`components/editor/extensions.ts`) goes with a change to `NODE_SPECS` and to this check.
 
 ## Presence
 

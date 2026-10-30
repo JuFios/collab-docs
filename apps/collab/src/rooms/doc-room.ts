@@ -49,6 +49,8 @@ export interface RoomObserver {
   updateApplied(): void;
   updateDuplicate(): void;
   updateRejected(reason: RejectReason): void;
+  /** Changes held back for a missing dependency were discarded because one of them is outside the content model. */
+  heldBackDropped(): void;
   rateLimited(): void;
 }
 
@@ -60,6 +62,7 @@ const NOOP_OBSERVER: RoomObserver = {
   updateApplied: () => undefined,
   updateDuplicate: () => undefined,
   updateRejected: () => undefined,
+  heldBackDropped: () => undefined,
   rateLimited: () => undefined,
 };
 
@@ -404,16 +407,8 @@ export class DocRoom {
   private dropHeldBack(violation: string): void {
     this.doc.store.pendingStructs = null;
     this.doc.store.pendingDs = null;
-    this.observer.updateRejected('invalid');
-    this.logger.warn(
-      {
-        event: 'collab.update_rejected',
-        reason: 'invalid',
-        documentId: this.documentId,
-        err: `held-back change outside the content model: ${violation}`,
-      },
-      'collab.update_rejected',
-    );
+    this.observer.heldBackDropped();
+    this.warn('collab.held_back_dropped', {}, new Error(violation));
   }
 
   /** Would the document stay within its size limit with `bytes` more? */
@@ -486,17 +481,27 @@ export class DocRoom {
 
   private reject(state: ConnectionState, reason: RejectReason, error?: unknown): void {
     this.observer.updateRejected(reason);
-    this.logger.warn(
+    this.warn(
+      'collab.update_rejected',
       {
-        event: 'collab.update_rejected',
         reason,
-        documentId: this.documentId,
         connectionId: state.conn.id,
         userId: state.conn.userId,
         correlationId: state.conn.correlationId,
+      },
+      error,
+    );
+  }
+
+  private warn(event: string, fields: Record<string, unknown>, error?: unknown): void {
+    this.logger.warn(
+      {
+        event,
+        ...fields,
+        documentId: this.documentId,
         err: error instanceof Error ? error.message : undefined,
       },
-      'collab.update_rejected',
+      event,
     );
   }
 

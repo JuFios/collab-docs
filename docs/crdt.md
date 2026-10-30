@@ -27,8 +27,9 @@ close codes and the `persisted` / `access` / `deleted` room events are specified
   as `collab.update_rejected` without disturbing the other clients; a refused update is reported to its sender
   (room event `rejected`), which reloads the document from the server state.
 - **Metrics** (`/metrics`): `collab_connections`, `collab_rooms`, `collab_updates_applied_total`,
-  `collab_updates_duplicate_total`, `collab_updates_rejected_total{reason}`, `collab_rate_limited_total`,
-  `collab_ws_close_total{code}`, `collab_access_changes_total{outcome}`, plus the platform metrics.
+  `collab_updates_duplicate_total`, `collab_updates_rejected_total{reason}`, `collab_held_back_dropped_total`,
+  `collab_rate_limited_total`, `collab_ws_close_total{code}`, `collab_access_changes_total{outcome}`, plus the
+  platform metrics.
 - **Internal port 4002** is a TCP microservice of the same application (`connectMicroservice`, so it shares the
   rooms and the store through one DI container), never published by compose; every message carries
   `INTERNAL_API_TOKEN` and the caller's correlation id.
