@@ -93,6 +93,16 @@ flowchart LR
   Keys carry the build id, so a deployment never serves the pages of the previous one. Without `REDIS_URL` (a build,
   `next dev`) the handler keeps a per-process map; when Redis is down a read is a miss (the page is rendered) and a
   lost revalidation fails the call, which the worker retries.
+- **The clocks of the web hosts must be synchronised (NTP).** The two times in that comparison come from different
+  machines: the replica that renders a page stamps the entry with its own `Date.now()`, the replica that takes the
+  revalidation call stamps the tag with its own, and any replica compares them. If the first clock runs ahead of
+  the second by more than the time between the render and the revalidation, the revalidation does not invalidate
+  that render: the old page is served until the next revalidation (entries live 30 days). A clock that runs behind
+  only costs renders, because a fresh entry looks older than the tag and is rendered again until time catches up.
+  Run `chronyd` or `systemd-timesyncd` on the hosts (cloud VMs and Kubernetes nodes normally do already) and keep
+  the drift well below the few seconds a revalidation takes to follow a change. The clock of the worker does not
+  matter, and stamping with the Redis server's `TIME` instead would remove the requirement at the price of an
+  extra command per write; that is not done.
 
 **Expiry.** Moving or setting `expiresAt` plans a delayed job in `link-expiry` (one per link and expiry time;
 the old one is removed). When it runs it logs `public_link.expired`, then invalidates the page of a `VIEW` link or

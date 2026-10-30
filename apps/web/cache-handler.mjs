@@ -9,6 +9,9 @@
  * written is a miss, so the next request renders it again. Entries are namespaced by build, so a new deployment never
  * reads the pages of the previous one. Without `REDIS_URL` (a build, `next dev`) it falls back to a per-process map;
  * when Redis cannot be reached a read is a miss and a write is dropped, which costs renders, never correctness.
+ *
+ * Both times are `Date.now()` of whichever replica wrote the entry or took the revalidation, and a third one compares
+ * them, so the clocks of the web hosts must be synchronised (NTP); see docs/publishing.md.
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
