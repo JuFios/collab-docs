@@ -44,7 +44,9 @@ either skip every account that owns something or destroy data): it keeps them un
 `<user id>@released.invalid`, all its refresh tokens are revoked, its pending link is void, and mail addressed to the
 placeholder is skipped (`mail.skipped`, reason `released_address`). The release is logged as `auth.address_released`.
 The trade-off: whoever knows an address can displace an account that stayed unconfirmed for over 48 hours, and its
-owner cannot sign in any more, although nothing is lost. The workspaces of such an account stay with it.
+owner can no longer sign in with that address (nothing is lost, and the workspaces of the account stay with it, but
+they are reachable only by an operator or with the placeholder). A purge of such accounts, with their data, is not
+done.
 
 For other modules: every route requires a valid access token unless it is marked `@Public()`; the user is
 available through `@CurrentUser()` (`{ id, jti }`). The guard verifies the JWT locally and never touches the
