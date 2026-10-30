@@ -101,6 +101,18 @@ export const emailInput = z
   .toLowerCase()
   .pipe(z.email('Enter a valid email address.').max(254, 'Email is too long.'));
 
+/**
+ * The domain of the address an account keeps after it gave up its real one to a new registration. `.invalid` never
+ * resolves (RFC 2606), so no mail reaches it, and nobody may register it: the placeholder of an account must always
+ * be free when the account is released.
+ */
+export const RELEASED_EMAIL_DOMAIN = 'released.invalid';
+
+export const releasedEmail = (userId: string): string => `${userId}@${RELEASED_EMAIL_DOMAIN}`;
+
+export const isReleasedEmail = (email: string): boolean =>
+  email.toLowerCase().endsWith(`@${RELEASED_EMAIL_DOMAIN}`);
+
 export const loginInputSchema = z.object({
   email: emailInput,
   password: z
@@ -111,7 +123,7 @@ export const loginInputSchema = z.object({
 
 export const registerInputSchema = z.object({
   name: z.string().trim().min(1, 'Enter your name.').max(100, 'Name is too long.'),
-  email: emailInput,
+  email: emailInput.refine((email) => !isReleasedEmail(email), 'This address cannot be used.'),
   password: z
     .string()
     .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)

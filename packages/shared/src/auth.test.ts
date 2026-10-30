@@ -91,4 +91,28 @@ describe('form input schemas', () => {
       registerInputSchema.safeParse({ ...base, name: '   ', password: 'x'.repeat(12) }).success,
     ).toBe(false);
   });
+
+  it('refuses to register the placeholder address of a released account', async () => {
+    const { registerInputSchema, releasedEmail } = await import('./auth');
+    const input = (email: string) => ({ name: 'Ada', email, password: 'x'.repeat(12) });
+    expect(registerInputSchema.safeParse(input(releasedEmail(userId))).success).toBe(false);
+    expect(registerInputSchema.safeParse(input('  Anyone@Released.Invalid ')).success).toBe(false);
+    expect(registerInputSchema.safeParse(input('ada@released.invalid.example')).success).toBe(true);
+  });
+});
+
+describe('released addresses', () => {
+  it('sit on a domain that never resolves, whatever the case', async () => {
+    const { isReleasedEmail, releasedEmail } = await import('./auth');
+    expect(releasedEmail('abc')).toBe('abc@released.invalid');
+    expect(isReleasedEmail('abc@released.invalid')).toBe(true);
+    expect(isReleasedEmail('ABC@Released.Invalid')).toBe(true);
+  });
+
+  it('are not mistaken for other addresses', async () => {
+    const { isReleasedEmail } = await import('./auth');
+    expect(isReleasedEmail('ada@example.com')).toBe(false);
+    expect(isReleasedEmail('ada@released.invalid.example.com')).toBe(false);
+    expect(isReleasedEmail('ada@notreleased.invalid')).toBe(false);
+  });
 });

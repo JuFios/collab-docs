@@ -1,18 +1,40 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsString, Length, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  Length,
+  MaxLength,
+  MinLength,
+  Validate,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
+} from 'class-validator';
 // argon2 accepts long inputs, but unbounded ones are a cheap way to burn CPU: the maximum is the same on every layer
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@collab-docs/shared';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, isReleasedEmail } from '@collab-docs/shared';
 
 const normaliseEmail = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+
+/** The placeholder an account keeps after it gave up its address must stay free, so nobody registers it. */
+@ValidatorConstraint({ name: 'notReleasedEmail', async: false })
+class NotReleasedEmailConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    return typeof value !== 'string' || !isReleasedEmail(value);
+  }
+
+  defaultMessage(): string {
+    return 'email cannot be used';
+  }
+}
 
 export class RegisterDto {
   @ApiProperty({ example: 'ada@example.com' })
   @Transform(normaliseEmail)
   @IsEmail()
   @MaxLength(254)
+  @Validate(NotReleasedEmailConstraint)
   email!: string;
 
   @ApiProperty({ minLength: PASSWORD_MIN_LENGTH, maxLength: PASSWORD_MAX_LENGTH })
