@@ -396,9 +396,10 @@ export class DocRoom {
   }
 
   /**
-   * Discards the changes Yjs holds back, because one of them does not fit the content model. This sender is not at
-   * fault: its update only supplied what they waited for (anyone can build a change on the next id of another
-   * client), so it is applied as usual and nobody is told, as the author of the held-back change is not known.
+   * Discards the changes Yjs holds back, because one of them does not fit the content model. The sender of the
+   * update being applied is not at fault: it only supplied what they waited for (a client can build a change on the
+   * id another client will use next), so that update is applied as usual. Nobody is told, since the author of the
+   * held-back change is not known.
    */
   private dropHeldBack(violation: string): void {
     this.doc.store.pendingStructs = null;
