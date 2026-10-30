@@ -99,6 +99,14 @@ describe('form input schemas', () => {
     expect(registerInputSchema.safeParse(input('  Anyone@Released.Invalid ')).success).toBe(false);
     expect(registerInputSchema.safeParse(input('ada@released.invalid.example')).success).toBe(true);
   });
+
+  it('refuses to invite the placeholder address, but accepts any other', async () => {
+    const { inviteInputSchema } = await import('./workspaces');
+    const { releasedEmail } = await import('./auth');
+    const invite = (email: string) => ({ email, role: 'EDITOR' });
+    expect(inviteInputSchema.safeParse(invite(releasedEmail(userId))).success).toBe(false);
+    expect(inviteInputSchema.safeParse(invite('ada@example.com')).success).toBe(true);
+  });
 });
 
 describe('released addresses', () => {

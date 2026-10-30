@@ -533,6 +533,17 @@ describe('workspaces, members, invites', () => {
       expect(revoked.body.code).toBe('INVITE_INVALID');
     });
 
+    it('does not invite the placeholder address of a released account', async () => {
+      const owner = await register();
+      const workspaceId = await createWorkspace(owner);
+      const denied = await as(owner)
+        .post(`/workspaces/${workspaceId}/invites`)
+        .send({ email: releasedEmail(owner.id), role: 'VIEWER' })
+        .expect(400);
+      expect(denied.body.code).toBe('VALIDATION_FAILED');
+      expect(await prisma.workspaceInvite.count({ where: { workspaceId } })).toBe(0);
+    });
+
     it('refuses an account with a different email, and keeps the invite usable', async () => {
       const team = await setupTeam();
       const invitee = await register('right');

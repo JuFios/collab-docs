@@ -8,6 +8,11 @@ export const REFRESH_COOKIE_PATH = '/api/auth';
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const ACCESS_TOKEN_AUDIENCE = 'api';
+/**
+ * How long an account can stay unconfirmed before a new registration may take its address: the life of one
+ * confirmation link, counted from the account.
+ */
+export const EMAIL_CONFIRMATION_HOURS = 48;
 
 export const authUserSchema = z.object({
   id: z.string().uuid(),
@@ -113,6 +118,15 @@ export const releasedEmail = (userId: string): string => `${userId}@${RELEASED_E
 export const isReleasedEmail = (email: string): boolean =>
   email.toLowerCase().endsWith(`@${RELEASED_EMAIL_DOMAIN}`);
 
+/**
+ * An address a person may register or be invited with: any valid one but the placeholder of a released account.
+ * Login takes `emailInput` as it is, since the api answers an unknown address like a wrong password.
+ */
+export const usableEmail = emailInput.refine(
+  (email) => !isReleasedEmail(email),
+  'This address cannot be used.',
+);
+
 export const loginInputSchema = z.object({
   email: emailInput,
   password: z
@@ -123,7 +137,7 @@ export const loginInputSchema = z.object({
 
 export const registerInputSchema = z.object({
   name: z.string().trim().min(1, 'Enter your name.').max(100, 'Name is too long.'),
-  email: emailInput.refine((email) => !isReleasedEmail(email), 'This address cannot be used.'),
+  email: usableEmail,
   password: z
     .string()
     .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)

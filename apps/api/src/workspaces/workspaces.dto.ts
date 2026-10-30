@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsEnum, IsIn, IsString, Length, MaxLength } from 'class-validator';
 import { PLAN_TIERS, WORKSPACE_ROLES, type WorkspaceRole } from '@collab-docs/shared';
+import { NotReleasedEmail } from '../auth/not-released-email';
 
 const INVITABLE_ROLES = WORKSPACE_ROLES.filter((role) => role !== 'OWNER');
 
@@ -36,6 +37,7 @@ export class CreateInviteDto {
   @Transform(normaliseEmail)
   @IsEmail()
   @MaxLength(254)
+  @NotReleasedEmail()
   email!: string;
 
   @ApiProperty({ enum: INVITABLE_ROLES })

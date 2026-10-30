@@ -144,6 +144,7 @@ const pairs: Pair[] = [
       ['a valid invite', {}],
       ['an address with capitals and spaces', { email: ' Grace@Example.test ' }],
       ['an invalid address', { email: 'grace@' }],
+      ['the placeholder of a released account', { email: 'abc@released.invalid' }],
       ['an admin role', { role: 'ADMIN' }],
       ['a viewer role', { role: 'VIEWER' }],
       ['the owner role', { role: 'OWNER' }],
