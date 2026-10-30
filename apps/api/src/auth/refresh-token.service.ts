@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { isIPv4, isIPv6 } from 'node:net';
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@collab-docs/db';
 import { REFRESH_TOKEN_TTL_SECONDS } from '@collab-docs/shared';
 import { AppException, logEvent, InjectPinoLogger, PinoLogger } from '@collab-docs/nest';
 import { PrismaService } from '../prisma/prisma.service';
@@ -125,6 +126,18 @@ export class RefreshTokenService {
       where: { tokenHash: hashToken(presented) },
     });
     if (row) await this.revokeFamily(row.familyId, now);
+  }
+
+  /** Revokes every live token of the user, in `db` when the caller is inside a transaction. */
+  async revokeAllOf(
+    userId: string,
+    db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
+    now = new Date(),
+  ): Promise<void> {
+    await db.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: now },
+    });
   }
 
   private async reuse(id: string, client: string, now: Date): Promise<RefreshResult> {

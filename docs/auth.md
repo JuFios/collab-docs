@@ -36,17 +36,33 @@ was introduced were marked confirmed by the migration (`0009_email_verification`
 **An address nobody confirmed.** Registering somebody else's address must not lock its owner out for good, and
 there is no password reset to get back in. An account that is still unconfirmed 48 hours after it was created (the
 life of one link, counted from the account, so asking for a new link does not extend it) no longer holds its
-address: the next registration with that address takes it, in the transaction that creates the new account
-(`EmailVerificationService.releaseStale`). Until then, and for any confirmed account however old, registering the
-address answers `409`. Of two registrations that arrive together exactly one succeeds. The old account is **not
-deleted**, because it may own workspaces and documents (their foreign keys are `RESTRICT`, and a purge job would
-either skip every account that owns something or destroy data): it keeps them under the placeholder address
-`<user id>@released.invalid`, all its refresh tokens are revoked, its pending link is void, and mail addressed to the
-placeholder is skipped (`mail.skipped`, reason `released_address`). The release is logged as `auth.address_released`.
+address: when a registration finds the address taken, one transaction releases that account and creates the new
+one (`AuthService`). A free address, a confirmed account however old, and an account younger than 48 hours cost
+the registration nothing but the insert and answer `409`. Of two registrations that arrive together exactly one
+succeeds.
+
+The old account is **not deleted**, because it may own workspaces and documents (their foreign keys are
+`RESTRICT`, and a purge job would either skip every account that owns something or destroy data). It keeps them
+under the placeholder address `<user id>@released.invalid`, and nothing can use that address:
+
+- registering it is refused (`.invalid` never resolves, and the placeholder of an account must always be free
+  when the account is released, so nobody can register it in advance to make the release collide);
+- sign-in with it fails like an unknown address, `GET /auth/me` and the confirmation resend answer `401`, and a
+  refresh token that was issued while the release ran is revoked on its first use;
+- every refresh token of the account is revoked in the same transaction, and its pending link is void;
+- mention emails to it are skipped (`mail.skipped`, reason `released_address`) instead of being sent.
+
+Confirming an address and accepting an invitation are conditional on the account still holding the address the
+link or the invitation was meant for, so a confirmation that races with a release either wins (the address stays)
+or finds the account gone (`400`), and a released account joins no workspace. The release is logged as
+`auth.address_released`. The access token of the old session stays valid for its remaining 15 minutes, like any
+access token.
+
 The trade-off: whoever knows an address can displace an account that stayed unconfirmed for over 48 hours, and its
 owner can no longer sign in with that address (nothing is lost, and the workspaces of the account stay with it, but
-they are reachable only by an operator or with the placeholder). A purge of such accounts, with their data, is not
-done.
+they are reachable only by an operator). Asking the new registrant to confirm their mailbox before the swap would
+avoid that; it needs a pending-registration table, a `202` answer and changes to the form, and is not done. A purge
+of such accounts, with their data, is not done either.
 
 For other modules: every route requires a valid access token unless it is marked `@Public()`; the user is
 available through `@CurrentUser()` (`{ id, jti }`). The guard verifies the JWT locally and never touches the

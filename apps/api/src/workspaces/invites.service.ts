@@ -15,6 +15,8 @@ import { PlanLimitsService } from './plan-limits.service';
 import type { AcceptInviteResponse, InvitePreviewResponse, InviteResponse } from './workspaces.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
+const differentAddress = () =>
+  new AppException('FORBIDDEN', 'This invitation was sent to a different email address');
 const invalidInvite = () =>
   new AppException('INVITE_INVALID', 'This invitation is invalid or has expired');
 
@@ -165,7 +167,7 @@ export class InvitesService {
     });
     if (!user) throw new AppException('UNAUTHENTICATED', 'Authentication required');
     if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
-      throw new AppException('FORBIDDEN', 'This invitation was sent to a different email address');
+      throw differentAddress();
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -188,11 +190,19 @@ export class InvitesService {
       await tx.workspaceMember.create({
         data: { workspaceId: invite.workspaceId, userId, role: invite.role },
       });
-      // the token came by email to this very address, which confirms it
-      await tx.user.updateMany({
-        where: { id: userId, emailVerifiedAt: null },
+      // the token came by email to this very address, which confirms it; the update holds only while the account
+      // still has that address, so one released to a new registration meanwhile joins nothing
+      const confirmed = await tx.user.updateMany({
+        where: { id: userId, email: user.email, emailVerifiedAt: null },
         data: { emailVerifiedAt: new Date() },
       });
+      if (confirmed.count === 0) {
+        const current = await tx.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        });
+        if (current?.email !== user.email) throw differentAddress();
+      }
     });
     logEvent(this.logger, 'invite.accepted', {
       workspaceId: invite.workspaceId,

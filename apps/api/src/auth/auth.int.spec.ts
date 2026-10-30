@@ -11,6 +11,7 @@ import {
   REFRESH_COOKIE,
   authSessionSchema,
   apiErrorSchema,
+  releasedEmail,
   signAccessToken,
 } from '@collab-docs/shared';
 import { PinoLogger, parseConfig } from '@collab-docs/nest';
@@ -18,7 +19,7 @@ import { createTestApp } from '../test/test-app';
 import { CurrentUser, Public } from './auth.decorators';
 import type { RequestUser } from './auth.types';
 import { EMAIL_VERIFICATION_TTL_MS } from './email-verification.service';
-import { hashToken } from './refresh-token.service';
+import { RefreshTokenService, hashToken } from './refresh-token.service';
 import { MailQueueService } from '../mail/mail-queue.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -270,7 +271,7 @@ describe('auth', () => {
       fresh('/api/auth/login').send({ email, password });
     const verify = (token: string) => fresh('/api/auth/verify-email').send({ token });
     const me = (access: string) =>
-      http().get('/api/auth/me').set('Authorization', `Bearer ${access}`).expect(200);
+      http().get('/api/auth/me').set('Authorization', `Bearer ${access}`);
 
     afterAll(async () => {
       // the released accounts keep their address placeholder, so the suite's cleanup by domain does not reach them
@@ -304,13 +305,23 @@ describe('auth', () => {
       expect(second.user.id).not.toBe(owner.id);
       await login(first.email, NEW_PASSWORD).expect(200);
 
-      // nobody can get into the old account any more: not by password, not by its refresh token
+      // nobody can get into the old account any more: not by the address, the placeholder, a refresh token or the
+      // access token it still holds (which no longer reads the account or asks for a new link)
+      await expect(
+        prisma.refreshToken.count({ where: { userId: owner.id, revokedAt: null } }),
+      ).resolves.toBe(0);
       await login(first.email, PASSWORD).expect(401);
+      await login(releasedEmail(owner.id), PASSWORD).expect(401);
       await refreshWith(first.refresh).expect(401);
+      await me(first.body.accessToken).expect(401);
+      await fresh('/api/auth/verify-email/resend')
+        .set('Authorization', `Bearer ${first.body.accessToken}`)
+        .expect(401);
+      expect(confirmationLinks.get(releasedEmail(owner.id))).toBeUndefined();
 
       // it is not deleted: its data stays, under an address nobody can receive mail at and its link is void
       const old = await prisma.user.findUniqueOrThrow({ where: { id: owner.id } });
-      expect(old.email).toBe(`${owner.id}@released.invalid`);
+      expect(old.email).toBe(releasedEmail(owner.id));
       expect(old.emailVerifiedAt).toBeNull();
       await expect(
         prisma.workspace.findUniqueOrThrow({ where: { id: workspace.id } }),
@@ -324,7 +335,9 @@ describe('auth', () => {
 
       // the new account has its own link, which confirms it and nothing else
       await verify(tokenOf(first.email)).expect(204);
-      expect((await me(second.accessToken)).body).toMatchObject({ emailVerified: true });
+      expect((await me(second.accessToken).expect(200)).body).toMatchObject({
+        emailVerified: true,
+      });
       await expect(
         prisma.user.findUniqueOrThrow({ where: { id: owner.id } }),
       ).resolves.toMatchObject({ emailVerifiedAt: null });
@@ -357,7 +370,61 @@ describe('auth', () => {
       await expect(prisma.user.count({ where: { email: first.email } })).resolves.toBe(1);
       await expect(
         prisma.user.findUniqueOrThrow({ where: { id: first.body.user.id } }),
-      ).resolves.toMatchObject({ email: `${first.body.user.id}@released.invalid` });
+      ).resolves.toMatchObject({ email: releasedEmail(first.body.user.id) });
+    });
+
+    it('cannot be kept by registering the placeholder of the account in advance', async () => {
+      const first = await register();
+      await ageOf(first.body.user.id, EMAIL_VERIFICATION_TTL_MS + 60_000);
+      released.push(first.body.user.id);
+
+      // the only thing that could make the release collide with another account
+      for (const email of [releasedEmail(first.body.user.id), 'Anyone@Released.Invalid']) {
+        const refused = await registerAgain(email).expect(400);
+        expect(refused.body.code).toBe('VALIDATION_FAILED');
+      }
+      await registerAgain(first.email).expect(201);
+    });
+
+    it('ends a refresh token issued while the account was being released', async () => {
+      const first = await register();
+      await ageOf(first.body.user.id, EMAIL_VERIFICATION_TTL_MS + 60_000);
+      released.push(first.body.user.id);
+      await registerAgain(first.email).expect(201);
+
+      // what a login that read the account just before the release would have issued after it
+      const late = await app.get(RefreshTokenService).issue(first.body.user.id);
+      await refreshWith(late).expect(401);
+      await expect(
+        prisma.refreshToken.count({ where: { userId: first.body.user.id, revokedAt: null } }),
+      ).resolves.toBe(0);
+    });
+
+    it('never confirms an account that is being released, whichever of the two wins', async () => {
+      for (let round = 0; round < 4; round += 1) {
+        const first = await register();
+        const token = tokenOf(first.email);
+        await ageOf(first.body.user.id, EMAIL_VERIFICATION_TTL_MS + 60_000);
+        released.push(first.body.user.id);
+
+        const [confirmation, registration] = await Promise.all([
+          verify(token),
+          registerAgain(first.email),
+        ]);
+
+        const old = await prisma.user.findUniqueOrThrow({ where: { id: first.body.user.id } });
+        if (registration.status === 201) {
+          // released: the old account is not confirmed, and its address is the placeholder
+          expect(confirmation.status).toBe(400);
+          expect(old).toMatchObject({ email: releasedEmail(old.id), emailVerifiedAt: null });
+        } else {
+          // confirmed first: it keeps the address
+          expect(registration.status).toBe(409);
+          expect(confirmation.status).toBe(204);
+          expect(old.email).toBe(first.email);
+          expect(old.emailVerifiedAt).not.toBeNull();
+        }
+      }
     });
   });
 
